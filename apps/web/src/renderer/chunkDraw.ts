@@ -1,5 +1,5 @@
 import { Infra, Terrain, ZoneDensity, type BuildingRecord, type InfluenceLayer } from '@city/shared';
-import type { World } from '@city/simulation';
+import { Connection, connectionMask, type World } from '@city/simulation';
 import { Container, Sprite, type Graphics } from 'pixi.js';
 import { HEIGHT_STEP, tileLocalToScreen, tileQuad, vertexToScreen, type Point } from './iso';
 import {
@@ -33,7 +33,8 @@ export type OverlayMode =
   | 'police'
   | 'fireCover'
   | 'health'
-  | 'education';
+  | 'education'
+  | 'access';
 
 export interface DrawContext {
   world: World;
@@ -147,16 +148,12 @@ function skirt(g: Graphics, a: Point, b: Point, ha: number, hb: number): void {
   g.poly([a.x, a.y, b.x, b.y, b.x, b.y + depth + hb * HEIGHT_STEP, a.x, a.y + depth + ha * HEIGHT_STEP]).fill(SKIRT_COLOR);
 }
 
-function hasRoad(world: World, x: number, y: number): boolean {
-  return world.inBounds(x, y) && world.hasInfra(world.index(x, y), Infra.Road);
-}
-
 function drawRoad(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point, Point, Point, Point], bridge: boolean): void {
-  const w = ctx.world;
-  const north = hasRoad(w, x, y - 1);
-  const east = hasRoad(w, x + 1, y);
-  const south = hasRoad(w, x, y + 1);
-  const west = hasRoad(w, x - 1, y);
+  const mask = connectionMask(ctx.world, x, y, Infra.Road);
+  const north = (mask & Connection.North) !== 0;
+  const east = (mask & Connection.East) !== 0;
+  const south = (mask & Connection.South) !== 0;
+  const west = (mask & Connection.West) !== 0;
   const base = bridge ? BRIDGE_COLOR : ROAD_COLOR;
   const lo = 0.22;
   const hi = 0.78;
@@ -191,14 +188,14 @@ function drawRoad(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point
 function drawPipe(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point, Point, Point, Point]): void {
   const w = ctx.world;
   const c = tileLocalToScreen(q, 0.5, 0.5);
-  const pipeAt = (nx: number, ny: number) => w.inBounds(nx, ny) && w.hasInfra(w.index(nx, ny), Infra.Pipe);
+  const mask = connectionMask(w, x, y, Infra.Pipe);
   const watered = w.watered[w.index(x, y)] === 1;
   const color = watered ? PIPE_COLOR : 0x8090a0;
   const links: Array<[boolean, number, number]> = [
-    [pipeAt(x, y - 1), 0.5, 0],
-    [pipeAt(x + 1, y), 1, 0.5],
-    [pipeAt(x, y + 1), 0.5, 1],
-    [pipeAt(x - 1, y), 0, 0.5],
+    [(mask & Connection.North) !== 0, 0.5, 0],
+    [(mask & Connection.East) !== 0, 1, 0.5],
+    [(mask & Connection.South) !== 0, 0.5, 1],
+    [(mask & Connection.West) !== 0, 0, 0.5],
   ];
   let any = false;
   for (const [on, u, v] of links) {
@@ -304,9 +301,10 @@ const OVERLAY_LAYER: Partial<Record<OverlayMode, InfluenceLayer>> = {
   fireCover: 'fireCover',
   health: 'health',
   education: 'education',
+  access: 'access',
 };
 
-const GOOD_OVERLAYS = new Set<OverlayMode>(['landValue', 'police', 'fireCover', 'health', 'education']);
+const GOOD_OVERLAYS = new Set<OverlayMode>(['landValue', 'police', 'fireCover', 'health', 'education', 'access']);
 
 export function drawOverlay(g: Graphics, ctx: DrawContext, area: ChunkArea): void {
   const mode = ctx.overlay;

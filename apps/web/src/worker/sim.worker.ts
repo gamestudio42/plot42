@@ -144,8 +144,8 @@ scope.onmessage = (event) => {
       case 'command': {
         if (!engine) throw new Error('No city loaded');
         const result = engine.execute(message.command);
-        post({ type: 'commandResult', id: message.id, result });
         publish();
+        post({ type: 'commandResult', id: message.id, result });
         break;
       }
       case 'setSpeed':

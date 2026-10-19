@@ -30,6 +30,23 @@ export type PolicyCommand =
 
 export type Command = ToolCommand | PolicyCommand;
 
+export type ToolType = ToolCommand['type'];
+
+const TOOL_TYPES: ReadonlySet<string> = new Set<ToolType>([
+  'road',
+  'powerLine',
+  'pipe',
+  'zone',
+  'demolish',
+  'level',
+  'plantTrees',
+  'place',
+]);
+
+export function isToolCommand(command: Command): command is ToolCommand {
+  return TOOL_TYPES.has(command.type);
+}
+
 export const RejectReason = {
   OutOfBounds: 'OUT_OF_BOUNDS',
   Water: 'WATER',

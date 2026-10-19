@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatMoney, t } from './i18n/pt-BR';
 import { GameSession } from './state/session';
 import { useStore } from './state/store';
+import { Toasts } from './ui/Toasts';
+import { Toolbar } from './ui/Toolbar';
+import { ToolTooltip } from './ui/ToolTooltip';
 
 export function App() {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -25,7 +29,14 @@ export function App() {
   return (
     <div className="app">
       <div ref={hostRef} className="viewport" />
-      {session && <TileReadout session={session} />}
+      {session && (
+        <>
+          <Toolbar session={session} />
+          <TileReadout session={session} />
+          <ToolTooltip session={session} />
+          <Toasts session={session} />
+        </>
+      )}
     </div>
   );
 }
@@ -33,10 +44,16 @@ export function App() {
 function TileReadout({ session }: { session: GameSession }) {
   const hover = useStore(session.ui, (s) => s.hover);
   const selected = useStore(session.ui, (s) => s.selected);
+  const funds = useStore(session.ui, (s) => s.stats?.funds ?? 0);
   return (
     <div className="readout" data-testid="readout">
-      <span>Cursor: {hover ? `${hover.x}, ${hover.y}` : '—'}</span>
-      <span data-testid="selected-tile">Selecionado: {selected ? `${selected.x}, ${selected.y}` : '—'}</span>
+      <span data-testid="funds">{formatMoney(funds)}</span>
+      <span>
+        {t.ui.cursor}: {hover ? `${hover.x}, ${hover.y}` : t.ui.none}
+      </span>
+      <span data-testid="selected-tile">
+        {t.ui.selected}: {selected ? `${selected.x}, ${selected.y}` : t.ui.none}
+      </span>
     </div>
   );
 }

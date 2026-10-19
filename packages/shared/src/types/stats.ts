@@ -19,11 +19,15 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export interface MonthlyReport {
   revenue: RciValues;
   expenses: Record<ExpenseCategory, number>;
+  /** One-off construction spending during the month (not part of `net`). */
+  construction: number;
   net: number;
 }
 
 export interface EconomyState {
   funds: number;
+  /** Construction spending accumulated since the last monthly report. */
+  constructionThisMonth: number;
   taxes: RciValues;
   funding: Record<Department, number>;
   lastMonth: MonthlyReport;

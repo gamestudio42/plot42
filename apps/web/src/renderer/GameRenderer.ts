@@ -25,8 +25,14 @@ interface Chunk {
 export interface HighlightTile {
   x: number;
   y: number;
-  ok: boolean;
+  state: 'ok' | 'bad' | 'neutral';
 }
+
+const HIGHLIGHT_COLORS = {
+  ok: { fill: 0x60e070, stroke: 0xa0ffb0 },
+  bad: { fill: 0xe05050, stroke: 0xff9090 },
+  neutral: { fill: 0xc0c8d0, stroke: 0xe8eef6 },
+} as const;
 
 export interface RendererInput {
   /** Called with tile coordinates (or null) on left-button events. */
@@ -57,6 +63,7 @@ export class GameRenderer {
   private highlightDirty = false;
   private input: RendererInput = {};
   private panning: { x: number; y: number } | null = null;
+  private readonly listeners = new AbortController();
   private readonly keys = new Set<string>();
   private initialized = false;
   private destroyed = false;
@@ -237,6 +244,7 @@ export class GameRenderer {
 
   destroy(): void {
     this.destroyed = true;
+    this.listeners.abort();
     if (this.initialized) this.app.destroy(true, { children: true });
   }
 
@@ -333,9 +341,10 @@ export class GameRenderer {
     if (!world) return;
     for (const t of this.highlightTiles) {
       if (!world.inBounds(t.x, t.y)) continue;
-      const q = tileQuad(world, t.x, t.y);
-      g.poly(q.flatMap((p) => [p.x, p.y])).fill({ color: t.ok ? 0x60e070 : 0xe05050, alpha: 0.35 });
-      g.poly(q.flatMap((p) => [p.x, p.y])).stroke({ width: 1.5, color: t.ok ? 0xa0ffb0 : 0xff9090, alpha: 0.9 });
+      const q = tileQuad(world, t.x, t.y).flatMap((p) => [p.x, p.y]);
+      const colors = HIGHLIGHT_COLORS[t.state];
+      g.poly(q).fill({ color: colors.fill, alpha: t.state === 'neutral' ? 0.2 : 0.35 });
+      g.poly(q).stroke({ width: 1.5, color: colors.stroke, alpha: 0.9 });
     }
     if (this.hoverTile && world.inBounds(this.hoverTile.x, this.hoverTile.y)) {
       const q = tileQuad(world, this.hoverTile.x, this.hoverTile.y);
@@ -392,12 +401,19 @@ export class GameRenderer {
       },
       { passive: false },
     );
-    window.addEventListener('keydown', (e) => {
-      if (isTyping(e)) return;
-      this.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+    const signal = this.listeners.signal;
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (isTyping(e) || e.ctrlKey || e.metaKey) return;
+        this.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+      },
+      { signal },
+    );
+    window.addEventListener('keyup', (e) => this.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key), {
+      signal,
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => this.keys.clear(), { signal });
   }
 
   private applyKeyboardPan(): void {

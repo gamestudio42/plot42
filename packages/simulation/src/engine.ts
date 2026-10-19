@@ -3,9 +3,12 @@ import {
   DEPARTMENTS,
   EXPENSE_CATEGORIES,
   type ActiveDisaster,
+  isToolCommand,
   type CityStats,
   type Command,
+  type CommandPreview,
   type CommandResult,
+  type DisasterKind,
   type EconomyState,
   type EngineSnapshot,
   type HistoryEntry,
@@ -14,7 +17,11 @@ import {
   type RciValues,
   type SimEvent,
   type TerrainOptions,
+  type ToolCommand,
 } from '@city/shared';
+import { applyToolPlan } from './commands/apply';
+import { planToolCommand, type PlanContext } from './commands/plan';
+import { applyPolicyCommand } from './commands/policy';
 import { Rng } from './rng/rng';
 import { DEFAULT_TERRAIN, generateTerrain } from './terrain/generate';
 import { World } from './world/world';
@@ -46,6 +53,7 @@ export function emptyReport(): MonthlyReport {
   return {
     revenue: { residential: 0, commercial: 0, industrial: 0 },
     expenses: Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c, 0])) as MonthlyReport['expenses'],
+    construction: 0,
     net: 0,
   };
 }
@@ -54,6 +62,7 @@ export function defaultEconomy(): EconomyState {
   const tax = BALANCE.economy.taxDefault;
   return {
     funds: BALANCE.startingFunds,
+    constructionThisMonth: 0,
     taxes: { residential: tax, commercial: tax, industrial: tax },
     funding: Object.fromEntries(DEPARTMENTS.map((d) => [d, 100])) as EconomyState['funding'],
     lastMonth: emptyReport(),
@@ -220,8 +229,38 @@ export class SimulationEngine {
     };
   }
 
-  private apply(_command: Command): CommandResult {
-    return { ok: false, cost: 0, applied: 0, skipped: 0, reason: 'INVALID' };
+  /** Validates a tool command against the current state without applying it. */
+  preview(command: ToolCommand): CommandPreview {
+    const { ok, cost, valid, invalid, reason } = planToolCommand(this.planContext(), command);
+    return reason ? { ok, cost, valid, invalid, reason } : { ok, cost, valid, invalid };
+  }
+
+  planContext(): PlanContext {
+    return {
+      world: this.world,
+      building: (id) => this.buildings.get(id),
+      funds: this.economy.funds,
+      bankrupt: this.economy.bankrupt,
+    };
+  }
+
+  /** Starts a disaster on demand. Returns false when the disaster cannot start. */
+  triggerDisaster(_kind: DisasterKind, _x?: number, _y?: number): boolean {
+    return false;
+  }
+
+  private apply(command: Command): CommandResult {
+    if (!isToolCommand(command)) return applyPolicyCommand(this, command);
+    const plan = planToolCommand(this.planContext(), command);
+    if (plan.ok) applyToolPlan(this, command, plan);
+    const result: CommandResult = {
+      ok: plan.ok,
+      cost: plan.ok ? plan.cost : 0,
+      applied: plan.ok ? plan.valid.length : 0,
+      skipped: plan.invalid.length,
+    };
+    if (plan.reason) result.reason = plan.reason;
+    return result;
   }
 }
 

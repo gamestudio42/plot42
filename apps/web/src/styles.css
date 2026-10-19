@@ -44,9 +44,128 @@ body,
   touch-action: none;
 }
 
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.toolbar {
+  position: absolute;
+  left: 10px;
+  top: 64px;
+  bottom: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  scrollbar-width: thin;
+}
+
+.tool-group {
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  gap: 3px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.tool-group:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.tool-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tool-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tool-button.active {
+  background: rgba(240, 180, 41, 0.22);
+  border-color: var(--accent);
+}
+
+.tool-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tool-tooltip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  padding: 5px 9px;
+  max-width: 260px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tool-tooltip.bad {
+  border-color: var(--bad);
+}
+
+.tool-tooltip-title {
+  font-weight: 600;
+}
+
+.tool-tooltip-reason {
+  color: var(--bad);
+  white-space: normal;
+}
+
+.toasts {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.toast.error {
+  border-left-color: var(--bad);
+}
+
+.toast.info {
+  border-left-color: var(--good);
+}
+
 .readout {
   position: absolute;
-  left: 12px;
+  right: 12px;
   bottom: 12px;
   display: flex;
   gap: 16px;

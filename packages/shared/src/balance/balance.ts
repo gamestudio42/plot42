@@ -78,6 +78,7 @@ export const BALANCE = {
     zoneLight: 5,
     zoneDense: 10,
     clearTrees: 2,
+    plantTree: 3,
     demolishTile: 1,
     demolishPerLevel: 5,
     levelPerUnit: 5,

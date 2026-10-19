@@ -1,4 +1,6 @@
 export { GAME_NAME } from '@city/shared';
+export { planToolCommand, DemolishOp, type PlanContext, type ToolPlan } from './commands/plan';
+export { lPath, normalizeArea, rectTiles } from './commands/shapes';
 export { createEngine, SimulationEngine, type EngineOptions, type LoggedCommand, type System } from './engine';
 export { hashSnapshot, hashState, hashTerrain } from './persistence/hash';
 export { Rng, type RngState } from './rng/rng';
@@ -6,4 +8,6 @@ export { DEFAULT_TERRAIN, generateTerrain, relaxSlopes } from './terrain/generat
 export { FractalNoise, ValueNoise } from './terrain/noise';
 export { dateOf, monthIndex, START_YEAR, type CityDate } from './time';
 export { BuildingStore } from './world/buildings';
+export { Connection, connectionMask } from './world/connections';
+export { tileVariant } from './world/variant';
 export { World } from './world/world';

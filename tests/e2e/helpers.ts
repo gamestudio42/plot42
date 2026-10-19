@@ -17,10 +17,33 @@ export async function startCity(page: Page, seed = 'e2e'): Promise<void> {
   await waitForCity(page);
 }
 
-export async function clientPointOf(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
-  await page.evaluate(([tx, ty]) => window.__cityDebug?.centerOnTile(tx as number, ty as number), [x, y]);
-  await page.waitForTimeout(100);
+export async function clientPointOf(page: Page, x: number, y: number, center = true): Promise<{ x: number; y: number }> {
+  if (center) {
+    await page.evaluate(([tx, ty]) => window.__cityDebug?.centerOnTile(tx as number, ty as number), [x, y]);
+    await page.waitForTimeout(100);
+  }
   const point = await page.evaluate(([tx, ty]) => window.__cityDebug?.tileToClient(tx as number, ty as number), [x, y]);
   expect(point).toBeTruthy();
   return point as { x: number; y: number };
+}
+
+/** Drags with the left button from one tile to another (camera must already show both). */
+export async function dragTiles(page: Page, from: [number, number], to: [number, number]): Promise<void> {
+  const a = await clientPointOf(page, from[0], from[1], false);
+  const b = await clientPointOf(page, to[0], to[1], false);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+}
+
+export async function clickTile(page: Page, x: number, y: number): Promise<void> {
+  const p = await clientPointOf(page, x, y, false);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(150);
+}
+
+export async function tile(page: Page, x: number, y: number) {
+  return page.evaluate(([tx, ty]) => window.__cityDebug?.getTile(tx as number, ty as number), [x, y]);
 }
