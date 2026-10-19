@@ -15,15 +15,24 @@ export class Camera {
 
   apply(root: Container): void {
     root.scale.set(this.zoom);
-    root.position.set(Math.round(this.viewWidth / 2 - this.x * this.zoom), Math.round(this.viewHeight / 2 - this.y * this.zoom));
+    root.position.set(
+      Math.round(this.viewWidth / 2 - this.x * this.zoom),
+      Math.round(this.viewHeight / 2 - this.y * this.zoom),
+    );
   }
 
   screenToWorld(sx: number, sy: number): Point {
-    return { x: (sx - this.viewWidth / 2) / this.zoom + this.x, y: (sy - this.viewHeight / 2) / this.zoom + this.y };
+    return {
+      x: (sx - this.viewWidth / 2) / this.zoom + this.x,
+      y: (sy - this.viewHeight / 2) / this.zoom + this.y,
+    };
   }
 
   worldToScreen(wx: number, wy: number): Point {
-    return { x: (wx - this.x) * this.zoom + this.viewWidth / 2, y: (wy - this.y) * this.zoom + this.viewHeight / 2 };
+    return {
+      x: (wx - this.x) * this.zoom + this.viewWidth / 2,
+      y: (wy - this.y) * this.zoom + this.viewHeight / 2,
+    };
   }
 
   pan(dxScreen: number, dyScreen: number): void {
@@ -50,7 +59,12 @@ export class Camera {
   /** Visible world rectangle. */
   visibleRect(): { x: number; y: number; width: number; height: number } {
     const tl = this.screenToWorld(0, 0);
-    return { x: tl.x, y: tl.y, width: this.viewWidth / this.zoom, height: this.viewHeight / this.zoom };
+    return {
+      x: tl.x,
+      y: tl.y,
+      width: this.viewWidth / this.zoom,
+      height: this.viewHeight / this.zoom,
+    };
   }
 
   private clamp(): void {

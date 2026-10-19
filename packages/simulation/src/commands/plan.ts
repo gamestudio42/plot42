@@ -119,14 +119,18 @@ export function planToolCommand(ctx: PlanContext, command: ToolCommand): ToolPla
       forTiles(ctx.world, lPath(command), plan, (i) => planPipe(ctx, i, plan));
       break;
     case 'zone':
-      forTiles(ctx.world, rectTiles(command), plan, (i) => planZone(ctx, i, command.zone, command.density, plan));
+      forTiles(ctx.world, rectTiles(command), plan, (i) =>
+        planZone(ctx, i, command.zone, command.density, plan),
+      );
       break;
     case 'plantTrees':
       forTiles(ctx.world, rectTiles(command), plan, (i) => planTrees(ctx, i, plan));
       break;
     case 'demolish': {
       const seen = new Set<number>();
-      forTiles(ctx.world, rectTiles(command), plan, (i) => planDemolish(ctx, i, command.underground === true, seen, plan));
+      forTiles(ctx.world, rectTiles(command), plan, (i) =>
+        planDemolish(ctx, i, command.underground === true, seen, plan),
+      );
       break;
     }
     case 'place':
@@ -139,7 +143,12 @@ export function planToolCommand(ctx: PlanContext, command: ToolCommand): ToolPla
   return plan.finish(ctx);
 }
 
-function forTiles(world: World, tiles: Array<[number, number]>, plan: PlanBuilder, fn: (i: number) => void): void {
+function forTiles(
+  world: World,
+  tiles: Array<[number, number]>,
+  plan: PlanBuilder,
+  fn: (i: number) => void,
+): void {
   for (const [x, y] of tiles) {
     if (!world.inBounds(x, y)) {
       plan.outOfBounds++;
@@ -171,7 +180,11 @@ function planPowerLine(ctx: PlanContext, i: number, plan: PlanBuilder): void {
   const w = ctx.world;
   if ((w.fire[i] as number) > 0) return plan.reject(i, RejectReason.OnFire);
   // Zones and buildings already conduct power.
-  if (w.hasInfra(i, Infra.PowerLine) || (w.buildingId[i] as number) !== 0 || (w.zone[i] as number) !== ZoneType.None) {
+  if (
+    w.hasInfra(i, Infra.PowerLine) ||
+    (w.buildingId[i] as number) !== 0 ||
+    (w.zone[i] as number) !== ZoneType.None
+  ) {
     return plan.reject(i, RejectReason.AlreadyBuilt);
   }
   if (w.hasInfra(i, Infra.Rubble)) return plan.reject(i, RejectReason.Rubble);
@@ -185,7 +198,13 @@ function planPipe(ctx: PlanContext, i: number, plan: PlanBuilder): void {
   plan.accept(i, BALANCE.costs.pipe);
 }
 
-function planZone(ctx: PlanContext, i: number, zone: ZoneType, density: ZoneDensity, plan: PlanBuilder): void {
+function planZone(
+  ctx: PlanContext,
+  i: number,
+  zone: ZoneType,
+  density: ZoneDensity,
+  plan: PlanBuilder,
+): void {
   const w = ctx.world;
   const current = w.zone[i] as ZoneType;
   const id = w.buildingId[i] as number;
@@ -198,7 +217,8 @@ function planZone(ctx: PlanContext, i: number, zone: ZoneType, density: ZoneDens
   if (w.isWater(i) || (w.flood[i] as number) > 0) return plan.reject(i, RejectReason.Water);
   if (w.hasInfra(i, Infra.Rubble)) return plan.reject(i, RejectReason.Rubble);
   if (w.hasInfra(i, Infra.Road | Infra.PowerLine)) return plan.reject(i, RejectReason.Occupied);
-  const zoneCost = density === ZoneDensity.Dense ? BALANCE.costs.zoneDense : BALANCE.costs.zoneLight;
+  const zoneCost =
+    density === ZoneDensity.Dense ? BALANCE.costs.zoneDense : BALANCE.costs.zoneLight;
   if (id !== 0) {
     const b = ctx.building(id);
     if (!b || !isZoneKind(b.kind) || current !== zone) return plan.reject(i, RejectReason.Occupied);
@@ -208,7 +228,8 @@ function planZone(ctx: PlanContext, i: number, zone: ZoneType, density: ZoneDens
     }
     return plan.accept(i, zoneCost);
   }
-  if (current === zone && (w.zoneDensity[i] as number) === density) return plan.reject(i, RejectReason.AlreadyBuilt);
+  if (current === zone && (w.zoneDensity[i] as number) === density)
+    return plan.reject(i, RejectReason.AlreadyBuilt);
   if (!w.isFlat(w.xOf(i), w.yOf(i))) return plan.reject(i, RejectReason.Slope);
   plan.accept(i, zoneCost + treeCost(w, i));
 }
@@ -217,14 +238,24 @@ function planTrees(ctx: PlanContext, i: number, plan: PlanBuilder): void {
   const w = ctx.world;
   if ((w.fire[i] as number) > 0) return plan.reject(i, RejectReason.OnFire);
   if (w.isWater(i) || (w.flood[i] as number) > 0) return plan.reject(i, RejectReason.Water);
-  if ((w.buildingId[i] as number) !== 0 || (w.zone[i] as number) !== ZoneType.None || w.hasInfra(i, SURFACE_BLOCKERS)) {
+  if (
+    (w.buildingId[i] as number) !== 0 ||
+    (w.zone[i] as number) !== ZoneType.None ||
+    w.hasInfra(i, SURFACE_BLOCKERS)
+  ) {
     return plan.reject(i, RejectReason.Occupied);
   }
   if ((w.trees[i] as number) >= 3) return plan.reject(i, RejectReason.AlreadyBuilt);
   plan.accept(i, BALANCE.costs.plantTree);
 }
 
-function planDemolish(ctx: PlanContext, i: number, underground: boolean, seen: Set<number>, plan: PlanBuilder): void {
+function planDemolish(
+  ctx: PlanContext,
+  i: number,
+  underground: boolean,
+  seen: Set<number>,
+  plan: PlanBuilder,
+): void {
   const w = ctx.world;
   if (seen.has(i)) return;
   if (underground) {
@@ -236,7 +267,8 @@ function planDemolish(ctx: PlanContext, i: number, underground: boolean, seen: S
     const b = ctx.building(id);
     if (!b) return plan.reject(i, RejectReason.Invalid);
     const footprint = footprintOf(w, b);
-    if (footprint.some((t) => (w.fire[t] as number) > 0)) return plan.reject(i, RejectReason.OnFire);
+    if (footprint.some((t) => (w.fire[t] as number) > 0))
+      return plan.reject(i, RejectReason.OnFire);
     let cost = BALANCE.costs.demolishTile * footprint.length;
     if (isZoneKind(b.kind)) cost += BALANCE.costs.demolishPerLevel * b.level;
     plan.removeBuildings.push(id);
@@ -247,18 +279,26 @@ function planDemolish(ctx: PlanContext, i: number, underground: boolean, seen: S
     return;
   }
   if ((w.fire[i] as number) > 0) return plan.reject(i, RejectReason.OnFire);
-  if (w.hasInfra(i, SURFACE_BLOCKERS)) return plan.accept(i, BALANCE.costs.demolishTile, DemolishOp.Surface);
+  if (w.hasInfra(i, SURFACE_BLOCKERS))
+    return plan.accept(i, BALANCE.costs.demolishTile, DemolishOp.Surface);
   if ((w.zone[i] as number) !== ZoneType.None) return plan.accept(i, 0, DemolishOp.Zone);
   if ((w.trees[i] as number) > 0) return plan.accept(i, BALANCE.costs.clearTrees, DemolishOp.Trees);
 }
 
 function footprintOf(world: World, b: BuildingRecord): number[] {
   const out: number[] = [];
-  for (let dy = 0; dy < b.h; dy++) for (let dx = 0; dx < b.w; dx++) out.push(world.index(b.x + dx, b.y + dy));
+  for (let dy = 0; dy < b.h; dy++)
+    for (let dx = 0; dx < b.w; dx++) out.push(world.index(b.x + dx, b.y + dy));
   return out;
 }
 
-function planPlace(ctx: PlanContext, kind: PlaceableKind, x0: number, y0: number, plan: PlanBuilder): void {
+function planPlace(
+  ctx: PlanContext,
+  kind: PlaceableKind,
+  x0: number,
+  y0: number,
+  plan: PlanBuilder,
+): void {
   const w = ctx.world;
   const spec = PLACEABLE_SPECS[kind];
   plan.atomic = true;
@@ -277,7 +317,8 @@ function planPlace(ctx: PlanContext, kind: PlaceableKind, x0: number, y0: number
       else if (w.hasInfra(i, Infra.Rubble)) plan.reject(i, RejectReason.Rubble);
       else if ((w.buildingId[i] as number) !== 0 || w.hasInfra(i, Infra.Road | Infra.PowerLine)) {
         plan.reject(i, RejectReason.Occupied);
-      } else if (!w.isFlat(x, y) || w.elevation(x, y) !== h0) plan.reject(i, RejectReason.NotFlatFootprint);
+      } else if (!w.isFlat(x, y) || w.elevation(x, y) !== h0)
+        plan.reject(i, RejectReason.NotFlatFootprint);
       else {
         plan.valid.push(i);
         cost += treeCost(w, i);
@@ -322,7 +363,12 @@ function planLevel(ctx: PlanContext, area: Area, plan: PlanBuilder): void {
     const h = heightOf(v);
     const vx = v % vs;
     const vy = (v / vs) | 0;
-    const neighbors = [vx > 0 ? v - 1 : -1, vx < vs - 1 ? v + 1 : -1, vy > 0 ? v - vs : -1, vy < vs - 1 ? v + vs : -1];
+    const neighbors = [
+      vx > 0 ? v - 1 : -1,
+      vx < vs - 1 ? v + 1 : -1,
+      vy > 0 ? v - vs : -1,
+      vy < vs - 1 ? v + vs : -1,
+    ];
     for (const n of neighbors) {
       if (n < 0) continue;
       const hn = heightOf(n);
@@ -351,7 +397,11 @@ function planLevel(ctx: PlanContext, area: Area, plan: PlanBuilder): void {
     }
   }
   for (const i of [...affected].sort((a, b) => a - b)) {
-    if ((w.buildingId[i] as number) !== 0 || w.hasInfra(i, SURFACE_BLOCKERS) || (w.fire[i] as number) > 0) {
+    if (
+      (w.buildingId[i] as number) !== 0 ||
+      w.hasInfra(i, SURFACE_BLOCKERS) ||
+      (w.fire[i] as number) > 0
+    ) {
       plan.reject(i, RejectReason.LevelAffectsConstruction);
     } else if ((w.zone[i] as number) !== ZoneType.None && !isFlatAfter(w, i, heightOf)) {
       plan.reject(i, RejectReason.LevelAffectsConstruction);

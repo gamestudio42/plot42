@@ -2,7 +2,15 @@ import { BALANCE, type BuildingRecord } from '@city/shared';
 import type { World } from '@city/simulation';
 import { Application, Container, Graphics } from 'pixi.js';
 import { Camera } from './camera';
-import { buildObjects, drawGround, drawOverlay, drawWires, type ChunkArea, type DrawContext, type OverlayMode } from './chunkDraw';
+import {
+  buildObjects,
+  drawGround,
+  drawOverlay,
+  drawWires,
+  type ChunkArea,
+  type DrawContext,
+  type OverlayMode,
+} from './chunkDraw';
 import { HEIGHT_STEP, pickTile, tileCenter, tileQuad, vertexToScreen, type Point } from './iso';
 import { SpriteFactory } from './sprites';
 
@@ -146,7 +154,12 @@ export class GameRenderer {
     const left = vertexToScreen(0, world.size, 0);
     const right = vertexToScreen(world.size, 0, 0);
     const bottom = vertexToScreen(world.size, world.size, 0);
-    this.camera.bounds = { minX: left.x, maxX: right.x, minY: -BALANCE.map.maxHeight * HEIGHT_STEP, maxY: bottom.y };
+    this.camera.bounds = {
+      minX: left.x,
+      maxX: right.x,
+      minY: -BALANCE.map.maxHeight * HEIGHT_STEP,
+      maxY: bottom.y,
+    };
     this.camera.viewWidth = this.app.screen.width;
     this.camera.viewHeight = this.app.screen.height;
     const centre = tileCenter(world, Math.floor(world.size / 2), Math.floor(world.size / 2));
@@ -250,7 +263,8 @@ export class GameRenderer {
 
   private markChunkAt(x: number, y: number): void {
     if (!this.world || x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return;
-    const c = this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerSide + Math.floor(x / CHUNK_SIZE)];
+    const c =
+      this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerSide + Math.floor(x / CHUNK_SIZE)];
     if (c) {
       c.dirty = true;
       c.overlayDirty = true;
@@ -265,7 +279,12 @@ export class GameRenderer {
     const top = vertexToScreen(x0, y0, 0);
     const bottom = vertexToScreen(x1, y1, 0);
     const margin = BALANCE.map.maxHeight * HEIGHT_STEP + 160;
-    c.bounds = { x: left.x - 8, y: top.y - margin, width: right.x - left.x + 16, height: bottom.y - top.y + margin + 40 };
+    c.bounds = {
+      x: left.x - 8,
+      y: top.y - margin,
+      width: right.x - left.x + 16,
+      height: bottom.y - top.y + margin + 40,
+    };
   }
 
   private context(): DrawContext | null {
@@ -353,7 +372,10 @@ export class GameRenderer {
   }
 
   private setHover(tile: Point | null): void {
-    const same = tile && this.hoverTile ? tile.x === this.hoverTile.x && tile.y === this.hoverTile.y : tile === this.hoverTile;
+    const same =
+      tile && this.hoverTile
+        ? tile.x === this.hoverTile.x && tile.y === this.hoverTile.y
+        : tile === this.hoverTile;
     if (same) return;
     this.hoverTile = tile;
     this.highlightDirty = true;
@@ -396,7 +418,11 @@ export class GameRenderer {
       (e) => {
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
-        this.camera.zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - rect.left, e.clientY - rect.top);
+        this.camera.zoomAt(
+          e.deltaY < 0 ? 1.15 : 1 / 1.15,
+          e.clientX - rect.left,
+          e.clientY - rect.top,
+        );
         this.input.onCamera?.();
       },
       { passive: false },
@@ -410,9 +436,13 @@ export class GameRenderer {
       },
       { signal },
     );
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key), {
-      signal,
-    });
+    window.addEventListener(
+      'keyup',
+      (e) => this.keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key),
+      {
+        signal,
+      },
+    );
     window.addEventListener('blur', () => this.keys.clear(), { signal });
   }
 
@@ -432,7 +462,10 @@ export class GameRenderer {
   }
 }
 
-function intersects(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean {
+function intersects(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 

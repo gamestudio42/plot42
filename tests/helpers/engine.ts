@@ -3,11 +3,21 @@ import { createEngine, relaxSlopes, type SimulationEngine } from '@city/simulati
 
 /** Flat grass map without trees, water or hills. */
 export function flatEngine(size = 32, seed = 'test'): SimulationEngine {
-  return createEngine({ seed, size, terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 } });
+  return createEngine({
+    seed,
+    size,
+    terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 },
+  });
 }
 
 /** Turns a rectangle of tiles into water (all corners at height 0). */
-export function addWater(engine: SimulationEngine, x0: number, y0: number, x1: number, y1: number): void {
+export function addWater(
+  engine: SimulationEngine,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): void {
   const w = engine.world;
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) w.terrain[w.index(x, y)] = Terrain.Water;

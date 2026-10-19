@@ -51,7 +51,9 @@ export class CityClient {
   private initResolvers: Array<() => void> = [];
 
   constructor() {
-    this.worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
+      type: 'module',
+    });
     this.worker.onmessage = (event: MessageEvent<FromWorkerMessage>) => this.handle(event.data);
   }
 
@@ -69,7 +71,9 @@ export class CityClient {
   }
 
   command(command: Command): Promise<CommandResult> {
-    return this.request({ type: 'command', id: 0, command }, (m) => (m.type === 'commandResult' ? m.result : undefined));
+    return this.request({ type: 'command', id: 0, command }, (m) =>
+      m.type === 'commandResult' ? m.result : undefined,
+    );
   }
 
   setSpeed(speed: Speed): void {
@@ -81,7 +85,9 @@ export class CityClient {
   }
 
   snapshot(): Promise<EngineSnapshot> {
-    return this.request({ type: 'snapshot', id: 0 }, (m) => (m.type === 'snapshot' ? m.snapshot : undefined));
+    return this.request({ type: 'snapshot', id: 0 }, (m) =>
+      m.type === 'snapshot' ? m.snapshot : undefined,
+    );
   }
 
   hash(): Promise<string> {
@@ -99,7 +105,10 @@ export class CityClient {
     });
   }
 
-  private request<T>(message: ToWorkerMessage & { id: number }, pick: (m: FromWorkerMessage) => T | undefined): Promise<T> {
+  private request<T>(
+    message: ToWorkerMessage & { id: number },
+    pick: (m: FromWorkerMessage) => T | undefined,
+  ): Promise<T> {
     const id = this.nextId++;
     return new Promise<T>((resolve) => {
       this.pending.set(id, (m) => resolve(pick(m) as T));
@@ -111,7 +120,10 @@ export class CityClient {
     this.worker.postMessage(message);
   }
 
-  private emit<K extends keyof ClientListener>(key: K, ...args: Parameters<NonNullable<ClientListener[K]>>): void {
+  private emit<K extends keyof ClientListener>(
+    key: K,
+    ...args: Parameters<NonNullable<ClientListener[K]>>
+  ): void {
     for (const listener of this.listeners) {
       const fn = listener[key] as ((...a: unknown[]) => void) | undefined;
       fn?.apply(listener, args);
@@ -175,7 +187,8 @@ export class CityClient {
         const values = structure[name];
         for (let k = 0; k < indices.length; k++) target[indices[k] as number] = values[k] as number;
       }
-      for (let k = 0; k < indices.length; k++) world.buildingId[indices[k] as number] = buildingId[k] as number;
+      for (let k = 0; k < indices.length; k++)
+        world.buildingId[indices[k] as number] = buildingId[k] as number;
     }
     if (delta.influence) {
       for (const name of INFLUENCE_LAYERS) world.influence[name].set(delta.influence[name]);

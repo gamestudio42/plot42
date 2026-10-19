@@ -52,7 +52,10 @@ function fullState(e: SimulationEngine): FullState {
   };
 }
 
-function copyLayers<K extends string>(source: Record<K, Uint8Array>, names: readonly K[]): Record<K, Uint8Array> {
+function copyLayers<K extends string>(
+  source: Record<K, Uint8Array>,
+  names: readonly K[],
+): Record<K, Uint8Array> {
   const out = {} as Record<K, Uint8Array>;
   for (const name of names) out[name] = source[name].slice();
   return out;
@@ -72,7 +75,8 @@ function buildDelta(e: SimulationEngine): Delta {
       structure[name] = out;
     }
     const buildingId = new Int32Array(indices.length);
-    for (let k = 0; k < indices.length; k++) buildingId[k] = w.buildingId[indices[k] as number] as number;
+    for (let k = 0; k < indices.length; k++)
+      buildingId[k] = w.buildingId[indices[k] as number] as number;
     tiles = { indices, structure, buildingId };
   }
   let influence: Record<InfluenceLayer, Uint8Array> | null = null;

@@ -12,7 +12,11 @@ import { tileVariant } from '../world/variant';
 import { DemolishOp, type ToolPlan } from './plan';
 
 /** Applies a plan produced by `planToolCommand` for the same command and state. */
-export function applyToolPlan(engine: SimulationEngine, command: ToolCommand, plan: ToolPlan): void {
+export function applyToolPlan(
+  engine: SimulationEngine,
+  command: ToolCommand,
+  plan: ToolPlan,
+): void {
   const w = engine.world;
   switch (command.type) {
     case 'road':
@@ -33,7 +37,11 @@ export function applyToolPlan(engine: SimulationEngine, command: ToolCommand, pl
     case 'zone':
       for (const i of plan.valid) {
         w.setLayer('zone', i, command.zone);
-        w.setLayer('zoneDensity', i, command.zone === ZoneType.None ? ZoneDensity.None : command.density);
+        w.setLayer(
+          'zoneDensity',
+          i,
+          command.zone === ZoneType.None ? ZoneDensity.None : command.density,
+        );
         if (command.zone !== ZoneType.None) w.setLayer('trees', i, 0);
       }
       break;

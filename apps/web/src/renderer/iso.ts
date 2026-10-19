@@ -54,7 +54,8 @@ export function pointInPolygon(p: Point, poly: readonly Point[]): boolean {
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const a = poly[i] as Point;
     const b = poly[j] as Point;
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x)
+      inside = !inside;
   }
   return inside;
 }
@@ -63,7 +64,12 @@ export function pointInPolygon(p: Point, poly: readonly Point[]): boolean {
  * Finds the front-most tile whose (possibly sloped) quad contains the screen point.
  * Tries the inverse projection at every candidate height.
  */
-export function pickTile(source: HeightSource, sx: number, sy: number, maxHeight: number): Point | null {
+export function pickTile(
+  source: HeightSource,
+  sx: number,
+  sy: number,
+  maxHeight: number,
+): Point | null {
   let best: Point | null = null;
   let bestDepth = -Infinity;
   const tested = new Set<number>();

@@ -63,23 +63,41 @@ function def(
 }
 
 const placeDef = (kind: PlaceableKind, group: ToolGroup, hotkey?: string): ToolDef =>
-  def(kind, group, 'footprint', place(kind), { size: PLACEABLE_SPECS[kind].size, ...(hotkey ? { hotkey } : {}) });
+  def(kind, group, 'footprint', place(kind), {
+    size: PLACEABLE_SPECS[kind].size,
+    ...(hotkey ? { hotkey } : {}),
+  });
 
 export const TOOLS: readonly ToolDef[] = [
   def('select', 'inspect', 'none', () => null, { hotkey: 'q' }),
   def('road', 'transport', 'path', (a) => ({ type: 'road', ...a }), { hotkey: 'r' }),
-  def('zoneResLight', 'zones', 'rect', zone(ZoneType.Residential, ZoneDensity.Light), { hotkey: '1' }),
-  def('zoneResDense', 'zones', 'rect', zone(ZoneType.Residential, ZoneDensity.Dense), { hotkey: '2' }),
-  def('zoneComLight', 'zones', 'rect', zone(ZoneType.Commercial, ZoneDensity.Light), { hotkey: '3' }),
-  def('zoneComDense', 'zones', 'rect', zone(ZoneType.Commercial, ZoneDensity.Dense), { hotkey: '4' }),
-  def('zoneIndLight', 'zones', 'rect', zone(ZoneType.Industrial, ZoneDensity.Light), { hotkey: '5' }),
-  def('zoneIndDense', 'zones', 'rect', zone(ZoneType.Industrial, ZoneDensity.Dense), { hotkey: '6' }),
+  def('zoneResLight', 'zones', 'rect', zone(ZoneType.Residential, ZoneDensity.Light), {
+    hotkey: '1',
+  }),
+  def('zoneResDense', 'zones', 'rect', zone(ZoneType.Residential, ZoneDensity.Dense), {
+    hotkey: '2',
+  }),
+  def('zoneComLight', 'zones', 'rect', zone(ZoneType.Commercial, ZoneDensity.Light), {
+    hotkey: '3',
+  }),
+  def('zoneComDense', 'zones', 'rect', zone(ZoneType.Commercial, ZoneDensity.Dense), {
+    hotkey: '4',
+  }),
+  def('zoneIndLight', 'zones', 'rect', zone(ZoneType.Industrial, ZoneDensity.Light), {
+    hotkey: '5',
+  }),
+  def('zoneIndDense', 'zones', 'rect', zone(ZoneType.Industrial, ZoneDensity.Dense), {
+    hotkey: '6',
+  }),
   def('dezone', 'zones', 'rect', zone(ZoneType.None, ZoneDensity.None), { hotkey: '0' }),
   def('powerLine', 'utilities', 'path', (a) => ({ type: 'powerLine', ...a }), { hotkey: 'e' }),
   placeDef('coalPlant', 'utilities'),
   placeDef('gasPlant', 'utilities'),
   placeDef('windTurbine', 'utilities'),
-  def('pipe', 'utilities', 'path', (a) => ({ type: 'pipe', ...a }), { hotkey: 't', underground: true }),
+  def('pipe', 'utilities', 'path', (a) => ({ type: 'pipe', ...a }), {
+    hotkey: 't',
+    underground: true,
+  }),
   placeDef('waterPump', 'utilities'),
   placeDef('policeStation', 'services'),
   placeDef('fireStation', 'services'),
@@ -91,7 +109,14 @@ export const TOOLS: readonly ToolDef[] = [
   def('trees', 'terrain', 'rect', (a) => ({ type: 'plantTrees', ...a }), { hotkey: 'f' }),
 ];
 
-export const TOOL_GROUPS: readonly ToolGroup[] = ['inspect', 'transport', 'zones', 'utilities', 'services', 'terrain'];
+export const TOOL_GROUPS: readonly ToolGroup[] = [
+  'inspect',
+  'transport',
+  'zones',
+  'utilities',
+  'services',
+  'terrain',
+];
 
 const BY_ID = new Map(TOOLS.map((tool) => [tool.id, tool]));
 

@@ -21,8 +21,12 @@ describe('terrain generation', () => {
     for (let vy = 0; vy < vs; vy++) {
       for (let vx = 0; vx < vs; vx++) {
         const h = world.heights[vy * vs + vx] as number;
-        if (vx + 1 < vs) expect(Math.abs(h - (world.heights[vy * vs + vx + 1] as number))).toBeLessThanOrEqual(1);
-        if (vy + 1 < vs) expect(Math.abs(h - (world.heights[(vy + 1) * vs + vx] as number))).toBeLessThanOrEqual(1);
+        if (vx + 1 < vs)
+          expect(Math.abs(h - (world.heights[vy * vs + vx + 1] as number))).toBeLessThanOrEqual(1);
+        if (vy + 1 < vs)
+          expect(Math.abs(h - (world.heights[(vy + 1) * vs + vx] as number))).toBeLessThanOrEqual(
+            1,
+          );
       }
     }
   });

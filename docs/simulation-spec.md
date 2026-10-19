@@ -68,7 +68,8 @@ Residential (blueprint hypothesis `D_R = clamp(a1·J + a2·Q − a3·T − a4·H
 ```
 J  = clamp((Jc + Ji + EXTERNAL_JOBS − W) / max(W, 50), −1, 1)
 Q  = mean over developed residential tiles of (landValue − pollution − crime) / 255 − 0.15
-H  = (Hc − P) / max(Hc, 1)
+     (0 while no residential building exists)
+H  = max(0, (Hc − P) / max(Hc, 1) − 0.10)          (10% natural vacancy is tolerated)
 DR = clamp(0.7·J + 0.3·Q − 0.5·T(tR) − 0.6·H, −1, 1)
 ```
 
@@ -76,16 +77,20 @@ Commercial:
 
 ```
 labor  = clamp((W − (Jc + Ji)) / max(W, 20), −1, 1)
-market = (0.12·P + 0.05·Ji + 2 − Jc) / max(0.12·P + 0.05·Ji + 2, Jc, 10)
+market = (0.20·P + 0.05·Ji + 2 − Jc) / max(0.20·P + 0.05·Ji + 2, Jc, 10)
 DC     = clamp(0.8·market + 0.3·labor − 0.5·T(tC), −1, 1)
 ```
 
-Industrial (external market grows with the city; a road on the map edge adds a regional bonus):
+Industrial (external market grows with the city; a road on the map edge adds a regional bonus
+of 0.1):
 
 ```
-market = (30 + 0.18·P − Ji) / max(30 + 0.18·P, Ji, 10)
+market = (30 + 0.25·P − Ji) / max(30 + 0.25·P, Ji, 10)
 DI     = clamp(0.8·market·crisis + 0.4·labor − 0.5·T(tI) + edgeBonus, −1, 1)
 ```
+
+The per-capita market factors (0.20 and 0.25) are tuned so that a balanced city keeps roughly
+one job per resident in the workforce; lower values stall residential demand on `J`.
 
 Smoothing: `demand ← demand + 0.5 · (target − demand)` every month.
 
@@ -111,12 +116,13 @@ industrial  = 0.25·access + 0.20·transport + 0.20·power + 0.05·water + 0.10�
 Requirements for any development: road within 3 tiles and power.
 
 - **Empty zone:** if `D > 0`, spawn a level-1 building with probability `0.5 · D · A`.
-- **Occupancy:** target `= capacity · clamp(0.35 + 0.65·A + 0.5·D, 0, 1)` for residential;
-  job buildings use `capacity · clamp(laborRatio, 0, 1) · clamp(0.4 + 0.6·A, 0, 1)` with
-  `laborRatio = (W + 10) / max(Jc + Ji, 1)`. Occupancy moves 35% of the gap per month.
-  Without power or road the target is 0.
-- **Upgrade:** occupancy ≥ 90%, `D > 0.15`, `A ≥ threshold(level)` (0.30, 0.45, 0.55, 0.65)
-  and level below the cap: probability `0.25 · D`.
+- **Occupancy:** target `= capacity · clamp(0.6 + 0.4·A + 0.5·D, 0, 1) · epidemic` for
+  residential; job buildings use `capacity · clamp(laborRatio, 0, 1) · clamp(0.6 + 0.4·A, 0, 1)`
+  with `laborRatio = (W + 10) / max(Jc + Ji, 1)`. Occupancy moves 35% of the gap per month
+  (rounded away from zero, so it always converges). Without power or road the target is 0.
+- **Upgrade:** occupancy ≥ 80%, `D > 0.02`, `A ≥ threshold(level)` (0.30, 0.45, 0.55, 0.65)
+  and level below the cap: probability `0.25 · clamp(0.3 + 2·D, 0, 1)`. The bias keeps
+  growing cities densifying while demand hovers near zero.
 - **Downgrade:** occupancy < 30%, `D < −0.2`, level > 1: probability 0.2.
 - **Decay:** condition −10 per month when `A < 0.15`, unpowered or without road; +5 otherwise.
   Condition 0, or six months empty, abandons the building.
@@ -126,11 +132,16 @@ Requirements for any development: road within 3 tiles and power.
 ## 7. Roads, accessibility and traffic, monthly
 
 1. Road tiles form a graph with orthogonal edges; connected components are labelled by BFS.
-2. Each tile gets an access road: the first road found within Chebyshev distance 3, scanning
-   rings in a fixed order.
+2. Each tile gets an access road: a multi-source BFS over the 8-neighbourhood starting from
+   all road tiles in index order, limited to Chebyshev distance 3. Ties go to the road reached
+   first, which keeps the result deterministic. Roads are recomputed lazily, only when the
+   world's `roadVersion` changes.
 3. Per component: residents, workforce, commercial and industrial jobs, edge connection.
+   A component touching the map edge counts as a source of external jobs and workers (the
+   neighbouring region), so edge roads also seed the Dijkstra below.
 4. Multi-source Dijkstra from job sites (C and I access roads) and from homes (R access roads).
-   Edge cost `1 + 2 · max(0, congestion − 0.6)²` using last month's congestion.
+   Edge cost `1 + 2 · max(0, congestion − 0.6)²` using last month's congestion. Ties are broken
+   by tile index.
 5. Distance decay: `1` up to 15 road tiles, linear to 0 at 50.
 6. Access values:
    - R: `clamp((jobs + external) / max(workforce, 1)) · decay(distance to jobs)`
@@ -146,12 +157,19 @@ Requirements for any development: road within 3 tiles and power.
 
 Conductors:
 
-- Power: power lines, building footprints and zoned tiles.
+- Power: power lines, building footprints and zoned tiles. Laying a power line on a zone or a
+  building is refused with `ALREADY_BUILT`, because those tiles already conduct.
 - Water: pipes and building footprints. Pumps only run when powered.
+- Conduction jumps over a single plain road tile between two conductors (a road with no line
+  or pipe on it). This mirrors the classic behaviour where a street between two blocks does
+  not break the grid; two or more road tiles in a row do.
+- Empty zoned tiles orthogonally adjacent to a watered tile are marked watered, so a growing
+  block can draw water before its first building appears.
 
 For each component (flood fill from the plant or pump with the lowest building id): supply
-is the sum of capacities; consumers are served in BFS discovery order until the supply runs
-out (explicit nearest-first policy). Remaining consumers are unserved.
+is the sum of capacities; consumers are served in BFS discovery order until the first one
+that does not fit (explicit nearest-first policy). That consumer and every later one are
+unserved, which makes brownouts spread from the far end of the network.
 
 | Element    | Power              | Water                                    |
 | ---------- | ------------------ | ---------------------------------------- |
@@ -163,7 +181,17 @@ out (explicit nearest-first policy). Remaining consumers are unserved.
 | Com L1..L5 | −3, 6, 10, 16, 25  | −2, 5, 10, 18, 30                        |
 | Ind L1..L5 | −6, 12, 18, 25, 35 | −4, 8, 14, 20, 28                        |
 
-Networks rebuild immediately after a command and at the start of every day.
+Networks rebuild immediately after a command and at the start of every day. Network state is
+derived (not serialized): it is a pure function of the saved world, so loading a save does
+not need to rebuild it to keep the state hash identical.
+
+## 8.1 Clock
+
+One tick is a quarter of a day; a month is 30 days (120 ticks). Each tick: queued commands run,
+networks rebuild at the start of each day, per-tick systems run (fire), the tick counter
+advances and, when it reaches a month boundary, the monthly pipeline closes the month that just
+ended: roads → traffic → services → influence maps → totals → demand → growth → budget →
+history.
 
 ## 9. Services and influence maps, monthly
 
@@ -174,7 +202,8 @@ Networks rebuild immediately after a command and at the start of every day.
   station get full strength.
 - Parks raise land value within radius 4.
 - **Pollution:** sources (industry `18·level`, coal 120, gas 50, commerce `3·level`, traffic
-  `0.3·traffic`, fire 80) blurred twice with a 5×5 box filter, minus `4·trees` and 20 near parks.
+  `0.3·traffic`, fire 80) blurred twice with a 5×5 box filter and multiplied by a gain of 4
+  (the blur spreads a source over 25 tiles), minus `4·trees` and 20 near parks.
 - **Land value:** `60 + water proximity (30) + 3·elevation + 2·trees + parks + 0.1·(education +
 health) + 0.05·police + 10·(road access) + city centre bonus max(0, 40 − d/2) − 0.5·pollution −
 0.3·crime − 0.1·traffic`, blurred once. Water tiles are 0.

@@ -43,7 +43,11 @@ export function Toolbar({ session }: { session: GameSession }) {
         <div key={group} className="tool-group" role="group" aria-label={t.toolGroups[group]}>
           {TOOLS.filter((tool) => tool.group === group).map((tool) => {
             const cost = costLabel(tool);
-            const title = [t.tools[tool.id], cost, tool.hotkey ? `Atalho: ${tool.hotkey.toUpperCase()}` : null]
+            const title = [
+              t.tools[tool.id],
+              cost,
+              tool.hotkey ? `Atalho: ${tool.hotkey.toUpperCase()}` : null,
+            ]
               .filter(Boolean)
               .join(' — ');
             return (

@@ -86,7 +86,8 @@ export class ToolController {
 
   private commandFor(area: Area): ToolCommand | null {
     const command = this.tool.command(area);
-    if (command?.type === 'demolish' && this.session.ui.get().underground) return { ...command, underground: true };
+    if (command?.type === 'demolish' && this.session.ui.get().underground)
+      return { ...command, underground: true };
     return command;
   }
 
@@ -96,7 +97,12 @@ export class ToolController {
     const stats = client.stats;
     if (!world || !stats) return null;
     return planToolCommand(
-      { world, building: (id) => client.buildings.get(id), funds: stats.funds, bankrupt: stats.bankrupt },
+      {
+        world,
+        building: (id) => client.buildings.get(id),
+        funds: stats.funds,
+        bankrupt: stats.bankrupt,
+      },
       command,
     );
   }
@@ -119,7 +125,8 @@ export class ToolController {
     }
     const highlight: HighlightTile[] = [];
     const allBad = !plan.ok;
-    for (const i of plan.valid) highlight.push({ x: world.xOf(i), y: world.yOf(i), state: allBad ? 'bad' : 'ok' });
+    for (const i of plan.valid)
+      highlight.push({ x: world.xOf(i), y: world.yOf(i), state: allBad ? 'bad' : 'ok' });
     for (const r of plan.invalid) {
       if (r.index < 0) continue;
       const state = r.reason === RejectReason.AlreadyBuilt ? 'neutral' : 'bad';

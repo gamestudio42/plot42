@@ -49,7 +49,11 @@ export interface FullState {
 export interface Delta {
   tick: number;
   /** Changed tiles: indices plus the value of every structure layer at those indices. */
-  tiles: { indices: Int32Array; structure: Record<StructureLayer, Uint8Array>; buildingId: Int32Array } | null;
+  tiles: {
+    indices: Int32Array;
+    structure: Record<StructureLayer, Uint8Array>;
+    buildingId: Int32Array;
+  } | null;
   heights: Uint8Array | null;
   influence: Record<InfluenceLayer, Uint8Array> | null;
   buildings: BuildingRecord[];

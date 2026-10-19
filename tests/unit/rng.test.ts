@@ -11,7 +11,9 @@ describe('Rng', () => {
   it('produces different sequences for different seeds', () => {
     const a = Rng.fromSeed(1);
     const b = Rng.fromSeed(2);
-    const same = Array.from({ length: 50 }, () => a.nextU32() === b.nextU32()).filter(Boolean).length;
+    const same = Array.from({ length: 50 }, () => a.nextU32() === b.nextU32()).filter(
+      Boolean,
+    ).length;
     expect(same).toBeLessThan(3);
   });
 

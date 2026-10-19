@@ -1,4 +1,11 @@
-import { Fnv1a, type CityStats, type Command, type CommandResult, type Speed, type Tile } from '@city/shared';
+import {
+  Fnv1a,
+  type CityStats,
+  type Command,
+  type CommandResult,
+  type Speed,
+  type Tile,
+} from '@city/shared';
 import type { Point } from '../renderer/iso';
 import type { GameSession } from './session';
 
@@ -64,7 +71,13 @@ export function installDebugApi(session: GameSession): void {
   window.__cityDebug = api;
 }
 
-function isFlatDryArea(session: GameSession, x0: number, y0: number, width: number, height: number): boolean {
+function isFlatDryArea(
+  session: GameSession,
+  x0: number,
+  y0: number,
+  width: number,
+  height: number,
+): boolean {
   const w = session.client.world;
   if (!w) return false;
   const h = w.inBounds(x0, y0) ? w.elevation(x0, y0) : -1;
@@ -72,7 +85,14 @@ function isFlatDryArea(session: GameSession, x0: number, y0: number, width: numb
     for (let x = x0; x < x0 + width; x++) {
       if (!w.inBounds(x, y)) return false;
       const i = w.index(x, y);
-      if (w.isWater(i) || !w.isFlat(x, y) || w.elevation(x, y) !== h || w.buildingId[i] !== 0 || w.infra[i] !== 0) return false;
+      if (
+        w.isWater(i) ||
+        !w.isFlat(x, y) ||
+        w.elevation(x, y) !== h ||
+        w.buildingId[i] !== 0 ||
+        w.infra[i] !== 0
+      )
+        return false;
     }
   }
   return true;

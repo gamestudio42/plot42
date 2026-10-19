@@ -6,7 +6,12 @@ export function Toasts({ session }: { session: GameSession }) {
   return (
     <div className="toasts" role="status" aria-live="polite" data-testid="toasts">
       {toasts.map((toast) => (
-        <button key={toast.id} type="button" className={`toast ${toast.kind}`} onClick={() => session.dismissToast(toast.id)}>
+        <button
+          key={toast.id}
+          type="button"
+          className={`toast ${toast.kind}`}
+          onClick={() => session.dismissToast(toast.id)}
+        >
           {toast.message}
         </button>
       ))}

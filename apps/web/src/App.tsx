@@ -18,7 +18,12 @@ export function App() {
     void s.mount(host).then(() => {
       if (cancelled) return;
       setSession(s);
-      void s.newCity({ name: 'Nova Cidade', seed: '1', size: 128, terrain: { water: 0.14, hills: 0.5, forest: 0.35, rivers: 1 } });
+      void s.newCity({
+        name: 'Nova Cidade',
+        seed: '1',
+        size: 128,
+        terrain: { water: 0.14, hills: 0.5, forest: 0.35, rivers: 1 },
+      });
     });
     return () => {
       cancelled = true;

@@ -1,4 +1,10 @@
-import { Infra, Terrain, ZoneDensity, type BuildingRecord, type InfluenceLayer } from '@city/shared';
+import {
+  Infra,
+  Terrain,
+  ZoneDensity,
+  type BuildingRecord,
+  type InfluenceLayer,
+} from '@city/shared';
 import { Connection, connectionMask, type World } from '@city/simulation';
 import { Container, Sprite, type Graphics } from 'pixi.js';
 import { HEIGHT_STEP, tileLocalToScreen, tileQuad, vertexToScreen, type Point } from './iso';
@@ -69,8 +75,19 @@ function fillQuad(g: Graphics, q: Point[], color: number, alpha = 1): void {
   g.poly(q.flatMap((p) => [p.x, p.y])).fill({ color, alpha });
 }
 
-function rect(q: [Point, Point, Point, Point], u0: number, v0: number, u1: number, v1: number): Point[] {
-  return [tileLocalToScreen(q, u0, v0), tileLocalToScreen(q, u1, v0), tileLocalToScreen(q, u1, v1), tileLocalToScreen(q, u0, v1)];
+function rect(
+  q: [Point, Point, Point, Point],
+  u0: number,
+  v0: number,
+  u1: number,
+  v1: number,
+): Point[] {
+  return [
+    tileLocalToScreen(q, u0, v0),
+    tileLocalToScreen(q, u1, v0),
+    tileLocalToScreen(q, u1, v1),
+    tileLocalToScreen(q, u0, v1),
+  ];
 }
 
 export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void {
@@ -127,7 +144,11 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
     if (infra & Infra.Rubble) {
       fillQuad(g, rect(q, 0.1, 0.1, 0.9, 0.9), RUBBLE_COLOR);
       for (let k = 0; k < 5; k++) {
-        const p = tileLocalToScreen(q, 0.2 + tileHash(x + k, y) * 0.6, 0.2 + tileHash(x, y + k) * 0.6);
+        const p = tileLocalToScreen(
+          q,
+          0.2 + tileHash(x + k, y) * 0.6,
+          0.2 + tileHash(x, y + k) * 0.6,
+        );
         g.circle(p.x, p.y, 2).fill(shade(RUBBLE_COLOR, 0.7));
       }
     }
@@ -145,10 +166,26 @@ function outline(g: Graphics, q: Point[], alpha: number): void {
 
 function skirt(g: Graphics, a: Point, b: Point, ha: number, hb: number): void {
   const depth = 2 * HEIGHT_STEP;
-  g.poly([a.x, a.y, b.x, b.y, b.x, b.y + depth + hb * HEIGHT_STEP, a.x, a.y + depth + ha * HEIGHT_STEP]).fill(SKIRT_COLOR);
+  g.poly([
+    a.x,
+    a.y,
+    b.x,
+    b.y,
+    b.x,
+    b.y + depth + hb * HEIGHT_STEP,
+    a.x,
+    a.y + depth + ha * HEIGHT_STEP,
+  ]).fill(SKIRT_COLOR);
 }
 
-function drawRoad(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point, Point, Point, Point], bridge: boolean): void {
+function drawRoad(
+  g: Graphics,
+  ctx: DrawContext,
+  x: number,
+  y: number,
+  q: [Point, Point, Point, Point],
+  bridge: boolean,
+): void {
   const mask = connectionMask(ctx.world, x, y, Infra.Road);
   const north = (mask & Connection.North) !== 0;
   const east = (mask & Connection.East) !== 0;
@@ -168,7 +205,11 @@ function drawRoad(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point
   if (west) fillQuad(g, rect(q, 0, lo, lo, hi), base);
   if (east) fillQuad(g, rect(q, hi, lo, 1, hi), base);
   // Kerbs along sides without a connection.
-  const kerb = (pts: Point[]) => g.moveTo(pts[0]!.x, pts[0]!.y).lineTo(pts[1]!.x, pts[1]!.y).stroke({ width: 1, color: ROAD_EDGE, alpha: 0.9 });
+  const kerb = (pts: Point[]) =>
+    g
+      .moveTo(pts[0]!.x, pts[0]!.y)
+      .lineTo(pts[1]!.x, pts[1]!.y)
+      .stroke({ width: 1, color: ROAD_EDGE, alpha: 0.9 });
   if (!north) kerb([tileLocalToScreen(q, lo, lo), tileLocalToScreen(q, hi, lo)]);
   if (!south) kerb([tileLocalToScreen(q, lo, hi), tileLocalToScreen(q, hi, hi)]);
   if (!west) kerb([tileLocalToScreen(q, lo, lo), tileLocalToScreen(q, lo, hi)]);
@@ -179,13 +220,23 @@ function drawRoad(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point
   if (straightX || straightY) {
     for (const t of [0.15, 0.55]) {
       const a = straightX ? tileLocalToScreen(q, t, 0.5) : tileLocalToScreen(q, 0.5, t);
-      const b = straightX ? tileLocalToScreen(q, t + 0.25, 0.5) : tileLocalToScreen(q, 0.5, t + 0.25);
-      g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width: 1, color: bridge ? 0xd8d0c0 : ROAD_MARK, alpha: 0.85 });
+      const b = straightX
+        ? tileLocalToScreen(q, t + 0.25, 0.5)
+        : tileLocalToScreen(q, 0.5, t + 0.25);
+      g.moveTo(a.x, a.y)
+        .lineTo(b.x, b.y)
+        .stroke({ width: 1, color: bridge ? 0xd8d0c0 : ROAD_MARK, alpha: 0.85 });
     }
   }
 }
 
-function drawPipe(g: Graphics, ctx: DrawContext, x: number, y: number, q: [Point, Point, Point, Point]): void {
+function drawPipe(
+  g: Graphics,
+  ctx: DrawContext,
+  x: number,
+  y: number,
+  q: [Point, Point, Point, Point],
+): void {
   const w = ctx.world;
   const c = tileLocalToScreen(q, 0.5, 0.5);
   const mask = connectionMask(w, x, y, Infra.Pipe);
@@ -231,17 +282,24 @@ export function drawWires(g: Graphics, ctx: DrawContext, area: ChunkArea): void 
       if (!w.inBounds(nx, ny) || !w.hasInfra(w.index(nx, ny), Infra.PowerLine)) continue;
       const b = poleTop(w, nx, ny);
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 2 };
-      g.moveTo(a.x, a.y).quadraticCurveTo((a.x + mid.x) / 2, (a.y + mid.y) / 2 + 1, mid.x, mid.y).stroke({
-        width: 1,
-        color: powered ? WIRE_COLOR : 0x9a3030,
-        alpha: 0.9,
-      });
+      g.moveTo(a.x, a.y)
+        .quadraticCurveTo((a.x + mid.x) / 2, (a.y + mid.y) / 2 + 1, mid.x, mid.y)
+        .stroke({
+          width: 1,
+          color: powered ? WIRE_COLOR : 0x9a3030,
+          alpha: 0.9,
+        });
     }
   });
 }
 
 /** Rebuilds building, tree, pole and fire sprites of a chunk, depth-sorted. */
-export function buildObjects(container: Container, ctx: DrawContext, factory: SpriteFactory, area: ChunkArea): void {
+export function buildObjects(
+  container: Container,
+  ctx: DrawContext,
+  factory: SpriteFactory,
+  area: ChunkArea,
+): void {
   for (const child of container.removeChildren()) child.destroy();
   if (ctx.underground) return;
   const w = ctx.world;
@@ -304,7 +362,14 @@ const OVERLAY_LAYER: Partial<Record<OverlayMode, InfluenceLayer>> = {
   access: 'access',
 };
 
-const GOOD_OVERLAYS = new Set<OverlayMode>(['landValue', 'police', 'fireCover', 'health', 'education', 'access']);
+const GOOD_OVERLAYS = new Set<OverlayMode>([
+  'landValue',
+  'police',
+  'fireCover',
+  'health',
+  'education',
+  'access',
+]);
 
 export function drawOverlay(g: Graphics, ctx: DrawContext, area: ChunkArea): void {
   const mode = ctx.overlay;
@@ -317,7 +382,10 @@ export function drawOverlay(g: Graphics, ctx: DrawContext, area: ChunkArea): voi
     let color: number;
     let alpha = 0.55;
     if (mode === 'power' || mode === 'water') {
-      const consumer = (w.buildingId[i] as number) !== 0 || (w.zone[i] as number) !== 0 || w.hasInfra(i, mode === 'power' ? Infra.PowerLine : Infra.Pipe);
+      const consumer =
+        (w.buildingId[i] as number) !== 0 ||
+        (w.zone[i] as number) !== 0 ||
+        w.hasInfra(i, mode === 'power' ? Infra.PowerLine : Infra.Pipe);
       if (!consumer) return;
       const served = mode === 'power' ? w.powered[i] === 1 : w.watered[i] === 1;
       color = served ? (mode === 'power' ? 0xf8e040 : 0x30a0f0) : 0xd03030;

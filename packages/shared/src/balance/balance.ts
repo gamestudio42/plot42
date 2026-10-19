@@ -17,7 +17,9 @@ export interface PlaceableSpec {
 export const DEPARTMENTS = ['transport', 'police', 'fire', 'health', 'education'] as const;
 export type Department = (typeof DEPARTMENTS)[number];
 
-const placeable = (spec: Partial<PlaceableSpec> & Pick<PlaceableSpec, 'size' | 'cost' | 'upkeep'>): PlaceableSpec => ({
+const placeable = (
+  spec: Partial<PlaceableSpec> & Pick<PlaceableSpec, 'size' | 'cost' | 'upkeep'>,
+): PlaceableSpec => ({
   department: null,
   powerSupply: 0,
   powerUse: 0,
@@ -32,11 +34,46 @@ export const PLACEABLE_SPECS: Record<PlaceableKind, PlaceableSpec> = {
   coalPlant: placeable({ size: 3, cost: 3000, upkeep: 60, powerSupply: 800, pollution: 120 }),
   gasPlant: placeable({ size: 2, cost: 1500, upkeep: 45, powerSupply: 400, pollution: 50 }),
   windTurbine: placeable({ size: 1, cost: 250, upkeep: 4, powerSupply: 60 }),
-  waterPump: placeable({ size: 2, cost: 400, upkeep: 15, powerUse: 10, waterSupply: 150, waterSupplyNearWater: 400 }),
-  policeStation: placeable({ size: 2, cost: 500, upkeep: 80, department: 'police', powerUse: 4, serviceRadius: 22 }),
-  fireStation: placeable({ size: 2, cost: 500, upkeep: 80, department: 'fire', powerUse: 4, serviceRadius: 20 }),
-  school: placeable({ size: 2, cost: 600, upkeep: 100, department: 'education', powerUse: 5, serviceRadius: 24 }),
-  hospital: placeable({ size: 2, cost: 800, upkeep: 120, department: 'health', powerUse: 6, serviceRadius: 26 }),
+  waterPump: placeable({
+    size: 2,
+    cost: 400,
+    upkeep: 15,
+    powerUse: 10,
+    waterSupply: 150,
+    waterSupplyNearWater: 400,
+  }),
+  policeStation: placeable({
+    size: 2,
+    cost: 500,
+    upkeep: 80,
+    department: 'police',
+    powerUse: 4,
+    serviceRadius: 22,
+  }),
+  fireStation: placeable({
+    size: 2,
+    cost: 500,
+    upkeep: 80,
+    department: 'fire',
+    powerUse: 4,
+    serviceRadius: 20,
+  }),
+  school: placeable({
+    size: 2,
+    cost: 600,
+    upkeep: 100,
+    department: 'education',
+    powerUse: 5,
+    serviceRadius: 24,
+  }),
+  hospital: placeable({
+    size: 2,
+    cost: 800,
+    upkeep: 120,
+    department: 'health',
+    powerUse: 6,
+    serviceRadius: 26,
+  }),
   park: placeable({ size: 1, cost: 50, upkeep: 2 }),
 };
 
@@ -91,9 +128,23 @@ export const BALANCE = {
     taxNeutral: 7,
     taxSpan: 13,
     smoothing: 0.5,
-    residential: { jobs: 0.7, quality: 0.3, tax: 0.5, housing: 0.6, qualityOffset: 0.15 },
-    commercial: { perCapita: 0.12, perIndustrialJob: 0.05, base: 2, market: 0.8, labor: 0.3, tax: 0.5 },
-    industrial: { base: 30, perCapita: 0.18, market: 0.8, labor: 0.4, tax: 0.5, edgeBonus: 0.1 },
+    residential: {
+      jobs: 0.7,
+      quality: 0.3,
+      tax: 0.5,
+      housing: 0.6,
+      qualityOffset: 0.15,
+      naturalVacancy: 0.1,
+    },
+    commercial: {
+      perCapita: 0.2,
+      perIndustrialJob: 0.05,
+      base: 2,
+      market: 0.8,
+      labor: 0.3,
+      tax: 0.5,
+    },
+    industrial: { base: 30, perCapita: 0.25, market: 0.8, labor: 0.4, tax: 0.5, edgeBonus: 0.1 },
   },
   attractiveness: {
     residential: {
@@ -131,10 +182,17 @@ export const BALANCE = {
   growth: {
     spawnRate: 0.5,
     occupancyRate: 0.35,
-    upgradeOccupancy: 0.9,
-    upgradeDemand: 0.15,
+    /** Residential occupancy target = capacity · clamp(base + attract·A + demand·D). */
+    residentialOccupancy: { base: 0.6, attract: 0.4, demand: 0.5 },
+    /** Job occupancy target = capacity · clamp(laborRatio) · clamp(base + attract·A). */
+    jobOccupancy: { base: 0.6, attract: 0.4 },
+    upgradeOccupancy: 0.8,
+    upgradeDemand: 0.02,
     upgradeThresholds: [0, 0.3, 0.45, 0.55, 0.65, 1],
+    /** Upgrade probability = upgradeRate · clamp(upgradeBias + upgradeDemandGain · D). */
     upgradeRate: 0.25,
+    upgradeBias: 0.3,
+    upgradeDemandGain: 2,
     downgradeOccupancy: 0.3,
     downgradeDemand: -0.2,
     downgradeRate: 0.2,
@@ -156,9 +214,24 @@ export const BALANCE = {
     congestionThreshold: 0.6,
     congestionCost: 2,
   },
-  services: { tileSpread: 2, spreadFalloff: 0.15, localRadius: 3, unpoweredFactor: 0.5, parkRadius: 4, parkValue: 40 },
+  services: {
+    tileSpread: 2,
+    spreadFalloff: 0.15,
+    localRadius: 3,
+    unpoweredFactor: 0.5,
+    parkRadius: 4,
+    parkValue: 40,
+  },
   influence: {
-    pollution: { coal: 120, gas: 50, trafficFactor: 0.3, fire: 80, treeReduction: 4, parkReduction: 20 },
+    pollution: {
+      coal: 120,
+      gas: 50,
+      trafficFactor: 0.3,
+      fire: 80,
+      gain: 4,
+      treeReduction: 4,
+      parkReduction: 20,
+    },
     landValue: {
       base: 60,
       waterBonus: 30,

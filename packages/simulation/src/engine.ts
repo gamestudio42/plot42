@@ -1,9 +1,9 @@
 import {
   BALANCE,
-  DEPARTMENTS,
-  EXPENSE_CATEGORIES,
-  type ActiveDisaster,
+  Infra,
   isToolCommand,
+  isZoneKind,
+  type ActiveDisaster,
   type CityStats,
   type Command,
   type CommandPreview,
@@ -12,7 +12,6 @@ import {
   type EconomyState,
   type EngineSnapshot,
   type HistoryEntry,
-  type MonthlyReport,
   type NewCityOptions,
   type RciValues,
   type SimEvent,
@@ -23,9 +22,20 @@ import { applyToolPlan } from './commands/apply';
 import { planToolCommand, type PlanContext } from './commands/plan';
 import { applyPolicyCommand } from './commands/policy';
 import { Rng } from './rng/rng';
+import { cityTotals, round4, updateDemand, type CityTotals } from './systems/demand';
+import { applyMonthlyBudget, computeMonthlyReport, defaultEconomy } from './systems/economy';
+import { updateGrowth, type GrowthResult } from './systems/growth';
+import { updateInfluence } from './systems/influence';
+import { RoadNetwork } from './systems/roads';
+import { updateServices } from './systems/services';
+import { updateTraffic, type TrafficResult } from './systems/traffic';
+import { updateUtilities, type UtilityResult } from './systems/utilities';
 import { DEFAULT_TERRAIN, generateTerrain } from './terrain/generate';
-import { World } from './world/world';
+import { dateOf, isDayStart, isMonthStart, monthIndex } from './time';
 import { BuildingStore } from './world/buildings';
+import { World } from './world/world';
+
+export { defaultEconomy, emptyReport } from './systems/economy';
 
 export interface EngineOptions {
   name?: string;
@@ -43,32 +53,18 @@ export interface LoggedCommand {
   command: Command;
 }
 
-/** A system updates part of the simulation. Systems are run in registration order. */
+/** A custom system run every tick after the built-in pipeline (used by tests and tools). */
 export interface System {
   readonly id: string;
   update(engine: SimulationEngine): void;
 }
 
-export function emptyReport(): MonthlyReport {
-  return {
-    revenue: { residential: 0, commercial: 0, industrial: 0 },
-    expenses: Object.fromEntries(EXPENSE_CATEGORIES.map((c) => [c, 0])) as MonthlyReport['expenses'],
-    construction: 0,
-    net: 0,
-  };
-}
+const MILESTONES = [100, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000] as const;
 
-export function defaultEconomy(): EconomyState {
-  const tax = BALANCE.economy.taxDefault;
-  return {
-    funds: BALANCE.startingFunds,
-    constructionThisMonth: 0,
-    taxes: { residential: tax, commercial: tax, industrial: tax },
-    funding: Object.fromEntries(DEPARTMENTS.map((d) => [d, 100])) as EconomyState['funding'],
-    lastMonth: emptyReport(),
-    monthsInDebt: 0,
-    bankrupt: false,
-  };
+interface LayerStats {
+  avgCongestion: number;
+  averages: CityStats['averages'];
+  coverage: CityStats['coverage'];
 }
 
 export class SimulationEngine {
@@ -76,6 +72,7 @@ export class SimulationEngine {
   readonly buildings: BuildingStore;
   readonly rng: Rng;
   readonly seed: string;
+  readonly roads: RoadNetwork;
   name: string;
   tick = 0;
   economy: EconomyState = defaultEconomy();
@@ -86,6 +83,13 @@ export class SimulationEngine {
   networksDirty = true;
   lastMilestone = 0;
   historyDirty = false;
+
+  /** Last results of the derived systems (not serialized; recomputed when needed). */
+  lastTraffic: TrafficResult | null = null;
+  lastGrowth: GrowthResult | null = null;
+  private utilities: { power: UtilityResult; water: UtilityResult } | null = null;
+  private layerStats: LayerStats | null = null;
+  private lastShortageMonth = -1;
 
   readonly commandLog: LoggedCommand[] = [];
   private readonly queue: Command[] = [];
@@ -98,6 +102,7 @@ export class SimulationEngine {
     this.seed = seed;
     this.name = name;
     this.buildings = new BuildingStore(world);
+    this.roads = new RoadNetwork(world);
   }
 
   static create(options: EngineOptions): SimulationEngine {
@@ -113,7 +118,9 @@ export class SimulationEngine {
     const world = new World(snapshot.size);
     world.heights.set(snapshot.heights);
     for (const [name, data] of Object.entries(snapshot.layers)) {
-      const target = (world.structure as Record<string, Uint8Array>)[name] ?? (world.influence as Record<string, Uint8Array>)[name];
+      const target =
+        (world.structure as Record<string, Uint8Array>)[name] ??
+        (world.influence as Record<string, Uint8Array>)[name];
       if (!target) throw new Error(`Unknown layer ${name}`);
       target.set(data);
     }
@@ -188,45 +195,20 @@ export class SimulationEngine {
 
   step(): void {
     while (this.queue.length > 0) this.execute(this.queue.shift() as Command);
+    if (isDayStart(this.tick)) this.refreshUtilities();
     for (const system of this.systems) system.update(this);
     this.tick++;
+    // The month closes at the end of its last tick.
+    if (isMonthStart(this.tick)) this.monthly();
   }
 
   runTicks(count: number): void {
     for (let i = 0; i < count; i++) this.step();
   }
 
-  stats(): CityStats {
-    return {
-      name: this.name,
-      tick: this.tick,
-      day: 1,
-      month: 0,
-      year: 2000,
-      funds: this.economy.funds,
-      population: 0,
-      housingCapacity: 0,
-      workforce: 0,
-      jobs: { residential: 0, commercial: 0, industrial: 0 },
-      employed: { residential: 0, commercial: 0, industrial: 0 },
-      unemployment: 0,
-      demand: { ...this.demand },
-      taxes: { ...this.economy.taxes },
-      funding: { ...this.economy.funding },
-      lastMonth: this.economy.lastMonth,
-      power: { supply: 0, demand: 0, served: 0 },
-      water: { supply: 0, demand: 0, served: 0 },
-      avgCongestion: 0,
-      averages: { pollution: 0, crime: 0, landValue: 0 },
-      coverage: { police: 0, fire: 0, health: 0, education: 0 },
-      counts: { roads: 0, residential: 0, commercial: 0, industrial: 0, abandoned: 0, services: 0, plants: 0 },
-      monthsInDebt: this.economy.monthsInDebt,
-      bankrupt: this.economy.bankrupt,
-      activeFires: 0,
-      disasters: this.disasters.map((d) => ({ ...d })),
-      disastersEnabled: this.disastersEnabled,
-      edgeConnected: false,
-    };
+  /** Runs whole months (useful for tests and headless simulation). */
+  runMonths(months: number): void {
+    this.runTicks(months * BALANCE.clock.ticksPerDay * BALANCE.clock.daysPerMonth);
   }
 
   /** Validates a tool command against the current state without applying it. */
@@ -249,10 +231,179 @@ export class SimulationEngine {
     return false;
   }
 
+  hasDisaster(kind: DisasterKind): boolean {
+    return this.disasters.some((d) => d.kind === kind);
+  }
+
+  totals(): CityTotals {
+    return cityTotals(this);
+  }
+
+  stats(): CityStats {
+    const date = dateOf(this.tick);
+    const totals = cityTotals(this);
+    const utilities = this.utilities ?? updateUtilities(this, false);
+    const layer = this.layerStats ?? (this.layerStats = computeLayerStats(this));
+    const counts = {
+      roads: 0,
+      residential: 0,
+      commercial: 0,
+      industrial: 0,
+      abandoned: 0,
+      services: 0,
+      plants: 0,
+    };
+    for (const b of this.buildings.values()) {
+      if (isZoneKind(b.kind)) {
+        if (b.abandoned) counts.abandoned++;
+        else counts[b.kind]++;
+      } else if (b.kind === 'coalPlant' || b.kind === 'gasPlant' || b.kind === 'windTurbine')
+        counts.plants++;
+      else if (b.kind !== 'waterPump') counts.services++;
+    }
+    const w = this.world;
+    let fires = 0;
+    let edgeConnected = false;
+    const size = w.size;
+    for (let i = 0; i < w.tileCount; i++) {
+      if ((w.fire[i] as number) > 0) fires++;
+      if (w.hasInfra(i, Infra.Road)) {
+        counts.roads++;
+        const x = i % size;
+        const y = (i / size) | 0;
+        if (x === 0 || y === 0 || x === size - 1 || y === size - 1) edgeConnected = true;
+      }
+    }
+    const employed = Math.min(
+      totals.workforce,
+      totals.commercialWorkers + totals.industrialWorkers,
+    );
+    return {
+      name: this.name,
+      tick: this.tick,
+      day: date.day,
+      month: date.month,
+      year: date.year,
+      funds: this.economy.funds,
+      population: totals.residents,
+      housingCapacity: totals.housing,
+      workforce: Math.round(totals.workforce),
+      jobs: {
+        residential: totals.housing,
+        commercial: totals.commercialJobs,
+        industrial: totals.industrialJobs,
+      },
+      employed: {
+        residential: Math.round(employed),
+        commercial: totals.commercialWorkers,
+        industrial: totals.industrialWorkers,
+      },
+      unemployment:
+        totals.workforce > 0
+          ? round4(Math.max(0, totals.workforce - employed) / totals.workforce)
+          : 0,
+      demand: { ...this.demand },
+      taxes: { ...this.economy.taxes },
+      funding: { ...this.economy.funding },
+      lastMonth: this.economy.lastMonth,
+      power: utilityStats(utilities.power),
+      water: utilityStats(utilities.water),
+      avgCongestion: layer.avgCongestion,
+      averages: layer.averages,
+      coverage: layer.coverage,
+      counts,
+      monthsInDebt: this.economy.monthsInDebt,
+      bankrupt: this.economy.bankrupt,
+      activeFires: fires,
+      disasters: this.disasters.map((d) => ({ ...d })),
+      disastersEnabled: this.disastersEnabled,
+      edgeConnected,
+    };
+  }
+
+  /** Recomputes power and water networks now. */
+  refreshUtilities(): void {
+    const result = updateUtilities(this);
+    this.utilities = result;
+    this.networksDirty = false;
+    const month = monthIndex(this.tick);
+    if ((result.power.shortage || result.water.shortage) && month !== this.lastShortageMonth) {
+      this.lastShortageMonth = month;
+      if (result.power.shortage) this.emit({ type: 'brownout' });
+      if (result.water.shortage) this.emit({ type: 'waterShortage' });
+    }
+  }
+
+  private monthly(): void {
+    this.roads.update();
+    const crisis = this.hasDisaster('crisis');
+    const epidemic = this.hasDisaster('epidemic');
+    const d = BALANCE.disasters;
+    this.lastTraffic = updateTraffic(this, this.roads);
+    updateServices(this);
+    updateInfluence(this, this.roads);
+    const before = cityTotals(this);
+    updateDemand(this, {
+      totals: before,
+      taxes: this.economy.taxes,
+      edgeConnected: this.roads.edgeRoads.length > 0,
+      crisis: crisis ? d.crisisIndustrialFactor : 1,
+    });
+    const healthCover = epidemic ? computeLayerStats(this).coverage.health : 0;
+    this.lastGrowth = updateGrowth(this, {
+      totals: before,
+      roads: this.roads,
+      epidemic: epidemic
+        ? d.epidemicResidentialFactor + (1 - d.epidemicResidentialFactor) * healthCover
+        : 1,
+    });
+    const report = computeMonthlyReport(this, {
+      crisisRevenue: crisis ? d.crisisRevenueFactor : 1,
+      epidemicCommercial: epidemic ? d.epidemicCommercialRevenue : 1,
+    });
+    applyMonthlyBudget(this, report);
+    this.layerStats = computeLayerStats(this);
+    this.recordHistory(cityTotals(this));
+    const date = dateOf(this.tick);
+    if (date.month === 0) this.emit({ type: 'newYear', year: date.year });
+  }
+
+  private recordHistory(totals: CityTotals): void {
+    const report = this.economy.lastMonth;
+    const layer = this.layerStats as LayerStats;
+    const revenue =
+      report.revenue.residential + report.revenue.commercial + report.revenue.industrial;
+    this.history.push({
+      month: monthIndex(this.tick) - 1,
+      population: totals.residents,
+      funds: this.economy.funds,
+      jobs: totals.commercialJobs + totals.industrialJobs,
+      demandR: this.demand.residential,
+      demandC: this.demand.commercial,
+      demandI: this.demand.industrial,
+      revenue,
+      expenses: revenue - report.net,
+      pollution: layer.averages.pollution,
+      crime: layer.averages.crime,
+      landValue: layer.averages.landValue,
+    });
+    if (this.history.length > BALANCE.history.maxMonths) this.history.shift();
+    this.historyDirty = true;
+    for (const m of MILESTONES) {
+      if (m > this.lastMilestone && totals.residents >= m) {
+        this.lastMilestone = m;
+        this.emit({ type: 'milestone', population: m });
+      }
+    }
+  }
+
   private apply(command: Command): CommandResult {
     if (!isToolCommand(command)) return applyPolicyCommand(this, command);
     const plan = planToolCommand(this.planContext(), command);
-    if (plan.ok) applyToolPlan(this, command, plan);
+    if (plan.ok) {
+      applyToolPlan(this, command, plan);
+      this.refreshUtilities();
+    }
     const result: CommandResult = {
       ok: plan.ok,
       cost: plan.ok ? plan.cost : 0,
@@ -262,6 +413,52 @@ export class SimulationEngine {
     if (plan.reason) result.reason = plan.reason;
     return result;
   }
+}
+
+function utilityStats(u: UtilityResult): CityStats['power'] {
+  return { supply: u.supply, demand: u.demand, served: round4(u.served) };
+}
+
+/** Averages and coverage derived purely from the influence layers and buildings. */
+function computeLayerStats(engine: SimulationEngine): LayerStats {
+  const w = engine.world;
+  const inf = w.influence;
+  let n = 0;
+  let pollution = 0;
+  let crime = 0;
+  let land = 0;
+  const covered = { police: 0, fire: 0, health: 0, education: 0 };
+  for (const b of engine.buildings.values()) {
+    if (!isZoneKind(b.kind) || b.abandoned) continue;
+    const i = w.index(b.x, b.y);
+    n++;
+    pollution += inf.pollution[i] as number;
+    crime += inf.crime[i] as number;
+    land += inf.landValue[i] as number;
+    if ((inf.police[i] as number) >= 64) covered.police++;
+    if ((inf.fireCover[i] as number) >= 64) covered.fire++;
+    if ((inf.health[i] as number) >= 64) covered.health++;
+    if ((inf.education[i] as number) >= 64) covered.education++;
+  }
+  let congestion = 0;
+  let roads = 0;
+  for (let i = 0; i < w.tileCount; i++) {
+    if (!w.hasInfra(i, Infra.Road)) continue;
+    roads++;
+    congestion += Math.min(2, (inf.traffic[i] as number) / 128);
+  }
+  const avg = (v: number) => (n === 0 ? 0 : Math.round(v / n));
+  const frac = (v: number) => (n === 0 ? 0 : round4(v / n));
+  return {
+    avgCongestion: roads === 0 ? 0 : round4(congestion / roads),
+    averages: { pollution: avg(pollution), crime: avg(crime), landValue: avg(land) },
+    coverage: {
+      police: frac(covered.police),
+      fire: frac(covered.fire),
+      health: frac(covered.health),
+      education: frac(covered.education),
+    },
+  };
 }
 
 function structuredCopy<T>(value: T): T {

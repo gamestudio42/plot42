@@ -83,7 +83,8 @@ export class BuildingStore {
   footprint(record: BuildingRecord): number[] {
     const tiles: number[] = [];
     for (let dy = 0; dy < record.h; dy++) {
-      for (let dx = 0; dx < record.w; dx++) tiles.push(this.world.index(record.x + dx, record.y + dy));
+      for (let dx = 0; dx < record.w; dx++)
+        tiles.push(this.world.index(record.x + dx, record.y + dy));
     }
     return tiles;
   }

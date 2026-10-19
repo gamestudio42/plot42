@@ -1,6 +1,11 @@
 import { SimulationEngine } from '@city/simulation';
 import { describe, expect, it } from 'vitest';
-import { pickTile, screenToGrid, tileCenter, vertexToScreen } from '../../apps/web/src/renderer/iso';
+import {
+  pickTile,
+  screenToGrid,
+  tileCenter,
+  vertexToScreen,
+} from '../../apps/web/src/renderer/iso';
 
 describe('isometric projection', () => {
   it('maps grid axes to screen diagonals', () => {
@@ -24,7 +29,11 @@ describe('isometric projection', () => {
   });
 
   it('picks the tile under the centre of every tile, including on hills', () => {
-    const { world } = SimulationEngine.create({ seed: 'pick', size: 48, terrain: { hills: 1, water: 0.1 } });
+    const { world } = SimulationEngine.create({
+      seed: 'pick',
+      size: 48,
+      terrain: { hills: 1, water: 0.1 },
+    });
     let checked = 0;
     for (let y = 0; y < world.size; y += 3) {
       for (let x = 0; x < world.size; x += 3) {

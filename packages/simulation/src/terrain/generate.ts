@@ -34,12 +34,17 @@ export function generateTerrain(world: World, rng: Rng, options: TerrainOptions)
     for (let x = 0; x < size; x++) {
       const v = y * vs + x;
       centre[y * size + x] =
-        ((raw[v] as number) + (raw[v + 1] as number) + (raw[v + vs] as number) + (raw[v + vs + 1] as number)) / 4;
+        ((raw[v] as number) +
+          (raw[v + 1] as number) +
+          (raw[v + vs] as number) +
+          (raw[v + vs + 1] as number)) /
+        4;
     }
   }
   const sorted = Float64Array.from(centre).sort();
   const waterFraction = Math.max(0, Math.min(0.5, options.water));
-  const seaLevel = waterFraction <= 0 ? -1 : (sorted[Math.floor(waterFraction * (sorted.length - 1))] as number);
+  const seaLevel =
+    waterFraction <= 0 ? -1 : (sorted[Math.floor(waterFraction * (sorted.length - 1))] as number);
   const maxRaw = sorted[sorted.length - 1] as number;
 
   const water = new Uint8Array(size * size);
@@ -71,12 +76,15 @@ export function generateTerrain(world: World, rng: Rng, options: TerrainOptions)
   // 4. Terrain type and vegetation per tile. The forest threshold is a percentile of the noise.
   const forestValues = new Float64Array(size * size);
   for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) forestValues[y * size + x] = forestNoise.sample((x + 0.5) / size, (y + 0.5) / size);
+    for (let x = 0; x < size; x++)
+      forestValues[y * size + x] = forestNoise.sample((x + 0.5) / size, (y + 0.5) / size);
   }
   const forestSorted = Float64Array.from(forestValues).sort();
   const forestFraction = Math.max(0, Math.min(1, options.forest));
   const forestThreshold =
-    forestFraction <= 0 ? 2 : (forestSorted[Math.floor((1 - forestFraction) * (forestSorted.length - 1))] as number);
+    forestFraction <= 0
+      ? 2
+      : (forestSorted[Math.floor((1 - forestFraction) * (forestSorted.length - 1))] as number);
   const forestMax = forestSorted[forestSorted.length - 1] as number;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {

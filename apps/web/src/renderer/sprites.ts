@@ -40,7 +40,14 @@ function poly(g: Graphics, points: Point[], color: number, alpha = 1): void {
 }
 
 /** Draws an isometric box and returns its top face corners. */
-function box(g: Graphics, n: number, inset: number, height: number, colors: BoxColors, floors = 0): Point[] {
+function box(
+  g: Graphics,
+  n: number,
+  inset: number,
+  height: number,
+  colors: BoxColors,
+  floors = 0,
+): Point[] {
   const { b, r, t, l } = footprint(n, inset);
   poly(g, [l, b, up(b, height), up(l, height)], shade(colors.wall, 0.78));
   poly(g, [b, r, up(r, height), up(b, height)], shade(colors.wall, 0.95));
@@ -50,11 +57,22 @@ function box(g: Graphics, n: number, inset: number, height: number, colors: BoxC
     windows(g, l, b, height, floors, shade(colors.window, 0.85));
     windows(g, b, r, height, floors, colors.window);
   }
-  g.poly([...top, top[0] as Point].flatMap((p) => [p.x, p.y])).stroke({ width: 1, color: shade(colors.roof, 0.7), alpha: 0.6 });
+  g.poly([...top, top[0] as Point].flatMap((p) => [p.x, p.y])).stroke({
+    width: 1,
+    color: shade(colors.roof, 0.7),
+    alpha: 0.6,
+  });
   return top;
 }
 
-function windows(g: Graphics, from: Point, to: Point, height: number, floors: number, color: number): void {
+function windows(
+  g: Graphics,
+  from: Point,
+  to: Point,
+  height: number,
+  floors: number,
+  color: number,
+): void {
   const columns = Math.max(2, Math.round(Math.hypot(to.x - from.x, to.y - from.y) / 9));
   const floorH = height / floors;
   for (let f = 0; f < floors; f++) {
@@ -84,8 +102,26 @@ function pitchedRoof(g: Graphics, top: Point[], rise: number, color: number): vo
 }
 
 function chimney(g: Graphics, base: Point, height: number, color: number): void {
-  poly(g, [{ x: base.x - 4, y: base.y }, { x: base.x, y: base.y + 2 }, { x: base.x, y: base.y + 2 - height }, { x: base.x - 4, y: base.y - height }], shade(color, 0.8));
-  poly(g, [{ x: base.x, y: base.y + 2 }, { x: base.x + 4, y: base.y }, { x: base.x + 4, y: base.y - height }, { x: base.x, y: base.y + 2 - height }], color);
+  poly(
+    g,
+    [
+      { x: base.x - 4, y: base.y },
+      { x: base.x, y: base.y + 2 },
+      { x: base.x, y: base.y + 2 - height },
+      { x: base.x - 4, y: base.y - height },
+    ],
+    shade(color, 0.8),
+  );
+  poly(
+    g,
+    [
+      { x: base.x, y: base.y + 2 },
+      { x: base.x + 4, y: base.y },
+      { x: base.x + 4, y: base.y - height },
+      { x: base.x, y: base.y + 2 - height },
+    ],
+    color,
+  );
   g.ellipse(base.x, base.y - height, 4, 2).fill(0x333333);
 }
 
@@ -125,7 +161,14 @@ function drawResidential(g: Graphics, level: number, variant: number, abandoned:
   } else {
     const heights = [0, 0, 0, 40, 68, 104];
     const floors = [0, 0, 0, 4, 7, 11];
-    box(g, 1, 0.1, heights[level] ?? 40, { wall, roof: shade(wall, 0.8), window }, floors[level] ?? 4);
+    box(
+      g,
+      1,
+      0.1,
+      heights[level] ?? 40,
+      { wall, roof: shade(wall, 0.8), window },
+      floors[level] ?? 4,
+    );
   }
 }
 
@@ -136,7 +179,14 @@ function drawCommercial(g: Graphics, level: number, variant: number, abandoned: 
   const window = abandoned ? 0x303030 : 0xd8eefc;
   const heights = [0, 16, 28, 50, 84, 128];
   const floors = [0, 1, 2, 4, 7, 11];
-  box(g, 1, level <= 1 ? 0.18 : 0.1, heights[level] ?? 16, { wall, roof, window }, floors[level] ?? 1);
+  box(
+    g,
+    1,
+    level <= 1 ? 0.18 : 0.1,
+    heights[level] ?? 16,
+    { wall, roof, window },
+    floors[level] ?? 1,
+  );
   if (level <= 2 && !abandoned) {
     const { b, r } = footprint(1, 0.18);
     poly(g, [up(b, 9), up(r, 9), up(lerp(r, b, 0), 6), up(lerp(b, b, 0), 6)], 0xd84a4a);
@@ -148,13 +198,21 @@ function drawIndustrial(g: Graphics, level: number, variant: number, abandoned: 
   const wall = abandoned ? 0x6a6560 : p.wall;
   const roof = abandoned ? 0x4f4a45 : p.roof;
   const heights = [0, 12, 18, 22, 28, 34];
-  const top = box(g, 1, 0.12, heights[level] ?? 12, { wall, roof, window: 0x50606a }, level >= 3 ? 1 : 0);
+  const top = box(
+    g,
+    1,
+    0.12,
+    heights[level] ?? 12,
+    { wall, roof, window: 0x50606a },
+    level >= 3 ? 1 : 0,
+  );
   if (level >= 3) {
     const c = lerp(top[0] as Point, top[2] as Point, 0.4);
     chimney(g, c, 14 + level * 4, abandoned ? 0x555555 : 0x8a4a3a);
     if (!abandoned) smoke(g, up(c, 14 + level * 4));
   }
-  if (level >= 5) chimney(g, lerp(top[0] as Point, top[2] as Point, 0.75), 26, abandoned ? 0x555555 : 0x7a4a3a);
+  if (level >= 5)
+    chimney(g, lerp(top[0] as Point, top[2] as Point, 0.75), 26, abandoned ? 0x555555 : 0x7a4a3a);
 }
 
 function drawPlaceable(g: Graphics, kind: string, size: number): void {
@@ -181,8 +239,14 @@ function drawPlaceable(g: Graphics, kind: string, size: number): void {
     case 'windTurbine': {
       g.rect(-1.5, -52, 3, 46).fill(0xeeeeee);
       const hub = { x: 0, y: -52 };
-      for (const [dx, dy] of [[0, -20], [17, 10], [-17, 10]] as const) {
-        g.moveTo(hub.x, hub.y).lineTo(hub.x + dx, hub.y + dy).stroke({ width: 3, color: 0xffffff });
+      for (const [dx, dy] of [
+        [0, -20],
+        [17, 10],
+        [-17, 10],
+      ] as const) {
+        g.moveTo(hub.x, hub.y)
+          .lineTo(hub.x + dx, hub.y + dy)
+          .stroke({ width: 3, color: 0xffffff });
       }
       g.circle(hub.x, hub.y, 3).fill(0xcccccc);
       break;
@@ -267,7 +331,9 @@ export class SpriteFactory {
 
   constructor(private readonly renderer: Renderer) {}
 
-  building(b: Pick<BuildingRecord, 'kind' | 'level' | 'variant' | 'abandoned' | 'w'>): SpriteTexture {
+  building(
+    b: Pick<BuildingRecord, 'kind' | 'level' | 'variant' | 'abandoned' | 'w'>,
+  ): SpriteTexture {
     const level = Math.max(1, b.level);
     const key = `b:${b.kind}:${level}:${b.variant % 3}:${b.abandoned ? 1 : 0}`;
     return this.get(key, (g) => {
@@ -283,7 +349,13 @@ export class SpriteFactory {
     return this.get(`t:${d}:${variant % 4}`, (g) => {
       const count = d === 1 ? 1 : d === 2 ? 3 : 5;
       const sorted = TREE_SPOTS.slice(0, count).sort((a, c) => a.y - c.y);
-      sorted.forEach((spot, k) => tree(g, { x: spot.x + ((variant + k) % 3) - 1, y: spot.y + 8 }, 0.75 + ((variant + k) % 3) * 0.1));
+      sorted.forEach((spot, k) =>
+        tree(
+          g,
+          { x: spot.x + ((variant + k) % 3) - 1, y: spot.y + 8 },
+          0.75 + ((variant + k) % 3) * 0.1,
+        ),
+      );
     });
   }
 
@@ -297,8 +369,14 @@ export class SpriteFactory {
   flame(frame: number): SpriteTexture {
     return this.get(`fire:${frame % 2}`, (g) => {
       const s = frame % 2 === 0 ? 1 : 1.15;
-      g.poly([-12 * s, -4, -4, -34 * s, 2, -12, 8, -40 * s, 14 * s, -4]).fill({ color: 0xe8501f, alpha: 0.9 });
-      g.poly([-7 * s, -4, -1, -24 * s, 4, -10, 7, -26 * s, 9 * s, -4]).fill({ color: 0xf8c030, alpha: 0.95 });
+      g.poly([-12 * s, -4, -4, -34 * s, 2, -12, 8, -40 * s, 14 * s, -4]).fill({
+        color: 0xe8501f,
+        alpha: 0.9,
+      });
+      g.poly([-7 * s, -4, -1, -24 * s, 4, -10, 7, -26 * s, 9 * s, -4]).fill({
+        color: 0xf8c030,
+        alpha: 0.95,
+      });
     });
   }
 
@@ -310,7 +388,11 @@ export class SpriteFactory {
     const holder = new Container();
     holder.addChild(g);
     const bounds = g.getLocalBounds();
-    const texture = this.renderer.generateTexture({ target: holder, resolution: 2, antialias: true });
+    const texture = this.renderer.generateTexture({
+      target: holder,
+      resolution: 2,
+      antialias: true,
+    });
     const entry: SpriteTexture = {
       texture,
       anchorX: bounds.width > 0 ? -bounds.x / bounds.width : 0.5,

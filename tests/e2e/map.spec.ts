@@ -17,7 +17,10 @@ test('renders the isometric map and selects the clicked tile', async ({ page }) 
     await page.mouse.up();
     const selected = await page.evaluate(() => window.__cityDebug?.getSelected());
     // Hills may hide the exact tile behind a taller one in front; flat tiles must match exactly.
-    const tile = await page.evaluate(([tx, ty]) => window.__cityDebug?.getTile(tx as number, ty as number), [x, y]);
+    const tile = await page.evaluate(
+      ([tx, ty]) => window.__cityDebug?.getTile(tx as number, ty as number),
+      [x, y],
+    );
     if (tile?.flat) expect(selected).toEqual({ x, y });
     else expect((selected?.x ?? 0) + (selected?.y ?? 0)).toBeGreaterThanOrEqual(x + y);
   }

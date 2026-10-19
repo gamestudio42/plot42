@@ -28,6 +28,8 @@ export class World {
   private dirtyList: number[] = [];
   heightsDirty = false;
   influenceDirty = false;
+  /** Incremented whenever a road bit changes; derived road data compares against it. */
+  roadVersion = 0;
 
   constructor(size: number) {
     this.size = size;
@@ -134,6 +136,7 @@ export class World {
     const after = on ? before | flag : before & ~flag;
     if (after !== before) {
       infra[i] = after;
+      if (((after ^ before) & Infra.Road) !== 0) this.roadVersion++;
       this.markDirty(i);
     }
   }

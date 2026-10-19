@@ -24,7 +24,9 @@ export function ToolTooltip({ session }: { session: GameSession }) {
           {tool.shape !== 'footprint' && ` · ${preview.count} ${t.ui.tiles}`}
         </div>
       )}
-      {showReason && preview.reason && <div className="tool-tooltip-reason">{t.reasons[preview.reason]}</div>}
+      {showReason && preview.reason && (
+        <div className="tool-tooltip-reason">{t.reasons[preview.reason]}</div>
+      )}
     </div>
   );
 }

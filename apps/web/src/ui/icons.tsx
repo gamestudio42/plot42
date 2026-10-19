@@ -4,7 +4,19 @@ import type { ToolId } from '../tools/tools';
 const zoneIcon = (color: string, letter: string, dense: boolean): ReactElement => (
   <>
     <rect x="3" y="3" width="18" height="18" rx="2" fill={color} opacity={dense ? 1 : 0.55} />
-    {dense && <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="#fff" strokeWidth="1.5" strokeDasharray="3 2" />}
+    {dense && (
+      <rect
+        x="3"
+        y="3"
+        width="18"
+        height="18"
+        rx="2"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="1.5"
+        strokeDasharray="3 2"
+      />
+    )}
     <text x="12" y="16.5" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">
       {letter}
     </text>
@@ -29,7 +41,12 @@ const ICONS: Record<ToolId, ReactElement> = {
   ),
   powerLine: (
     <>
-      <path d="M12 2 L7 22 M12 2 L17 22 M8 9 H16 M9 15 H15" stroke="#c8ccd2" strokeWidth="1.8" fill="none" />
+      <path
+        d="M12 2 L7 22 M12 2 L17 22 M8 9 H16 M9 15 H15"
+        stroke="#c8ccd2"
+        strokeWidth="1.8"
+        fill="none"
+      />
       <path d="M2 7 Q12 12 22 7" stroke="#f0c030" strokeWidth="1.4" fill="none" />
     </>
   ),
@@ -48,7 +65,17 @@ const ICONS: Record<ToolId, ReactElement> = {
   zoneIndDense: zoneIcon('#c09020', 'I', true),
   dezone: (
     <>
-      <rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 3" />
+      <rect
+        x="3"
+        y="3"
+        width="18"
+        height="18"
+        rx="2"
+        fill="none"
+        stroke="#94a3b8"
+        strokeWidth="2"
+        strokeDasharray="4 3"
+      />
       <path d="M7 7 L17 17 M17 7 L7 17" stroke="#f87171" strokeWidth="2.4" />
     </>
   ),
@@ -83,11 +110,30 @@ const ICONS: Record<ToolId, ReactElement> = {
       <path d="M12 10 L12 2 M12 10 L5 14 M12 10 L19 14" stroke="#e8eef6" strokeWidth="2" />
     </>
   ),
-  waterPump: building('#2070c0', '#5aa0e0', <path d="M12 12 Q9 16 12 18 Q15 16 12 12 Z" fill="#fff" />),
-  policeStation: building('#2040a0', '#6080c0', <path d="M12 11 L14 15 L12 18 L10 15 Z" fill="#f0d050" />),
-  fireStation: building('#b02020', '#e06050', <rect x="9" y="13" width="6" height="7" fill="#601010" />),
+  waterPump: building(
+    '#2070c0',
+    '#5aa0e0',
+    <path d="M12 12 Q9 16 12 18 Q15 16 12 12 Z" fill="#fff" />,
+  ),
+  policeStation: building(
+    '#2040a0',
+    '#6080c0',
+    <path d="M12 11 L14 15 L12 18 L10 15 Z" fill="#f0d050" />,
+  ),
+  fireStation: building(
+    '#b02020',
+    '#e06050',
+    <rect x="9" y="13" width="6" height="7" fill="#601010" />,
+  ),
   school: building('#a06020', '#e0b070', <rect x="11.5" y="1" width="1" height="5" fill="#333" />),
-  hospital: building('#d0d0d0', '#f4f4f4', <path d="M10.5 11 H13.5 V13.5 H16 V16.5 H13.5 V19 H10.5 V16.5 H8 V13.5 H10.5 Z" fill="#d03030" />),
+  hospital: building(
+    '#d0d0d0',
+    '#f4f4f4',
+    <path
+      d="M10.5 11 H13.5 V13.5 H16 V16.5 H13.5 V19 H10.5 V16.5 H8 V13.5 H10.5 Z"
+      fill="#d03030"
+    />,
+  ),
   park: (
     <>
       <rect x="2" y="13" width="20" height="8" rx="2" fill="#4caf50" />

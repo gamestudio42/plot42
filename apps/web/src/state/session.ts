@@ -1,4 +1,11 @@
-import type { CityStats, HistoryEntry, NewCityOptions, RejectReason, SimEvent, Speed } from '@city/shared';
+import type {
+  CityStats,
+  HistoryEntry,
+  NewCityOptions,
+  RejectReason,
+  SimEvent,
+  Speed,
+} from '@city/shared';
 import { t } from '../i18n/pt-BR';
 import { GameRenderer } from '../renderer/GameRenderer';
 import type { OverlayMode } from '../renderer/chunkDraw';
@@ -96,7 +103,9 @@ export class GameSession {
       },
     });
     window.addEventListener('keydown', (e) => this.onKey(e), { signal: this.listeners.signal });
-    host.addEventListener('pointerleave', () => this.ui.set({ pointer: null }), { signal: this.listeners.signal });
+    host.addEventListener('pointerleave', () => this.ui.set({ pointer: null }), {
+      signal: this.listeners.signal,
+    });
     installDebugApi(this);
   }
 
@@ -144,7 +153,10 @@ export class GameSession {
 
   toast(kind: Toast['kind'], message: string): void {
     const id = this.nextToastId++;
-    const toasts = [...this.ui.get().toasts.filter((x) => x.message !== message), { id, kind, message }].slice(-4);
+    const toasts = [
+      ...this.ui.get().toasts.filter((x) => x.message !== message),
+      { id, kind, message },
+    ].slice(-4);
     this.ui.set({ toasts });
     setTimeout(() => this.dismissToast(id), TOAST_MS);
   }
@@ -154,7 +166,10 @@ export class GameSession {
   }
 
   notifyReason(reason: RejectReason): void {
-    this.toast(reason === 'INSUFFICIENT_FUNDS' || reason === 'BANKRUPT' ? 'error' : 'warning', t.reasons[reason]);
+    this.toast(
+      reason === 'INSUFFICIENT_FUNDS' || reason === 'BANKRUPT' ? 'error' : 'warning',
+      t.reasons[reason],
+    );
   }
 
   onBuilt(_cost: number): void {}
@@ -168,7 +183,11 @@ export class GameSession {
 
   private onKey(e: KeyboardEvent): void {
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+    )
+      return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
     if (key === 'escape') {

@@ -1,8 +1,34 @@
 export { GAME_NAME } from '@city/shared';
 export { planToolCommand, DemolishOp, type PlanContext, type ToolPlan } from './commands/plan';
 export { lPath, normalizeArea, rectTiles } from './commands/shapes';
-export { createEngine, SimulationEngine, type EngineOptions, type LoggedCommand, type System } from './engine';
+export {
+  createEngine,
+  SimulationEngine,
+  type EngineOptions,
+  type LoggedCommand,
+  type System,
+} from './engine';
 export { hashSnapshot, hashState, hashTerrain } from './persistence/hash';
+export { buildTown, flatCity, run, type CityLayout } from './scenarios/builders';
+export {
+  cityTotals,
+  demandTargets,
+  taxPressure,
+  type CityTotals,
+  type DemandInputs,
+} from './systems/demand';
+export { attractiveness, maxLevel, transportScore, ZONE_KIND } from './systems/growth';
+export { boxBlur, populationCentre } from './systems/influence';
+export { RoadNetwork } from './systems/roads';
+export { SERVICE_LAYERS, stationAccessRoads } from './systems/services';
+export { commuteDecay, roadDijkstra, type TrafficResult } from './systems/traffic';
+export {
+  powerDemand,
+  powerSupply,
+  pumpNearWater,
+  waterDemand,
+  waterSupply,
+} from './systems/utilities';
 export { Rng, type RngState } from './rng/rng';
 export { DEFAULT_TERRAIN, generateTerrain, relaxSlopes } from './terrain/generate';
 export { FractalNoise, ValueNoise } from './terrain/noise';

@@ -7,7 +7,8 @@ export const Connection = { North: 1, East: 2, South: 4, West: 8 } as const;
  * (north = y - 1, east = x + 1, south = y + 1, west = x - 1).
  */
 export function connectionMask(world: World, x: number, y: number, flag: number): number {
-  const has = (nx: number, ny: number) => world.inBounds(nx, ny) && world.hasInfra(world.index(nx, ny), flag);
+  const has = (nx: number, ny: number) =>
+    world.inBounds(nx, ny) && world.hasInfra(world.index(nx, ny), flag);
   return (
     (has(x, y - 1) ? Connection.North : 0) |
     (has(x + 1, y) ? Connection.East : 0) |

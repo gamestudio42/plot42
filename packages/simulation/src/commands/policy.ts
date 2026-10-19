@@ -3,9 +3,18 @@ import type { SimulationEngine } from '../engine';
 
 const MAX_NAME_LENGTH = 40;
 
-export function applyPolicyCommand(engine: SimulationEngine, command: PolicyCommand): CommandResult {
+export function applyPolicyCommand(
+  engine: SimulationEngine,
+  command: PolicyCommand,
+): CommandResult {
   const ok: CommandResult = { ok: true, cost: 0, applied: 1, skipped: 0 };
-  const invalid: CommandResult = { ok: false, cost: 0, applied: 0, skipped: 0, reason: RejectReason.Invalid };
+  const invalid: CommandResult = {
+    ok: false,
+    cost: 0,
+    applied: 0,
+    skipped: 0,
+    reason: RejectReason.Invalid,
+  };
   switch (command.type) {
     case 'setTax': {
       if (!Number.isFinite(command.rate)) return invalid;

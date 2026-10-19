@@ -42,7 +42,9 @@ describe('road tool', () => {
     e.execute({ type: 'road', x0: 2, y0: 5, x1: 8, y1: 5 });
     e.execute({ type: 'road', x0: 5, y0: 2, x1: 5, y1: 8 });
     const w = e.world;
-    expect(connectionMask(w, 5, 5, Infra.Road)).toBe(Connection.North | Connection.East | Connection.South | Connection.West);
+    expect(connectionMask(w, 5, 5, Infra.Road)).toBe(
+      Connection.North | Connection.East | Connection.South | Connection.West,
+    );
     expect(connectionMask(w, 3, 5, Infra.Road)).toBe(Connection.East | Connection.West);
     expect(connectionMask(w, 2, 5, Infra.Road)).toBe(Connection.East);
     expect(connectionMask(w, 5, 2, Infra.Road)).toBe(Connection.South);
@@ -89,12 +91,16 @@ describe('road tool', () => {
   it('refuses construction in a bankrupt city', () => {
     const e = flatEngine();
     e.economy.bankrupt = true;
-    expect(e.execute({ type: 'road', x0: 0, y0: 0, x1: 2, y1: 0 }).reason).toBe(RejectReason.Bankrupt);
+    expect(e.execute({ type: 'road', x0: 0, y0: 0, x1: 2, y1: 0 }).reason).toBe(
+      RejectReason.Bankrupt,
+    );
   });
 
   it('reports out of bounds drags', () => {
     const e = flatEngine(16);
-    expect(e.execute({ type: 'road', x0: 20, y0: 20, x1: 25, y1: 20 }).reason).toBe(RejectReason.OutOfBounds);
+    expect(e.execute({ type: 'road', x0: 20, y0: 20, x1: 25, y1: 20 }).reason).toBe(
+      RejectReason.OutOfBounds,
+    );
   });
 });
 
@@ -113,7 +119,15 @@ describe('power lines and pipes', () => {
 
   it('treats zones and buildings as conductors', () => {
     const e = flatEngine();
-    e.execute({ type: 'zone', zone: ZoneType.Residential, density: ZoneDensity.Light, x0: 2, y0: 0, x1: 3, y1: 0 });
+    e.execute({
+      type: 'zone',
+      zone: ZoneType.Residential,
+      density: ZoneDensity.Light,
+      x0: 2,
+      y0: 0,
+      x1: 3,
+      y1: 0,
+    });
     const result = e.execute({ type: 'powerLine', x0: 0, y0: 0, x1: 5, y1: 0 });
     expect(result.applied).toBe(4);
     expect(result.skipped).toBe(2);
@@ -133,7 +147,15 @@ describe('zone tool', () => {
     const e = flatEngine();
     addWater(e, 4, 0, 4, 31);
     e.execute({ type: 'road', x0: 0, y0: 1, x1: 3, y1: 1 });
-    const result = e.execute({ type: 'zone', zone: ZoneType.Industrial, density: ZoneDensity.Dense, x0: 0, y0: 0, x1: 4, y1: 2 });
+    const result = e.execute({
+      type: 'zone',
+      zone: ZoneType.Industrial,
+      density: ZoneDensity.Dense,
+      x0: 0,
+      y0: 0,
+      x1: 4,
+      y1: 2,
+    });
     // 15 tiles: 3 water, 4 road.
     expect(result.applied).toBe(8);
     expect(result.skipped).toBe(7);
@@ -145,17 +167,53 @@ describe('zone tool', () => {
   it('rejects sloped tiles', () => {
     const e = flatEngine();
     addHill(e, 10, 10, 3);
-    const result = e.execute({ type: 'zone', zone: ZoneType.Residential, density: ZoneDensity.Light, x0: 9, y0: 9, x1: 10, y1: 10 });
+    const result = e.execute({
+      type: 'zone',
+      zone: ZoneType.Residential,
+      density: ZoneDensity.Light,
+      x0: 9,
+      y0: 9,
+      x1: 10,
+      y1: 10,
+    });
     expect(result.ok).toBe(false);
     expect(result.reason).toBe(RejectReason.Slope);
   });
 
   it('re-zones and de-zones empty tiles', () => {
     const e = flatEngine();
-    e.execute({ type: 'zone', zone: ZoneType.Residential, density: ZoneDensity.Light, x0: 0, y0: 0, x1: 1, y1: 0 });
-    expect(e.execute({ type: 'zone', zone: ZoneType.Commercial, density: ZoneDensity.Light, x0: 0, y0: 0, x1: 0, y1: 0 }).ok).toBe(true);
+    e.execute({
+      type: 'zone',
+      zone: ZoneType.Residential,
+      density: ZoneDensity.Light,
+      x0: 0,
+      y0: 0,
+      x1: 1,
+      y1: 0,
+    });
+    expect(
+      e.execute({
+        type: 'zone',
+        zone: ZoneType.Commercial,
+        density: ZoneDensity.Light,
+        x0: 0,
+        y0: 0,
+        x1: 0,
+        y1: 0,
+      }).ok,
+    ).toBe(true);
     expect(e.world.zone[0]).toBe(ZoneType.Commercial);
-    expect(e.execute({ type: 'zone', zone: ZoneType.None, density: ZoneDensity.None, x0: 0, y0: 0, x1: 1, y1: 0 }).applied).toBe(2);
+    expect(
+      e.execute({
+        type: 'zone',
+        zone: ZoneType.None,
+        density: ZoneDensity.None,
+        x0: 0,
+        y0: 0,
+        x1: 1,
+        y1: 0,
+      }).applied,
+    ).toBe(2);
     expect(e.world.zone[1]).toBe(ZoneType.None);
   });
 });
@@ -175,12 +233,18 @@ describe('placing buildings', () => {
   it('refuses invalid footprints as a whole', () => {
     const e = flatEngine();
     addHill(e, 10, 10, 2);
-    expect(e.execute({ type: 'place', kind: 'school', x: 9, y: 9 }).reason).toBe(RejectReason.NotFlatFootprint);
+    expect(e.execute({ type: 'place', kind: 'school', x: 9, y: 9 }).reason).toBe(
+      RejectReason.NotFlatFootprint,
+    );
     addWater(e, 0, 0, 0, 0);
     expect(e.execute({ type: 'place', kind: 'park', x: 0, y: 0 }).reason).toBe(RejectReason.Water);
-    expect(e.execute({ type: 'place', kind: 'coalPlant', x: 30, y: 30 }).reason).toBe(RejectReason.OutOfBounds);
+    expect(e.execute({ type: 'place', kind: 'coalPlant', x: 30, y: 30 }).reason).toBe(
+      RejectReason.OutOfBounds,
+    );
     e.execute({ type: 'road', x0: 20, y0: 20, x1: 20, y1: 20 });
-    expect(e.execute({ type: 'place', kind: 'hospital', x: 19, y: 19 }).reason).toBe(RejectReason.Occupied);
+    expect(e.execute({ type: 'place', kind: 'hospital', x: 19, y: 19 }).reason).toBe(
+      RejectReason.Occupied,
+    );
     expect(e.buildings.size).toBe(0);
   });
 });
@@ -200,14 +264,24 @@ describe('demolish tool', () => {
     const e = flatEngine();
     const w = e.world;
     e.execute({ type: 'road', x0: 0, y0: 0, x1: 0, y1: 0 });
-    e.execute({ type: 'zone', zone: ZoneType.Residential, density: ZoneDensity.Light, x0: 1, y0: 0, x1: 1, y1: 0 });
+    e.execute({
+      type: 'zone',
+      zone: ZoneType.Residential,
+      density: ZoneDensity.Light,
+      x0: 1,
+      y0: 0,
+      x1: 1,
+      y1: 0,
+    });
     w.trees[2] = 3;
     e.execute({ type: 'pipe', x0: 0, y0: 0, x1: 3, y1: 0 });
     expect(e.execute({ type: 'demolish', x0: 0, y0: 0, x1: 3, y1: 0 }).applied).toBe(3);
     expect(w.infra[0]).toBe(Infra.Pipe);
     expect(w.zone[1]).toBe(ZoneType.None);
     expect(w.trees[2]).toBe(0);
-    expect(e.execute({ type: 'demolish', underground: true, x0: 0, y0: 0, x1: 3, y1: 0 }).applied).toBe(4);
+    expect(
+      e.execute({ type: 'demolish', underground: true, x0: 0, y0: 0, x1: 3, y1: 0 }).applied,
+    ).toBe(4);
     expect(w.infra[0]).toBe(0);
   });
 
@@ -215,7 +289,9 @@ describe('demolish tool', () => {
     const e = flatEngine();
     e.execute({ type: 'road', x0: 0, y0: 0, x1: 0, y1: 0 });
     e.world.fire[0] = 50;
-    expect(e.execute({ type: 'demolish', x0: 0, y0: 0, x1: 0, y1: 0 }).reason).toBe(RejectReason.OnFire);
+    expect(e.execute({ type: 'demolish', x0: 0, y0: 0, x1: 0, y1: 0 }).reason).toBe(
+      RejectReason.OnFire,
+    );
   });
 });
 
@@ -225,7 +301,13 @@ describe('level tool', () => {
     addHill(e, 16, 16, 6);
     const start = { x: 16, y: 16 };
     const target = e.world.elevation(start.x, start.y);
-    const result = e.execute({ type: 'level', x0: start.x, y0: start.y, x1: start.x + 3, y1: start.y + 3 });
+    const result = e.execute({
+      type: 'level',
+      x0: start.x,
+      y0: start.y,
+      x1: start.x + 3,
+      y1: start.y + 3,
+    });
     expect(result.ok).toBe(true);
     for (let y = 16; y <= 19; y++) {
       for (let x = 16; x <= 19; x++) {
@@ -241,7 +323,8 @@ describe('level tool', () => {
   it('refuses when the change would affect construction', () => {
     const e = flatEngine();
     const w = e.world;
-    for (let vy = 10; vy <= 20; vy++) for (let vx = 10; vx <= 20; vx++) w.heights[w.vertex(vx, vy)] = 1;
+    for (let vy = 10; vy <= 20; vy++)
+      for (let vx = 10; vx <= 20; vx++) w.heights[w.vertex(vx, vy)] = 1;
     expect(e.execute({ type: 'road', x0: 12, y0: 12, x1: 14, y1: 12 }).ok).toBe(true);
     const before = hashState(e);
     const result = e.execute({ type: 'level', x0: 5, y0: 5, x1: 12, y1: 12 });
@@ -263,7 +346,15 @@ describe('level tool', () => {
 describe('preview and replay', () => {
   it('previews without mutating the state and matches execution', () => {
     const e = flatEngine();
-    const command = { type: 'zone', zone: ZoneType.Commercial, density: ZoneDensity.Light, x0: 0, y0: 0, x1: 3, y1: 3 } as const;
+    const command = {
+      type: 'zone',
+      zone: ZoneType.Commercial,
+      density: ZoneDensity.Light,
+      x0: 0,
+      y0: 0,
+      x1: 3,
+      y1: 3,
+    } as const;
     const before = hashState(e);
     const preview = e.preview(command);
     expect(hashState(e)).toBe(before);
@@ -276,7 +367,15 @@ describe('preview and replay', () => {
   it('replays the command log to the same state', () => {
     const a = createEngine({ seed: 'replay', size: 48 });
     a.execute({ type: 'road', x0: 2, y0: 20, x1: 40, y1: 24 });
-    a.execute({ type: 'zone', zone: ZoneType.Residential, density: ZoneDensity.Light, x0: 2, y0: 21, x1: 12, y1: 23 });
+    a.execute({
+      type: 'zone',
+      zone: ZoneType.Residential,
+      density: ZoneDensity.Light,
+      x0: 2,
+      y0: 21,
+      x1: 12,
+      y1: 23,
+    });
     a.execute({ type: 'place', kind: 'park', x: 30, y: 30 });
     a.execute({ type: 'level', x0: 10, y0: 10, x1: 14, y1: 12 });
     a.execute({ type: 'setTax', zone: 'commercial', rate: 9 });
