@@ -1,0 +1,217 @@
+import type { PlaceableKind, ZoneBuildingKind } from '../types/buildings';
+
+export interface PlaceableSpec {
+  size: number;
+  cost: number;
+  upkeep: number;
+  /** Department whose funding scales upkeep and effect. */
+  department: Department | null;
+  powerSupply: number;
+  powerUse: number;
+  waterSupply: number;
+  waterSupplyNearWater: number;
+  pollution: number;
+  serviceRadius: number;
+}
+
+export const DEPARTMENTS = ['transport', 'police', 'fire', 'health', 'education'] as const;
+export type Department = (typeof DEPARTMENTS)[number];
+
+const placeable = (spec: Partial<PlaceableSpec> & Pick<PlaceableSpec, 'size' | 'cost' | 'upkeep'>): PlaceableSpec => ({
+  department: null,
+  powerSupply: 0,
+  powerUse: 0,
+  waterSupply: 0,
+  waterSupplyNearWater: 0,
+  pollution: 0,
+  serviceRadius: 0,
+  ...spec,
+});
+
+export const PLACEABLE_SPECS: Record<PlaceableKind, PlaceableSpec> = {
+  coalPlant: placeable({ size: 3, cost: 3000, upkeep: 60, powerSupply: 800, pollution: 120 }),
+  gasPlant: placeable({ size: 2, cost: 1500, upkeep: 45, powerSupply: 400, pollution: 50 }),
+  windTurbine: placeable({ size: 1, cost: 250, upkeep: 4, powerSupply: 60 }),
+  waterPump: placeable({ size: 2, cost: 400, upkeep: 15, powerUse: 10, waterSupply: 150, waterSupplyNearWater: 400 }),
+  policeStation: placeable({ size: 2, cost: 500, upkeep: 80, department: 'police', powerUse: 4, serviceRadius: 22 }),
+  fireStation: placeable({ size: 2, cost: 500, upkeep: 80, department: 'fire', powerUse: 4, serviceRadius: 20 }),
+  school: placeable({ size: 2, cost: 600, upkeep: 100, department: 'education', powerUse: 5, serviceRadius: 24 }),
+  hospital: placeable({ size: 2, cost: 800, upkeep: 120, department: 'health', powerUse: 6, serviceRadius: 26 }),
+  park: placeable({ size: 1, cost: 50, upkeep: 2 }),
+};
+
+type LevelTable = readonly [number, number, number, number, number, number];
+
+export const ZONE_SPECS: Record<
+  ZoneBuildingKind,
+  { capacity: LevelTable; power: LevelTable; water: LevelTable; pollution: number }
+> = {
+  residential: {
+    capacity: [0, 10, 30, 80, 180, 400],
+    power: [0, 1, 2, 4, 7, 12],
+    water: [0, 2, 4, 9, 18, 36],
+    pollution: 0,
+  },
+  commercial: {
+    capacity: [0, 4, 12, 30, 70, 150],
+    power: [0, 3, 6, 10, 16, 25],
+    water: [0, 2, 5, 10, 18, 30],
+    pollution: 3,
+  },
+  industrial: {
+    capacity: [0, 8, 20, 45, 90, 160],
+    power: [0, 6, 12, 18, 25, 35],
+    water: [0, 4, 8, 14, 20, 28],
+    pollution: 18,
+  },
+};
+
+export const BALANCE = {
+  startingFunds: 20000,
+  map: { defaultSize: 128, maxHeight: 12 },
+  costs: {
+    road: 10,
+    bridge: 50,
+    powerLine: 5,
+    powerLineOverWater: 15,
+    pipe: 5,
+    zoneLight: 5,
+    zoneDense: 10,
+    clearTrees: 2,
+    demolishTile: 1,
+    demolishPerLevel: 5,
+    levelPerUnit: 5,
+  },
+  zones: { maxLevelLight: 2, maxLevelDense: 5, maxLevelWithoutWater: 2 },
+  clock: { ticksPerDay: 4, daysPerMonth: 30, monthsPerYear: 12 },
+  demand: {
+    laborRate: 0.45,
+    externalJobs: 30,
+    taxNeutral: 7,
+    taxSpan: 13,
+    smoothing: 0.5,
+    residential: { jobs: 0.7, quality: 0.3, tax: 0.5, housing: 0.6, qualityOffset: 0.15 },
+    commercial: { perCapita: 0.12, perIndustrialJob: 0.05, base: 2, market: 0.8, labor: 0.3, tax: 0.5 },
+    industrial: { base: 30, perCapita: 0.18, market: 0.8, labor: 0.4, tax: 0.5, edgeBonus: 0.1 },
+  },
+  attractiveness: {
+    residential: {
+      access: 0.25,
+      landValue: 0.2,
+      services: 0.15,
+      power: 0.15,
+      water: 0.1,
+      transport: 0.15,
+      pollution: 0.25,
+      crime: 0.2,
+    },
+    commercial: {
+      access: 0.25,
+      landValue: 0.2,
+      transport: 0.15,
+      power: 0.15,
+      water: 0.1,
+      services: 0.1,
+      base: 0.05,
+      crime: 0.15,
+      pollution: 0.1,
+    },
+    industrial: {
+      access: 0.25,
+      transport: 0.2,
+      power: 0.2,
+      water: 0.05,
+      cheapLand: 0.1,
+      fireCover: 0.1,
+      base: 0.1,
+      crime: 0.1,
+    },
+  },
+  growth: {
+    spawnRate: 0.5,
+    occupancyRate: 0.35,
+    upgradeOccupancy: 0.9,
+    upgradeDemand: 0.15,
+    upgradeThresholds: [0, 0.3, 0.45, 0.55, 0.65, 1],
+    upgradeRate: 0.25,
+    downgradeOccupancy: 0.3,
+    downgradeDemand: -0.2,
+    downgradeRate: 0.2,
+    decayAttractiveness: 0.15,
+    conditionLoss: 10,
+    conditionGain: 5,
+    abandonEmptyMonths: 6,
+    recoverAttractiveness: 0.35,
+    recoverDemand: 0.2,
+    recoverRate: 0.1,
+    externalWorkers: 10,
+  },
+  traffic: {
+    accessRadius: 3,
+    roadCapacity: 120,
+    shoppingRate: 0.25,
+    nearCommute: 15,
+    maxCommute: 50,
+    congestionThreshold: 0.6,
+    congestionCost: 2,
+  },
+  services: { tileSpread: 2, spreadFalloff: 0.15, localRadius: 3, unpoweredFactor: 0.5, parkRadius: 4, parkValue: 40 },
+  influence: {
+    pollution: { coal: 120, gas: 50, trafficFactor: 0.3, fire: 80, treeReduction: 4, parkReduction: 20 },
+    landValue: {
+      base: 60,
+      waterBonus: 30,
+      waterRadius: 3,
+      perElevation: 3,
+      perTree: 2,
+      education: 0.1,
+      health: 0.1,
+      police: 0.05,
+      roadAccess: 10,
+      centerBonus: 40,
+      pollution: 0.5,
+      crime: 0.3,
+      traffic: 0.1,
+    },
+    crime: { base: 40, perLevel: 12, abandoned: 90, police: 0.6 },
+  },
+  economy: {
+    taxDefault: 7,
+    taxMax: 20,
+    residentialTax: 3.0,
+    commercialTax: 4.0,
+    industrialTax: 3.5,
+    landValueBase: 0.6,
+    upkeep: { road: 0.25, bridge: 1, powerLine: 0.05, pipe: 0.05 },
+    bankruptcyMonths: 12,
+  },
+  fire: {
+    burnout: 100,
+    spread: 0.025,
+    spreadCoverReduction: 0.8,
+    extinguishBase: 0.002,
+    extinguishCover: 0.05,
+    ignitionPerBuilding: 0.0015,
+  },
+  disasters: {
+    randomChancePerMonth: 0.015,
+    floodDays: 30,
+    floodMaxTiles: 60,
+    earthquakeRadius: 20,
+    crisisMonths: 12,
+    crisisIndustrialFactor: 0.6,
+    crisisRevenueFactor: 0.8,
+    blackoutDays: 30,
+    epidemicMonths: 6,
+    epidemicResidentialFactor: 0.85,
+    epidemicCommercialRevenue: 0.85,
+  },
+  history: { maxMonths: 240 },
+} as const;
+
+export const TICKS_PER_MONTH = BALANCE.clock.ticksPerDay * BALANCE.clock.daysPerMonth;
+export const TICKS_PER_YEAR = TICKS_PER_MONTH * BALANCE.clock.monthsPerYear;
+
+/** Simulation ticks per real second for each speed setting (index = speed). */
+export const SPEED_TICKS_PER_SECOND = [0, 20, 40, 80] as const;
+export type Speed = 0 | 1 | 2 | 3;
