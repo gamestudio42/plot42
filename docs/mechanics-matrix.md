@@ -32,7 +32,8 @@ References studied (cloned into the git-ignored `references/` folder):
 | Zoning      | Light/dense zones, level caps                               | Observed   | SC2000 has light and dense zones. Caps are ours.                      |
 | Zoning      | Water required above level 2                                | Observed   | SC2000 limits growth without water; the threshold is ours.            |
 | Zoning      | Pollution > 128 blocks residential immigration              | Code       | `doResIn`. We use a weight instead of a hard cut.                     |
-| Zoning      | Failed commute causes emigration                            | Code       | `doResidential`: `makeTraffic == −1` → `doResOut`. We use access = 0. |
+| Zoning      | Failed commute causes emigration                            | Code       | `doResidential`: `makeTraffic == −1` → `doResOut`. See next row.      |
+| Zoning      | No destination zone on the road component → no growth       | Code       | Micropolis looks for a zone of the target type, even empty. Ours too. |
 | Demand      | Demand is integrated over time (valves)                     | Code       | `setValves` adds a velocity to each valve. We smooth by 50%/month.    |
 | Demand      | Employment ratio drives residential migration               | Code       | `employment = (comHist + indHist) / normalizedResPop`.                |
 | Demand      | Commercial driven by the internal market                    | Code       | `internalMarket = totalPop / 3.7`.                                    |
@@ -49,6 +50,7 @@ References studied (cloned into the git-ignored `references/` folder):
 | Water       | Pumps need power and output more next to water              | Observed   | Values are ours.                                                      |
 | Traffic     | Trips from zones to destinations within a max distance      | Code       | `tryDrive`, `MAX_TRAFFIC_DISTANCE = 30`.                              |
 | Traffic     | Aggregated flow with Dijkstra and congestion feedback       | New        | Replaces Micropolis' random walk.                                     |
+| Traffic     | Congestion averaged over months                             | New        | Avoids the empty/jammed oscillation of a single bottleneck road.      |
 | Traffic     | Traffic produces pollution                                  | Code       | Heavy traffic pollution 75 in `getPollutionValue`.                    |
 | Land value  | Distance to city centre, terrain, pollution, crime          | Code       | `pollutionTerrainLandValueScan`.                                      |
 | Land value  | Services, parks, water proximity                            | Observed   | SC2000 land value factors. Weights are ours.                          |

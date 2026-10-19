@@ -11,6 +11,7 @@ import type { SimulationEngine } from '../engine';
 import { tileVariant } from '../world/variant';
 import type { CityTotals } from './demand';
 import type { RoadNetwork } from './roads';
+import { hasDestination, type ComponentStats } from './traffic';
 
 export const ZONE_KIND: Record<number, ZoneBuildingKind> = {
   [ZoneType.Residential]: 'residential',
@@ -102,6 +103,7 @@ export function maxLevel(density: number, watered: boolean): number {
 export interface GrowthContext {
   totals: CityTotals;
   roads: RoadNetwork;
+  components: ComponentStats;
   /** Residential occupancy factor during an epidemic (1 otherwise). */
   epidemic: number;
 }
@@ -144,6 +146,7 @@ export function updateGrowth(engine: SimulationEngine, ctx: GrowthContext): Grow
     if (demand <= 0 || !roads.hasAccess(i) || w.powered[i] !== 1) continue;
     if ((w.fire[i] as number) > 0 || (w.flood[i] as number) > 0 || w.hasInfra(i, Infra.Rubble))
       continue;
+    if (!hasDestination(ctx.components, roads, i, zone as ZoneType)) continue;
     const a = attractiveness(engine, roads, i, kind);
     if (engine.rng.next() >= g.spawnRate * demand * a) continue;
     const x = w.xOf(i);
@@ -186,7 +189,8 @@ function updateBuilding(
   const g = BALANCE.growth;
   const kind = b.kind as ZoneBuildingKind;
   const spec = ZONE_SPECS[kind];
-  const hasRoad = ctx.roads.hasAccess(i);
+  const hasRoad =
+    ctx.roads.hasAccess(i) && hasDestination(ctx.components, ctx.roads, i, w.zone[i] as ZoneType);
   const powered = w.powered[i] === 1;
   const a = attractiveness(engine, ctx.roads, i, kind);
   b.age++;

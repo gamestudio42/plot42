@@ -207,12 +207,16 @@ export const BALANCE = {
   },
   traffic: {
     accessRadius: 3,
-    roadCapacity: 120,
+    roadCapacity: 200,
     shoppingRate: 0.25,
     nearCommute: 15,
     maxCommute: 50,
+    /** Path search bound as a multiple of maxCommute; trips use any path within it. */
+    searchFactor: 3,
     congestionThreshold: 0.6,
     congestionCost: 2,
+    /** Weight of the new month in the congestion moving average. */
+    congestionSmoothing: 0.5,
   },
   services: {
     tileSpread: 2,

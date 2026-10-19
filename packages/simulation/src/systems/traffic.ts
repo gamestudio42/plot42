@@ -9,10 +9,15 @@ export interface ComponentStats {
   residents: Float64Array;
   commercialJobs: Float64Array;
   industrialJobs: Float64Array;
+  /** Zoned tiles with road access per component, developed or not (trip destinations). */
+  residentialZones: Float64Array;
+  jobZones: Float64Array;
+  edge: Uint8Array;
 }
 
 export interface PathTree {
-  dist: Float32Array;
+  /** Float64 on purpose: keys pushed to the heap must compare exactly with stored distances. */
+  dist: Float64Array;
   parent: Int32Array;
 }
 
@@ -31,8 +36,20 @@ export function componentStats(engine: SimulationEngine, roads: RoadNetwork): Co
     residents: new Float64Array(n),
     commercialJobs: new Float64Array(n),
     industrialJobs: new Float64Array(n),
+    residentialZones: new Float64Array(n),
+    jobZones: new Float64Array(n),
+    edge: roads.edgeConnected,
   };
   const w = engine.world;
+  for (let i = 0; i < w.tileCount; i++) {
+    const zone = w.zone[i] as ZoneType;
+    if (zone === ZoneType.None) continue;
+    const c = roads.componentOf(i);
+    if (c === 0) continue;
+    if (zone === ZoneType.Residential)
+      stats.residentialZones[c] = (stats.residentialZones[c] as number) + 1;
+    else stats.jobZones[c] = (stats.jobZones[c] as number) + 1;
+  }
   for (const b of engine.buildings.values()) {
     if (!isZoneKind(b.kind) || b.abandoned) continue;
     const c = roads.componentOf(w.index(b.x, b.y));
@@ -43,6 +60,24 @@ export function componentStats(engine: SimulationEngine, roads: RoadNetwork): Co
     else stats.industrialJobs[c] = (stats.industrialJobs[c] as number) + b.capacity;
   }
   return stats;
+}
+
+/**
+ * Trip generation succeeds when the tile's road component reaches a destination zone: job zones
+ * for homes, residential zones for job sites, or the region through a map-edge road. Empty zones
+ * count, so the first buildings of a new city can appear before any job exists.
+ */
+export function hasDestination(
+  stats: ComponentStats,
+  roads: RoadNetwork,
+  i: number,
+  zone: ZoneType,
+): boolean {
+  const c = roads.componentOf(i);
+  if (c === 0) return false;
+  if (stats.edge[c] === 1) return true;
+  const targets = zone === ZoneType.Residential ? stats.jobZones : stats.residentialZones;
+  return (targets[c] as number) > 0;
 }
 
 /** Linear distance decay: 1 up to `nearCommute`, 0 at `maxCommute`. */
@@ -59,9 +94,10 @@ function clamp01(v: number): number {
 
 /** Multi-source Dijkstra over road tiles; edge cost grows with last month's congestion. */
 export function roadDijkstra(world: World, sources: number[], congestion: Float32Array): PathTree {
-  const { congestionThreshold, congestionCost, maxCommute } = BALANCE.traffic;
+  const { congestionThreshold, congestionCost, maxCommute, searchFactor } = BALANCE.traffic;
+  const maxCost = maxCommute * searchFactor;
   const size = world.size;
-  const dist = new Float32Array(world.tileCount).fill(Number.POSITIVE_INFINITY);
+  const dist = new Float64Array(world.tileCount).fill(Number.POSITIVE_INFINITY);
   const parent = new Int32Array(world.tileCount).fill(-1);
   const heap = new MinHeap();
   for (const s of sources) {
@@ -82,7 +118,7 @@ export function roadDijkstra(world: World, sources: number[], congestion: Float3
   while (heap.size > 0) {
     const t = heap.pop();
     const d = heap.lastKey;
-    if (d > (dist[t] as number) || d > maxCommute) continue;
+    if (d > (dist[t] as number) || d > maxCost) continue;
     const x = t % size;
     const y = (t / size) | 0;
     if (y > 0) relax(t, t - size, d);
@@ -164,11 +200,12 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
     if (b.kind !== 'residential' || b.abandoned || b.occupancy <= 0) continue;
     const road = roads.accessRoad[w.index(b.x, b.y)] as number;
     if (road < 0) continue;
-    addTrips(flow, jobs, road, labor * b.occupancy, t.maxCommute);
-    addTrips(flow, shops, road, t.shoppingRate * b.occupancy, t.maxCommute);
+    addTrips(flow, jobs, road, labor * b.occupancy);
+    addTrips(flow, shops, road, t.shoppingRate * b.occupancy);
   }
   const funding = engine.economy.funding.transport / 100;
   const capacity = t.roadCapacity * (0.5 + 0.5 * funding);
+  const k = t.congestionSmoothing;
   let sum = 0;
   let roadsCount = 0;
   for (let i = 0; i < w.tileCount; i++) {
@@ -176,9 +213,10 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
       traffic[i] = 0;
       continue;
     }
-    const c = (flow[i] as number) / capacity;
-    traffic[i] = Math.min(255, Math.round(c * 128));
-    sum += Math.min(c, 2);
+    const fresh = Math.min(255, ((flow[i] as number) / capacity) * 128);
+    const value = Math.round((1 - k) * (traffic[i] as number) + k * fresh);
+    traffic[i] = value;
+    sum += value / 128;
     roadsCount++;
   }
   w.influenceDirty = true;
@@ -191,17 +229,10 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
   };
 }
 
-function addTrips(
-  flow: Float32Array,
-  tree: PathTree,
-  start: number,
-  amount: number,
-  maxSteps: number,
-): void {
+/** Adds `amount` trips on every road tile from `start` back to the tree's nearest source. */
+function addTrips(flow: Float32Array, tree: PathTree, start: number, amount: number): void {
   if (!Number.isFinite(tree.dist[start] as number)) return;
-  let node = start;
-  for (let steps = 0; node >= 0 && steps <= maxSteps; steps++) {
+  for (let node = start; node >= 0; node = tree.parent[node] as number) {
     flow[node] = (flow[node] as number) + amount;
-    node = tree.parent[node] as number;
   }
 }

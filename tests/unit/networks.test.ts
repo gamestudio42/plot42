@@ -1,4 +1,5 @@
-import { Infra, ZoneDensity, ZoneType } from '@city/shared';
+import { BALANCE, Infra, ZoneDensity, ZoneType } from '@city/shared';
+import { roadDijkstra } from '@city/simulation';
 import { describe, expect, it } from 'vitest';
 import { addWater, flatEngine } from '../helpers/engine';
 
@@ -19,6 +20,28 @@ describe('road network', () => {
     expect(r.hasAccess(w.index(4, 8))).toBe(true);
     expect(r.accessDistance[w.index(4, 8)]).toBe(3);
     expect(r.hasAccess(w.index(4, 9))).toBe(false);
+  });
+
+  it('reaches every road tile when edge costs are fractional', () => {
+    const e = flatEngine(64);
+    e.execute({ type: 'road', x0: 0, y0: 10, x1: 63, y1: 10 });
+    const w = e.world;
+    const congestion = new Float32Array(w.tileCount);
+    for (let x = 0; x < 64; x++) congestion[w.index(x, 10)] = 0.6 + ((x * 37) % 100) / 73;
+    const tree = roadDijkstra(w, [w.index(63, 10)], congestion);
+    for (let x = 0; x < 64; x++) {
+      const d = tree.dist[w.index(x, 10)] as number;
+      if (d <= BALANCE.traffic.maxCommute * BALANCE.traffic.searchFactor - 10) {
+        expect(Number.isFinite(d)).toBe(true);
+      }
+    }
+    // Distances grow monotonically away from the source along a single road.
+    for (let x = 1; x < 63; x++) {
+      const here = tree.dist[w.index(x, 10)] as number;
+      const next = tree.dist[w.index(x + 1, 10)] as number;
+      if (Number.isFinite(here)) expect(here).toBeGreaterThan(next);
+    }
+    expect(Number.isFinite(tree.dist[w.index(40, 10)] as number)).toBe(true);
   });
 
   it('recomputes only when roads change', () => {

@@ -34,11 +34,19 @@ export function buildTown(
   options: {
     power?: boolean;
     water?: boolean;
+    /** Number of inland pumps stacked north of the first one (1..8). */
+    pumps?: number;
     edgeRoad?: boolean;
     industryNearHomes?: boolean;
   } = {},
 ): CityLayout {
-  const { power = true, water = true, edgeRoad = true, industryNearHomes = false } = options;
+  const {
+    power = true,
+    water = true,
+    pumps = 8,
+    edgeRoad = true,
+    industryNearHomes = false,
+  } = options;
   const avenueY = 20;
   const x0 = edgeRoad ? 0 : 4;
   const x1 = 40;
@@ -73,11 +81,86 @@ export function buildTown(
     run(engine, { type: 'powerLine', x0: 36, y0: avenueY + 3, x1: 43, y1: avenueY + 3 });
   }
   if (water) {
-    run(engine, { type: 'place', kind: 'waterPump', x: 44, y: avenueY - 4 });
+    // Adjacent pumps conduct power and water to each other, so the column needs one link.
+    for (let p = 0; p < Math.max(1, Math.min(8, pumps)); p++) {
+      run(engine, { type: 'place', kind: 'waterPump', x: 44, y: avenueY - 4 - 2 * p });
+    }
     run(engine, { type: 'powerLine', x0: 44, y0: avenueY - 2, x1: 44, y1: avenueY + 1 });
     run(engine, { type: 'pipe', x0: 43, y0: avenueY - 3, x1: 7, y1: avenueY - 3 });
     run(engine, { type: 'pipe', x0: 7, y0: avenueY + 2, x1: 43, y1: avenueY + 2 });
     run(engine, { type: 'pipe', x0: 43, y0: avenueY - 3, x1: 43, y1: avenueY + 2 });
   }
   return { avenueY, x0, x1 };
+}
+
+const PLANT_SLOTS = [
+  [47, 22],
+  [47, 24],
+  [49, 22],
+  [49, 24],
+  [51, 22],
+  [51, 24],
+] as const;
+const PUMP_SLOTS = [16, 14, 12, 10, 8, 6, 4, 2].map((y) => [46, y] as const);
+
+/**
+ * A minimal automated player for `buildTown` cities: adds a gas plant or a pump next to the
+ * existing ones when demand passes 85% of supply. Returns the number of buildings added.
+ */
+export function maintainTown(engine: SimulationEngine): number {
+  const s = engine.stats();
+  let added = 0;
+  const tryPlace = (
+    kind: 'gasPlant' | 'waterPump',
+    slots: readonly (readonly [number, number])[],
+  ) => {
+    for (const [x, y] of slots) {
+      if (engine.execute({ type: 'place', kind, x, y }).ok) {
+        added++;
+        return;
+      }
+    }
+  };
+  if (s.power.demand > 0.85 * s.power.supply) tryPlace('gasPlant', PLANT_SLOTS);
+  if (s.water.supply > 0 && s.water.demand > 0.85 * s.water.supply)
+    tryPlace('waterPump', PUMP_SLOTS);
+  return added;
+}
+
+/**
+ * Homes on the west half of a street, shops and industry on the east half, powered by a gas
+ * plant through a ring of power lines. With `gap`, the street is cut between the two halves
+ * and does not reach the map edge, so homes cannot reach any job.
+ */
+export function buildCorridor(
+  engine: SimulationEngine,
+  options: { gap?: boolean } = {},
+): CityLayout {
+  const avenueY = 20;
+  if (options.gap) {
+    run(engine, { type: 'road', x0: 4, y0: avenueY, x1: 20, y1: avenueY });
+    run(engine, { type: 'road', x0: 24, y0: avenueY, x1: 40, y1: avenueY });
+  } else {
+    run(engine, { type: 'road', x0: 4, y0: avenueY, x1: 40, y1: avenueY });
+  }
+  const zone = (z: ZoneType, ax0: number, ay0: number, ax1: number, ay1: number) =>
+    run(engine, {
+      type: 'zone',
+      zone: z,
+      density: ZoneDensity.Light,
+      x0: ax0,
+      y0: ay0,
+      x1: ax1,
+      y1: ay1,
+    });
+  zone(ZoneType.Residential, 4, avenueY - 3, 20, avenueY - 1);
+  zone(ZoneType.Residential, 4, avenueY + 1, 20, avenueY + 2);
+  zone(ZoneType.Commercial, 24, avenueY - 3, 40, avenueY - 1);
+  zone(ZoneType.Industrial, 24, avenueY + 1, 40, avenueY + 3);
+  run(engine, { type: 'place', kind: 'gasPlant', x: 44, y: avenueY - 2 });
+  run(engine, { type: 'powerLine', x0: 41, y0: avenueY - 1, x1: 43, y1: avenueY - 1 });
+  run(engine, { type: 'powerLine', x0: 41, y0: avenueY - 4, x1: 41, y1: avenueY + 4 });
+  run(engine, { type: 'powerLine', x0: 3, y0: avenueY - 4, x1: 40, y1: avenueY - 4 });
+  run(engine, { type: 'powerLine', x0: 3, y0: avenueY - 4, x1: 3, y1: avenueY + 2 });
+  return { avenueY, x0: 4, x1: 40 };
 }

@@ -353,6 +353,7 @@ export class SimulationEngine {
     this.lastGrowth = updateGrowth(this, {
       totals: before,
       roads: this.roads,
+      components: this.lastTraffic.components,
       epidemic: epidemic
         ? d.epidemicResidentialFactor + (1 - d.epidemicResidentialFactor) * healthCover
         : 1,

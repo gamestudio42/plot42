@@ -9,7 +9,15 @@ export {
   type System,
 } from './engine';
 export { hashSnapshot, hashState, hashTerrain } from './persistence/hash';
-export { buildTown, flatCity, run, type CityLayout } from './scenarios/builders';
+export { collectMetrics, type MonthMetrics } from './report';
+export {
+  buildCorridor,
+  buildTown,
+  flatCity,
+  maintainTown,
+  run,
+  type CityLayout,
+} from './scenarios/builders';
 export {
   cityTotals,
   demandTargets,
@@ -21,7 +29,7 @@ export { attractiveness, maxLevel, transportScore, ZONE_KIND } from './systems/g
 export { boxBlur, populationCentre } from './systems/influence';
 export { RoadNetwork } from './systems/roads';
 export { SERVICE_LAYERS, stationAccessRoads } from './systems/services';
-export { commuteDecay, roadDijkstra, type TrafficResult } from './systems/traffic';
+export { commuteDecay, hasDestination, roadDijkstra, type TrafficResult } from './systems/traffic';
 export {
   powerDemand,
   powerSupply,

@@ -139,9 +139,14 @@ Requirements for any development: road within 3 tiles and power.
 3. Per component: residents, workforce, commercial and industrial jobs, edge connection.
    A component touching the map edge counts as a source of external jobs and workers (the
    neighbouring region), so edge roads also seed the Dijkstra below.
+   **Trip generation:** a zone tile can develop (and its building keeps residents or workers)
+   only if its road component contains a destination zone: any C or I zone tile for homes, any
+   R zone tile for job sites, or a map-edge road. Empty zones count as destinations, so a new
+   city can start. A failed trip behaves like a missing road (occupancy target 0).
 4. Multi-source Dijkstra from job sites (C and I access roads) and from homes (R access roads).
    Edge cost `1 + 2 · max(0, congestion − 0.6)²` using last month's congestion. Ties are broken
-   by tile index.
+   by tile index. The search stops at `3 · maxCommute`; distances are stored in float64 so heap
+   keys compare exactly with stored values.
 5. Distance decay: `1` up to 15 road tiles, linear to 0 at 50.
 6. Access values:
    - R: `clamp((jobs + external) / max(workforce, 1)) · decay(distance to jobs)`
@@ -149,9 +154,10 @@ Requirements for any development: road within 3 tiles and power.
    - I: `clamp(workforce / max(jobs, 10)) · decay(distance to homes)`
 7. Trip assignment: each residential building sends `0.45 · occupancy` commuters to its nearest
    job site and `0.25 · occupancy` shoppers to its nearest commercial site, following the
-   Dijkstra parent pointers. Flow accumulates per road tile.
-8. Congestion `= flow / capacity`, capacity `= 120 · (0.5 + 0.5 · transportFunding)`. The traffic
-   map stores `min(255, congestion · 128)`.
+   Dijkstra parent pointers (any reachable path, even beyond `maxCommute`, so a jammed road
+   does not empty itself the next month). Flow accumulates per road tile.
+8. Congestion `= flow / capacity`, capacity `= 200 · (0.5 + 0.5 · transportFunding)`. The traffic
+   map stores a moving average: `traffic ← round(0.5 · traffic + 0.5 · min(255, congestion · 128))`.
 
 ## 8. Power and water
 
