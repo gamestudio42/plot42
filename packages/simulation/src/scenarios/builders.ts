@@ -2,13 +2,28 @@ import { ZoneDensity, ZoneType, type Command, type CommandResult } from '@city/s
 import { createEngine, type SimulationEngine } from '../engine';
 
 /** Flat grass map without water, hills or trees. */
-export function flatCity(seed = 'scenario', size = 64): SimulationEngine {
+export function flatCity(seed = 'scenario', size = 64, funds?: number): SimulationEngine {
   return createEngine({
     seed,
     size,
     name: 'Cenário',
     terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 },
+    ...(funds === undefined ? {} : { funds }),
   });
+}
+
+/**
+ * Police, fire, school and hospital along the town's avenue, plus a few parks. Placed between
+ * the zone blocks so every station touches a road.
+ */
+export function addServices(engine: SimulationEngine, layout: CityLayout): void {
+  const y = layout.avenueY;
+  // Stations sit on the free tiles west of the first residential block and next to the plant.
+  run(engine, { type: 'place', kind: 'policeStation', x: 4, y: y - 3 });
+  run(engine, { type: 'place', kind: 'fireStation', x: 4, y: y + 2 });
+  run(engine, { type: 'place', kind: 'school', x: 37, y: y - 3 });
+  run(engine, { type: 'place', kind: 'hospital', x: 37, y: y + 4 });
+  for (const x of [1, 2]) run(engine, { type: 'place', kind: 'park', x, y: y - 2 });
 }
 
 export function run(engine: SimulationEngine, command: Command): CommandResult {
@@ -37,16 +52,14 @@ export function buildTown(
     /** Number of inland pumps stacked north of the first one (1..8). */
     pumps?: number;
     edgeRoad?: boolean;
-    industryNearHomes?: boolean;
+    /**
+     * `mixed` (default): industry beside the eastern homes. `near`: an industrial strip right
+     * across the avenue from every home. `far`: the same strip on a street eight tiles south.
+     */
+    industry?: 'mixed' | 'near' | 'far';
   } = {},
 ): CityLayout {
-  const {
-    power = true,
-    water = true,
-    pumps = 8,
-    edgeRoad = true,
-    industryNearHomes = false,
-  } = options;
+  const { power = true, water = true, pumps = 8, edgeRoad = true, industry = 'mixed' } = options;
   const avenueY = 20;
   const x0 = edgeRoad ? 0 : 4;
   const x1 = 40;
@@ -68,9 +81,14 @@ export function buildTown(
   for (let x = 7; x + 4 <= x1; x += 6) {
     zone(ZoneType.Residential, x, avenueY - 6, x + 4, avenueY - 1, true);
   }
-  if (industryNearHomes) {
+  if (industry === 'near') {
     zone(ZoneType.Industrial, 7, avenueY + 1, 35, avenueY + 3, true);
     zone(ZoneType.Commercial, 7, avenueY + 4, 35, avenueY + 6);
+  } else if (industry === 'far') {
+    zone(ZoneType.Commercial, 7, avenueY + 1, 35, avenueY + 3);
+    run(engine, { type: 'road', x0: 6, y0: avenueY + 8, x1: 36, y1: avenueY + 8 });
+    zone(ZoneType.Industrial, 7, avenueY + 9, 35, avenueY + 11, true);
+    if (power) run(engine, { type: 'powerLine', x0: 36, y0: avenueY + 4, x1: 36, y1: avenueY + 9 });
   } else {
     zone(ZoneType.Commercial, 7, avenueY + 1, 23, avenueY + 3, true);
     zone(ZoneType.Industrial, 25, avenueY + 1, 35, avenueY + 6, true);

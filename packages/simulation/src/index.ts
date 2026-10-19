@@ -11,6 +11,7 @@ export {
 export { hashSnapshot, hashState, hashTerrain } from './persistence/hash';
 export { collectMetrics, type MonthMetrics } from './report';
 export {
+  addServices,
   buildCorridor,
   buildTown,
   flatCity,

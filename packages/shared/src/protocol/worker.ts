@@ -1,4 +1,4 @@
-import type { Speed } from '../balance/balance';
+import type { Difficulty, Speed } from '../balance/balance';
 import type { Command, CommandResult } from '../commands/commands';
 import type { EngineSnapshot } from '../schemas/snapshot';
 import type { BuildingRecord } from '../types/buildings';
@@ -22,6 +22,7 @@ export interface NewCityOptions {
   seed: string;
   size: number;
   terrain: TerrainOptions;
+  difficulty?: Difficulty;
 }
 
 export type ToWorkerMessage =

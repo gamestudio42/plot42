@@ -12,6 +12,7 @@ import {
   type EconomyState,
   type EngineSnapshot,
   type HistoryEntry,
+  type Difficulty,
   type NewCityOptions,
   type RciValues,
   type SimEvent,
@@ -42,6 +43,10 @@ export interface EngineOptions {
   seed: string | number;
   size?: number;
   terrain?: Partial<TerrainOptions>;
+  /** Starting funds preset; defaults to `BALANCE.startingFunds`. */
+  difficulty?: Difficulty;
+  /** Explicit starting funds (overrides the difficulty). */
+  funds?: number;
 }
 
 export function createEngine(options: NewCityOptions | EngineOptions): SimulationEngine {
@@ -111,7 +116,13 @@ export class SimulationEngine {
     const world = new World(size);
     const rng = Rng.fromSeed(seed);
     generateTerrain(world, rng.fork(), { ...DEFAULT_TERRAIN, ...options.terrain });
-    return new SimulationEngine(world, rng, seed, options.name ?? 'Nova Cidade');
+    const engine = new SimulationEngine(world, rng, seed, options.name ?? 'Nova Cidade');
+    engine.economy.funds =
+      options.funds ??
+      (options.difficulty
+        ? BALANCE.startingFundsByDifficulty[options.difficulty]
+        : BALANCE.startingFunds);
+    return engine;
   }
 
   static fromSnapshot(snapshot: EngineSnapshot): SimulationEngine {

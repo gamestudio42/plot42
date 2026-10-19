@@ -18,6 +18,11 @@
 - Assert **invariants and trends**, never exact growth numbers: "population with power is at
   least 5× population without power", not "population is 1234".
 - Always use fixed seeds. When a scenario compares two variants, both use the same seed.
+- Each scenario records its monthly metrics and named checks through `tests/scenarios/harness.ts`
+  and writes `reports/scenarios/<name>.json` (git-ignored) before asserting, so a failing run
+  still leaves a report to inspect.
+- Scenarios that grow for years use `maintainTown`, a minimal automated player that adds
+  plants and pumps when demand passes 85% of supply.
 
 ## Required scenarios
 

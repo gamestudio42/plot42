@@ -232,6 +232,8 @@ police, fire, health, education; 0..100%). Power and water upkeep is fixed.
 Debt: every month with a negative balance increments `monthsInDebt`; twelve consecutive months
 declare bankruptcy (no construction until the balance is positive again).
 
+Starting funds by difficulty: easy 20 000, normal 10 000, hard 5 000.
+
 ## 11. Events and disasters
 
 - **Fire** (tick): intensity grows by 1 per tick; at 100 the tile burns out (building → rubble,

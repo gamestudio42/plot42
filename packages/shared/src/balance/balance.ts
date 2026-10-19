@@ -103,8 +103,15 @@ export const ZONE_SPECS: Record<
   },
 };
 
+export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
 export const BALANCE = {
   startingFunds: 20000,
+  startingFundsByDifficulty: { easy: 20000, normal: 10000, hard: 5000 } satisfies Record<
+    Difficulty,
+    number
+  >,
   map: { defaultSize: 128, maxHeight: 12 },
   costs: {
     road: 10,
