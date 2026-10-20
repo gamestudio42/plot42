@@ -1,14 +1,64 @@
-# Urbe
+<p align="center">
+  <img src="apps/web/public/favicon.svg" width="88" alt="Urbe">
+</p>
 
-Urbe is an isometric city builder that runs in the browser, inspired by the mechanics of classic
-city simulators: zoning, growth driven by demand, power and water networks, traffic, budget,
-public services, pollution, crime, land value and disasters.
+<h1 align="center">Urbe</h1>
 
-The game interface is in Brazilian Portuguese. Code and docs are in English.
+<p align="center"><strong>You set the conditions. The city decides the rest.</strong></p>
 
-Play it at [gamestudio42.github.io/urbe](https://gamestudio42.github.io/urbe/).
+<p align="center">
+  An isometric city builder that runs in the browser.
+  Zone the land, connect power and water, keep the budget alive —
+  then watch demand, traffic and disasters do the rest.
+  No install. Interface in Brazilian Portuguese.
+</p>
 
-## Quick start
+<p align="center">
+  <a href="https://gamestudio42.github.io/urbe/">
+    <img src="docs/screenshots/play.svg" alt="Play Urbe in the browser" height="56">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://gamestudio42.github.io/urbe/">
+    <img src="docs/screenshots/menu.jpg" alt="Urbe main menu over a living city" width="920">
+  </a>
+</p>
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/city.jpg" alt="A dense isometric city with traffic and industry" width="920">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/play.jpg" alt="Founding a town: HUD, toolbar, zones and a coal plant" width="920">
+</p>
+
+<p align="center">
+  <a href="https://gamestudio42.github.io/urbe/">
+    <img src="docs/screenshots/play.svg" alt="Play Urbe in the browser" height="56">
+  </a>
+</p>
+
+## Why Urbe
+
+- **Play in the browser.** Open the link and found a city. Nothing to download.
+- **You create the conditions.** Roads, zones, plants and pumps. The simulator grows — or abandons — the lots.
+- **A living city.** Cars follow traffic, chimneys smoke, water shimmers, fire engines roll out.
+- **A mayor's desk.** Taxes, department funding, charts, thematic maps and a tile inspector that tells you *why* a lot is not growing.
+- **Original soundtrack.** Calm lo-fi, synthesized on the fly — a slower piece in the menu, another in the city.
+- **Your city stays with you.** Autosave in the browser, plus export and import of `.city.json` files.
+
+## Play
+
+| | |
+| --- | --- |
+| **Live game** | [gamestudio42.github.io/urbe](https://gamestudio42.github.io/urbe/) |
+| **Hotkeys** | `R` road · `1–6` zones · `E` power · `T` water · `P` pause · `M` sound |
+| **Language** | Interface in Brazilian Portuguese · code and docs in English |
+
+## Develop
 
 ```sh
 pnpm install
@@ -17,50 +67,23 @@ pnpm dev        # http://localhost:5173
 
 Or with Docker: `docker compose up`.
 
-## Playing
+| Command         | Description                                                 |
+| --------------- | ----------------------------------------------------------- |
+| `pnpm check`    | Lint, type check, unit/integration/scenario tests and build |
+| `pnpm test:e2e` | Playwright end-to-end tests                                 |
+| `pnpm sim`      | Headless simulation over presets and seeds                  |
+| `pnpm bench`    | Tick timing benchmark (`--strict` for CI)                   |
 
-Pick a name, seed, map size, difficulty and terrain in the menu. Lay roads, zone residential,
-commercial and industrial areas, and connect them to power and water; the city grows where
-there is demand, access and services. The toolbar shows each tool's cost and hotkey; `Esc`
-cancels, `P` pauses, `M` toggles the sound and the system panel lists every shortcut.
-A scripted city lives behind the main menu while you pick the options, and a calm lo-fi
-soundtrack is synthesized on the fly (a slower piece in the menu, another in the city; it
-quiets down while paused and can be turned off in the system panel).
-Cars follow the simulated traffic, chimneys smoke, water shimmers and fire engines drive to
-covered fires; the animations can be switched off in the system panel (they never change the
-simulation). Cities are saved in the browser (IndexedDB, with autosave) and can be exported to a
-`.city.json` file.
+Every push to `main` publishes `apps/web/dist` to GitHub Pages. To host it elsewhere:
 
-## Scripts
+```sh
+BASE_PATH=/path/ pnpm build
+```
 
-| Command         | Description                                                   |
-| --------------- | ------------------------------------------------------------- |
-| `pnpm dev`      | Development server                                            |
-| `pnpm build`    | Production build (`apps/web/dist`)                            |
-| `pnpm preview`  | Serve the production build                                    |
-| `pnpm check`    | Lint, type check, unit/integration/scenario tests and build   |
-| `pnpm test:e2e` | Playwright end-to-end tests                                   |
-| `pnpm sim`      | Headless simulation over presets and seeds (JSON reports)     |
-| `pnpm bench`    | Tick timing benchmark against the budgets (`--strict` for CI) |
+Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md)
 
-## Deploy
+## Licence
 
-The game is a static site. Every push to `main` builds `apps/web/dist` with
-`BASE_PATH=/urbe/` and publishes it to GitHub Pages at
-https://gamestudio42.github.io/urbe/. To host it elsewhere, run
-`BASE_PATH=/path/ pnpm build` and serve the `dist` folder.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Simulation specification](docs/simulation-spec.md)
-- [Balancing and performance](docs/balancing.md)
-- [Mechanics matrix](docs/mechanics-matrix.md) (provenance of every rule)
-- [Roadmap](docs/roadmap.md)
-- [Testing strategy](docs/testing-strategy.md)
-- [Agent guide](AGENTS.md)
-
-## Credits and licence
-
-Original code, procedurally generated sprites and synthesized sounds and music, MIT licence. Micropolis (GPLv3) and OpenSC2K
-were studied as references for behaviour only; no code or assets were copied.
+Original code, procedural sprites and synthesized sound and music, MIT licence.
+Micropolis (GPLv3) and OpenSC2K were studied as references for behaviour only;
+no code or assets were copied.
