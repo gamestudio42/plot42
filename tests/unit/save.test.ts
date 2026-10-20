@@ -8,6 +8,7 @@ import {
 } from '@city/shared';
 import { buildTown, flatCity, hashState, SimulationEngine } from '@city/simulation';
 import { describe, expect, it } from 'vitest';
+import { saveFileName } from '../../apps/web/src/persistence/saves';
 
 const META = { population: 0, funds: 0, savedAt: '2026-01-01T00:00:00.000Z' };
 
@@ -137,5 +138,15 @@ describe('save codec', () => {
       currentVersion: 2,
     });
     expect(broken.ok ? [] : broken.errors.map((e) => e.code)).toEqual(['MIGRATION_FAILED']);
+  });
+});
+
+describe('save file name', () => {
+  it('keeps the city name readable, dropping accents and symbols', () => {
+    expect(saveFileName('Cenário')).toBe('Cenario.city.json');
+    expect(saveFileName('São Paulo')).toBe('Sao-Paulo.city.json');
+    expect(saveFileName('Vila E2E')).toBe('Vila-E2E.city.json');
+    expect(saveFileName('  Ação & Cia! ')).toBe('Acao-Cia.city.json');
+    expect(saveFileName('***')).toBe('cidade.city.json');
   });
 });

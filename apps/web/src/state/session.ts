@@ -1,5 +1,4 @@
 import {
-  SAVE_FILE_EXTENSION,
   type CityStats,
   type Command,
   type CommandResult,
@@ -20,6 +19,7 @@ import {
   listSaves,
   manualSlotId,
   readSave,
+  saveFileName,
   SaveStorageError,
   writeSave,
   type SaveSlot,
@@ -359,15 +359,10 @@ export class GameSession {
   async exportFile(): Promise<void> {
     if (!this.client.world) return;
     const { text, meta } = await this.client.exportSave(new Date().toISOString());
-    const slug =
-      meta.name
-        .normalize('NFD')
-        .replace(/[^\w-]+/g, '-')
-        .replace(/^-|-$/g, '') || 'cidade';
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${slug}${SAVE_FILE_EXTENSION}`;
+    link.download = saveFileName(meta.name);
     document.body.appendChild(link);
     link.click();
     link.remove();

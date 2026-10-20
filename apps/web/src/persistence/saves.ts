@@ -1,4 +1,4 @@
-import type { SaveMeta } from '@city/shared';
+import { SAVE_FILE_EXTENSION, type SaveMeta } from '@city/shared';
 
 const DB_NAME = 'city-builder';
 const DB_VERSION = 1;
@@ -29,6 +29,16 @@ export class SaveStorageError extends Error {
 /** Slot of the manual save of a city: one per name and seed. */
 export function manualSlotId(name: string, seed: string): string {
   return `city:${seed}:${name}`;
+}
+
+/** Download file name for a city: ASCII letters, digits and hyphens, accents dropped. */
+export function saveFileName(name: string): string {
+  const slug = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${slug || 'cidade'}${SAVE_FILE_EXTENSION}`;
 }
 
 function toStorageError(error: unknown): SaveStorageError {
