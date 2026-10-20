@@ -198,7 +198,7 @@ export class AnimationLayer {
 
     const alpha = frame.overlay ? OVERLAY_ALPHA : 1;
     this.syncVehicles(world, !frame.underground, alpha);
-    this.syncPuffs(!frame.underground, alpha);
+    this.syncPuffs(!frame.underground, alpha, frame.zoom);
   }
 
   stats(): AnimationStats {
@@ -320,7 +320,7 @@ export class AnimationLayer {
     }
   }
 
-  private syncPuffs(show: boolean, alpha: number): void {
+  private syncPuffs(show: boolean, alpha: number, zoom: number): void {
     const puffs = this.puffs.puffs;
     const tex = this.factory.smokePuff();
     while (this.puffSprites.length < puffs.length) {
@@ -336,7 +336,7 @@ export class AnimationLayer {
         sprite.visible = false;
         continue;
       }
-      const look = puffLook(p);
+      const look = puffLook(p, zoom);
       sprite.visible = true;
       sprite.position.set(p.x, p.y);
       sprite.scale.set(look.scale);

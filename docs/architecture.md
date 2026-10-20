@@ -194,6 +194,9 @@ Pixi sprites.
 - **Chimney smoke** (`smoke.ts`) rises from coal and gas plants while online and from working
   industry of level 3 or more (powered, occupied, not abandoned). Chimney positions come from
   `renderer/chimneys.ts`, shared with the building textures, which no longer draw static smoke.
+  At most 300 puffs: when the chimneys in view would need more, every chimney emits
+  proportionally less (and the first one served rotates each frame), so all of them keep
+  smoking. Puffs grow up to 2× when zoomed out (`1/√zoom`) so they stay readable.
 - **Water glints** (`water.ts`) flash on a stable third of the open-water tiles; they use real
   time, so they keep shimmering while paused.
 - **Fire engines** (`fireDispatch.ts`) leave a station for fires on covered tiles

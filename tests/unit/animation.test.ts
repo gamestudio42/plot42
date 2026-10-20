@@ -19,7 +19,15 @@ import {
   routeBfs,
   type Dir,
 } from '../../apps/web/src/renderer/animation/roads';
-import { SmokeSim, isSmoking, smokeVents } from '../../apps/web/src/renderer/animation/smoke';
+import {
+  MAX_PUFFS,
+  SmokeSim,
+  emissionShare,
+  isSmoking,
+  puffLook,
+  puffZoomBoost,
+  smokeVents,
+} from '../../apps/web/src/renderer/animation/smoke';
 import { VehicleSim, carDensity } from '../../apps/web/src/renderer/animation/vehicles';
 import { sparkleAlpha, sparkleSpots } from '../../apps/web/src/renderer/animation/water';
 import { addWater, flatEngine } from '../helpers/engine';
@@ -238,6 +246,30 @@ describe('chimney smoke', () => {
     expect(sim.puffs.length).toBeLessThanOrEqual(5);
     for (let k = 0; k < 40; k++) sim.step([], 0.2);
     expect(sim.puffs).toHaveLength(0);
+  });
+
+  it('shares the puff budget so every chimney in view keeps smoking', () => {
+    expect(emissionShare([1, 0.7, 0.5])).toBe(1);
+    const strengths = Array.from({ length: 120 }, (_, k) => [1, 0.7, 0.5][k % 3] as number);
+    expect(emissionShare(strengths)).toBeLessThan(1);
+
+    // Vents 100 px apart; a puff drifts less than 60 px, so its origin is known.
+    const vents = strengths.map((strength, k) => ({ key: k, x: k * 100, y: 0, strength }));
+    const sim = new SmokeSim(createRandom(4));
+    for (let k = 0; k < 600; k++) sim.step(vents, 1 / 60);
+    expect(sim.puffs.length).toBeLessThanOrEqual(MAX_PUFFS);
+    const smoking = new Set(sim.puffs.map((p) => Math.floor((p.x + 10) / 100)));
+    expect(smoking.size).toBe(vents.length);
+  });
+
+  it('enlarges puffs when zoomed out, never when zoomed in', () => {
+    expect(puffZoomBoost(1)).toBe(1);
+    expect(puffZoomBoost(2.5)).toBe(1);
+    expect(puffZoomBoost(0.5)).toBeGreaterThan(1);
+    expect(puffZoomBoost(0.25)).toBeLessThanOrEqual(2);
+    const puff = { x: 0, y: 0, vx: 0, vy: 0, age: 1, life: 3, weight: 1 };
+    expect(puffLook(puff, 0.4).scale).toBeGreaterThan(puffLook(puff, 1).scale);
+    expect(puffLook(puff, 0.4).alpha).toBeLessThanOrEqual(1);
   });
 });
 

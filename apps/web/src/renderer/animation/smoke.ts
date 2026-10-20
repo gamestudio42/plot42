@@ -76,15 +76,33 @@ export interface Puff {
   weight: number;
 }
 
-export const MAX_PUFFS = 200;
+export const MAX_PUFFS = 300;
 const PUFFS_PER_SECOND = 2.2;
 const RISE = 16;
 const WIND = 7;
+const LIFE_MIN = 2.4;
+const LIFE_SPREAD = 1.2;
+/** Share of the puff budget the expected steady state may fill, leaving room for variance. */
+const BUDGET_USE = 0.85;
+/** Upper bound of the zoomed-out size boost. */
+const MAX_ZOOM_BOOST = 2;
+
+/**
+ * Emission rate multiplier for a set of vents: 1 while the budget suffices, otherwise every
+ * vent emits proportionally less so all chimneys in view keep smoking.
+ */
+export function emissionShare(strengths: readonly number[], maxPuffs = MAX_PUFFS): number {
+  let demand = 0;
+  for (const s of strengths) demand += PUFFS_PER_SECOND * s * (LIFE_MIN + LIFE_SPREAD / 2);
+  const budget = maxPuffs * BUDGET_USE;
+  return demand > budget ? budget / demand : 1;
+}
 
 /** Screen-space smoke particles; emission and motion use game time. */
 export class SmokeSim {
   readonly puffs: Puff[] = [];
   private credit = new Map<number, number>();
+  private turn = 0;
 
   constructor(
     private readonly random: Random,
@@ -94,6 +112,7 @@ export class SmokeSim {
   clear(): void {
     this.puffs.length = 0;
     this.credit.clear();
+    this.turn = 0;
   }
 
   /**
@@ -114,8 +133,17 @@ export class SmokeSim {
       this.puffs[kept++] = p;
     }
     this.puffs.length = kept;
-    for (const v of vents) {
-      let credit = (this.credit.get(v.key) ?? this.random()) + dt * PUFFS_PER_SECOND * v.strength;
+    const share = emissionShare(
+      vents.map((v) => v.strength),
+      this.maxPuffs,
+    );
+    // When the cap is hit anyway, the vent served first rotates so no chimney is starved.
+    const n = vents.length;
+    const start = n > 0 ? this.turn++ % n : 0;
+    for (let k = 0; k < n; k++) {
+      const v = vents[(start + k) % n] as (typeof vents)[number];
+      let credit =
+        (this.credit.get(v.key) ?? this.random()) + dt * PUFFS_PER_SECOND * v.strength * share;
       while (credit >= 1 && this.puffs.length < this.maxPuffs) {
         credit -= 1;
         this.puffs.push({
@@ -124,7 +152,7 @@ export class SmokeSim {
           vx: WIND * (0.6 + this.random() * 0.8),
           vy: -RISE * (0.8 + this.random() * 0.4),
           age: 0,
-          life: 2.4 + this.random() * 1.2,
+          life: LIFE_MIN + this.random() * LIFE_SPREAD,
           weight: 0.5 + v.strength * 0.5,
         });
       }
@@ -133,11 +161,18 @@ export class SmokeSim {
   }
 }
 
-/** Scale and opacity of a puff over its life: it grows and fades. */
-export function puffLook(p: Puff): { scale: number; alpha: number } {
+/** Size multiplier for zoomed-out views, so puffs shrink slower than the city around them. */
+export function puffZoomBoost(zoom: number): number {
+  return zoom >= 1 ? 1 : Math.min(MAX_ZOOM_BOOST, 1 / Math.sqrt(zoom));
+}
+
+/** Scale and opacity of a puff over its life (it grows and fades) at the given camera zoom. */
+export function puffLook(p: Puff, zoom = 1): { scale: number; alpha: number } {
   const k = Math.min(1, p.age / p.life);
+  const boost = puffZoomBoost(zoom);
+  const alpha = 0.85 * (1 - k * k) * (k < 0.08 ? k / 0.08 : 1) * (0.6 + 0.4 * p.weight);
   return {
-    scale: (0.45 + 1.2 * k) * p.weight,
-    alpha: 0.85 * (1 - k * k) * (k < 0.08 ? k / 0.08 : 1) * (0.6 + 0.4 * p.weight),
+    scale: (0.45 + 1.2 * k) * p.weight * boost,
+    alpha: Math.min(1, alpha * (1 + 0.25 * (boost - 1))),
   };
 }
