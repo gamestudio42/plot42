@@ -1,5 +1,6 @@
 import type { Difficulty, Speed } from '../balance/balance';
 import type { Command, CommandResult } from '../commands/commands';
+import type { SaveError, SaveMeta } from '../schemas/save';
 import type { EngineSnapshot } from '../schemas/snapshot';
 import type { BuildingRecord } from '../types/buildings';
 import type { CityStats, HistoryEntry, SimEvent } from '../types/stats';
@@ -32,7 +33,14 @@ export type ToWorkerMessage =
   | { type: 'setSpeed'; speed: Speed }
   | { type: 'runTicks'; id: number; ticks: number }
   | { type: 'snapshot'; id: number }
-  | { type: 'hash'; id: number };
+  | { type: 'hash'; id: number }
+  /** Encodes the current city as a save file (the host supplies the timestamp). */
+  | { type: 'exportSave'; id: number; savedAt: string }
+  /** Decodes and validates a save; on success it replaces the current city. */
+  | { type: 'importSave'; id: number; text: string };
+
+export type LoadResult =
+  { ok: true; meta: SaveMeta; migratedFrom: number | null } | { ok: false; errors: SaveError[] };
 
 export interface FullState {
   size: number;
@@ -71,4 +79,7 @@ export type FromWorkerMessage =
   | { type: 'ticksDone'; id: number }
   | { type: 'snapshot'; id: number; snapshot: EngineSnapshot }
   | { type: 'hash'; id: number; hash: string }
+  | { type: 'saveData'; id: number; text: string; meta: SaveMeta }
+  /** Sent after the `init` of the loaded city when the load succeeded. */
+  | { type: 'loadResult'; id: number; result: LoadResult }
   | { type: 'error'; message: string };

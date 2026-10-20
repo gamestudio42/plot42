@@ -271,18 +271,40 @@ export const BALANCE = {
     bankruptcyMonths: 12,
   },
   fire: {
+    /** Ticks of burning before a building is destroyed. */
     burnout: 100,
+    /** Ticks of burning before a forest tile is consumed. */
+    treeBurnout: 30,
+    /** Chance per tick that a burning tile ignites a flammable orthogonal neighbour. */
     spread: 0.025,
+    /** Relative flammability of a fully wooded tile (scaled by tree density / 3). */
+    treeFlammability: 0.4,
     spreadCoverReduction: 0.8,
     extinguishBase: 0.002,
     extinguishCover: 0.05,
-    ignitionPerBuilding: 0.0015,
+    /** Monthly chance that a building catches fire without coverage (disasters enabled). */
+    ignitionPerBuilding: 0.0005,
+    /** Condition lost per point of intensity when a fire is put out. */
+    damagePerIntensity: 0.25,
   },
   disasters: {
     randomChancePerMonth: 0.015,
     floodDays: 30,
+    /** The water rises during the first days of a flood, then stays until it recedes. */
+    floodSpreadDays: 10,
+    floodSpreadChance: 0.5,
     floodMaxTiles: 60,
+    /** A tile floods when its elevation is at most this much above the shore it came from. */
+    floodMaxRise: 1,
+    floodDamagePerDay: 4,
+    floodDestroyChancePerDay: 0.02,
     earthquakeRadius: 20,
+    /** Chance that a building at the epicentre is hit; decreases linearly to the radius. */
+    earthquakeStrength: 0.5,
+    /** Share of hit buildings that collapse (the rest catch fire). */
+    earthquakeCollapseShare: 0.6,
+    /** Relative chance that a road or power line within the radius is cut. */
+    earthquakeNetworkFactor: 0.3,
     crisisMonths: 12,
     crisisIndustrialFactor: 0.6,
     crisisRevenueFactor: 0.8,

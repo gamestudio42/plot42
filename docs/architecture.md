@@ -145,9 +145,19 @@ order. The engine only orchestrates; game rules live in the systems.
 
 `engine.serialize()` returns an `EngineSnapshot` (plain data, layers as `Uint8Array`).
 `@city/shared` turns it into a versioned `SaveFile` (JSON, layers in base64, FNV checksum) and
-validates it on load. Migrations are pure functions registered by version. The web app stores
-saves in IndexedDB (`city-builder` database, `saves` store), autosaves periodically, and can
-export or import `.city.json` files.
+validates it on load (format in [the spec](simulation-spec.md#111-save-format)). Migrations are
+pure functions registered by version.
+
+Encoding and decoding run in the worker (`exportSave` / `importSave` messages), so a large
+city never blocks the UI thread and an invalid file never replaces the running city.
+
+The web app (`apps/web/src/persistence/saves.ts`) stores saves in IndexedDB, database
+`city-builder`, with two stores keyed by slot id: `meta` (the small `SaveSlot` records listed
+by the menu) and `data` (the save text). Each city has one manual slot (`city:<seed>:<name>`)
+plus a shared `autosave` slot, written every minute of real time while the game screen is
+open, when the tab is hidden and when the player goes back to the menu. Storage errors are
+classified (`quota`, `unavailable`, `missing`) and shown to the player; export to a
+`.city.json` file is always available as a fallback. Loaded cities start paused.
 
 ## Rendering
 

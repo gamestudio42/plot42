@@ -137,7 +137,7 @@ button {
 
 .toasts {
   position: absolute;
-  top: 64px;
+  top: 88px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -405,6 +405,69 @@ input[type='range'] {
   flex: 1;
   padding: 10px;
   font-size: 15px;
+}
+
+.saved-cities {
+  margin: 4px 0 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.saved-cities h3 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.saved-cities .menu-actions .button {
+  flex: 1;
+}
+
+.save-list {
+  max-height: 200px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.save-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.save-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.save-info strong {
+  margin-right: 6px;
+}
+
+.badge.auto {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.hud-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 220px;
 }
 
 /* HUD */

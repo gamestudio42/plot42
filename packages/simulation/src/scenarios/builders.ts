@@ -1,15 +1,20 @@
 import { ZoneDensity, ZoneType, type Command, type CommandResult } from '@city/shared';
 import { createEngine, type SimulationEngine } from '../engine';
 
-/** Flat grass map without water, hills or trees. */
+/**
+ * Flat grass map without water, hills or trees. Random fires and disasters start disabled so
+ * economic scenarios measure trends, not luck; enable them with `setDisasters`.
+ */
 export function flatCity(seed = 'scenario', size = 64, funds?: number): SimulationEngine {
-  return createEngine({
+  const engine = createEngine({
     seed,
     size,
     name: 'Cenário',
     terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 },
     ...(funds === undefined ? {} : { funds }),
   });
+  engine.disastersEnabled = false;
+  return engine;
 }
 
 /**

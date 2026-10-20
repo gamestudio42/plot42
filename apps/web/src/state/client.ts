@@ -10,7 +10,9 @@ import {
   type FromWorkerMessage,
   type FullState,
   type HistoryEntry,
+  type LoadResult,
   type NewCityOptions,
+  type SaveMeta,
   type SimEvent,
   type Speed,
   type ToWorkerMessage,
@@ -92,6 +94,19 @@ export class CityClient {
 
   hash(): Promise<string> {
     return this.request({ type: 'hash', id: 0 }, (m) => (m.type === 'hash' ? m.hash : undefined));
+  }
+
+  exportSave(savedAt: string): Promise<{ text: string; meta: SaveMeta }> {
+    return this.request({ type: 'exportSave', id: 0, savedAt }, (m) =>
+      m.type === 'saveData' ? { text: m.text, meta: m.meta } : undefined,
+    );
+  }
+
+  /** Loads a save in the worker; on success the mirror world is rebuilt before this resolves. */
+  importSave(text: string): Promise<LoadResult> {
+    return this.request({ type: 'importSave', id: 0, text }, (m) =>
+      m.type === 'loadResult' ? m.result : undefined,
+    );
   }
 
   dispose(): void {

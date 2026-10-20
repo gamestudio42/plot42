@@ -1,7 +1,10 @@
 import {
+  decodeSave,
+  encodeSave,
   INFLUENCE_LAYERS,
   SPEED_TICKS_PER_SECOND,
   STRUCTURE_LAYERS,
+  stringifySave,
   type Delta,
   type FromWorkerMessage,
   type FullState,
@@ -142,6 +145,7 @@ scope.onmessage = (event) => {
         break;
       case 'loadCity':
         engine = SimulationEngine.fromSnapshot(message.snapshot);
+        speed = 0;
         accumulator = 0;
         post({ type: 'init', state: fullState(engine) });
         break;
@@ -170,6 +174,35 @@ scope.onmessage = (event) => {
         if (!engine) throw new Error('No city loaded');
         post({ type: 'hash', id: message.id, hash: hashState(engine) });
         break;
+      case 'exportSave': {
+        if (!engine) throw new Error('No city loaded');
+        const stats = engine.stats();
+        const file = encodeSave(engine.serialize(), {
+          population: stats.population,
+          funds: stats.funds,
+          savedAt: message.savedAt,
+        });
+        post({ type: 'saveData', id: message.id, text: stringifySave(file), meta: file.meta });
+        break;
+      }
+      case 'importSave': {
+        const decoded = decodeSave(message.text);
+        if (!decoded.ok) {
+          post({ type: 'loadResult', id: message.id, result: decoded });
+          break;
+        }
+        engine = SimulationEngine.fromSnapshot(decoded.snapshot);
+        // Loaded cities start paused so the restored state is exactly the saved one.
+        speed = 0;
+        accumulator = 0;
+        post({ type: 'init', state: fullState(engine) });
+        post({
+          type: 'loadResult',
+          id: message.id,
+          result: { ok: true, meta: decoded.meta, migratedFrom: decoded.migratedFrom },
+        });
+        break;
+      }
     }
   } catch (error) {
     post({ type: 'error', message: error instanceof Error ? error.message : String(error) });

@@ -23,6 +23,11 @@
   still leaves a report to inspect.
 - Scenarios that grow for years use `maintainTown`, a minimal automated player that adds
   plants and pumps when demand passes 85% of supply.
+- `flatCity` disables random fires and disasters so trends are not luck. The repeated-simulation
+  and save/load scenarios turn them on to exercise those RNG paths.
+- A/B comparisons fork one city through `serialize()` / `fromSnapshot()` and change a single
+  factor (the fire scenario cuts fire funding in the control), so both runs share every
+  building.
 
 ## Required scenarios
 
@@ -47,8 +52,11 @@ hashes, which makes any divergence visible immediately.
 
 The web app exposes `window.__cityDebug` (always on, read-only helpers plus `runTicks` for tests):
 the selected tile, tile lookup, statistics, camera helpers to project a tile to screen
-coordinates, and the engine hash. Playwright uses it to click specific tiles and to assert
-results without parsing pixels. Screenshots are kept as artifacts for visual review.
+coordinates, the engine hash, save export/import and disaster triggers. Playwright uses it to
+click specific tiles and to assert results without parsing pixels. Screenshots are kept as
+artifacts for visual review. Save tests cover IndexedDB across a reload, file export and
+import, corrupted files (checksum, truncation, foreign JSON) and a simulated
+`QuotaExceededError`.
 
 ## Performance budgets
 

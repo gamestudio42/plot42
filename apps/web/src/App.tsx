@@ -9,6 +9,7 @@ import { Inspector } from './ui/Inspector';
 import { MainMenu } from './ui/MainMenu';
 import { Minimap } from './ui/Minimap';
 import { OverlayPanel } from './ui/OverlayPanel';
+import { SaveControls, SavedCities } from './ui/Saves';
 import { SystemPanel } from './ui/SystemPanel';
 import { Toasts } from './ui/Toasts';
 import { Toolbar } from './ui/Toolbar';
@@ -47,7 +48,7 @@ function Screens({ session }: { session: GameSession }) {
   if (screen === 'menu') {
     return (
       <>
-        <MainMenu session={session} />
+        <MainMenu session={session} extra={<SavedCities session={session} />} />
         <Toasts session={session} />
       </>
     );
@@ -64,7 +65,11 @@ function Screens({ session }: { session: GameSession }) {
         {panel === 'budget' && <BudgetPanel session={session} />}
         {panel === 'charts' && <ChartsPanel session={session} />}
         {panel === 'overlays' && <OverlayPanel session={session} />}
-        {panel === 'system' && <SystemPanel session={session} />}
+        {panel === 'system' && (
+          <SystemPanel session={session}>
+            <SaveControls session={session} />
+          </SystemPanel>
+        )}
       </div>
       <Tutorial session={session} />
       <Toasts session={session} />

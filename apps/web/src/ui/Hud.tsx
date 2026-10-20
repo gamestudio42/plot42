@@ -49,6 +49,20 @@ export function Hud({ session }: { session: GameSession }) {
         <span data-testid="population">{formatNumber(stats.population)}</span>
       </div>
       <RciBars demand={stats.demand} />
+      {(stats.activeFires > 0 || stats.disasters.length > 0) && (
+        <div className="hud-alerts" data-testid="hud-alerts">
+          {stats.activeFires > 0 && (
+            <span className="badge bad" data-testid="hud-fires">
+              {h.fires(stats.activeFires)}
+            </span>
+          )}
+          {stats.disasters.map((d) => (
+            <span key={d.kind} className="badge warn">
+              {t.disasters[d.kind]}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="speed-controls" role="group" aria-label="Velocidade">
         {SPEEDS.map((s) => (
           <button

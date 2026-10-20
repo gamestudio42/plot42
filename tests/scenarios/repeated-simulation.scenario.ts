@@ -11,6 +11,8 @@ import { Scenario } from './harness';
 
 function play(engine: SimulationEngine): Scenario {
   const s = new Scenario(`repeated-${engine.seed}`, engine);
+  // Random fires and disasters consume the RNG too; they must replay identically.
+  engine.execute({ type: 'setDisasters', enabled: true });
   buildTown(engine);
   s.run(12);
   engine.execute({ type: 'setTax', zone: 'commercial', rate: 9 });

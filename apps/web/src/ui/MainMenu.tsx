@@ -142,9 +142,9 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
             >
               {m.start}
             </button>
-            {extra}
           </div>
         </form>
+        {extra}
         <p className="muted small">{m.credits}</p>
       </div>
     </div>

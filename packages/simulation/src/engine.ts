@@ -24,6 +24,14 @@ import { planToolCommand, type PlanContext } from './commands/plan';
 import { applyPolicyCommand } from './commands/policy';
 import { Rng } from './rng/rng';
 import { cityTotals, round4, updateDemand, type CityTotals } from './systems/demand';
+import {
+  countFires,
+  monthlyDisasters,
+  triggerDisaster,
+  updateDisasters,
+  updateFires,
+  type DestructionCause,
+} from './systems/disasters';
 import { applyMonthlyBudget, computeMonthlyReport, defaultEconomy } from './systems/economy';
 import { updateGrowth, type GrowthResult } from './systems/growth';
 import { updateInfluence } from './systems/influence';
@@ -65,6 +73,7 @@ export interface System {
 }
 
 const MILESTONES = [100, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000] as const;
+const MAX_PENDING_EVENTS = 500;
 
 interface LayerStats {
   avgCongestion: number;
@@ -88,6 +97,11 @@ export class SimulationEngine {
   networksDirty = true;
   lastMilestone = 0;
   historyDirty = false;
+
+  /** Burning tiles, derived from the `fire` layer. */
+  fireCount = 0;
+  /** Buildings destroyed since this engine instance started (diagnostics only). */
+  readonly losses: Record<DestructionCause, number> = { fire: 0, flood: 0, earthquake: 0 };
 
   /** Last results of the derived systems (not serialized; recomputed when needed). */
   lastTraffic: TrafficResult | null = null;
@@ -146,6 +160,7 @@ export class SimulationEngine {
     engine.disastersEnabled = snapshot.disastersEnabled;
     engine.networksDirty = snapshot.networksDirty;
     engine.lastMilestone = snapshot.lastMilestone;
+    engine.fireCount = countFires(engine);
     world.markAllDirty();
     engine.buildings.takeChanges();
     return engine;
@@ -184,6 +199,8 @@ export class SimulationEngine {
   }
 
   emit(event: SimEvent): void {
+    // Headless runs may never drain events; keep only the most recent ones.
+    if (this.pendingEvents.length >= MAX_PENDING_EVENTS) this.pendingEvents.shift();
     this.pendingEvents.push(event);
   }
 
@@ -207,6 +224,8 @@ export class SimulationEngine {
   step(): void {
     while (this.queue.length > 0) this.execute(this.queue.shift() as Command);
     if (isDayStart(this.tick)) this.refreshUtilities();
+    updateFires(this);
+    updateDisasters(this);
     for (const system of this.systems) system.update(this);
     this.tick++;
     // The month closes at the end of its last tick.
@@ -238,8 +257,8 @@ export class SimulationEngine {
   }
 
   /** Starts a disaster on demand. Returns false when the disaster cannot start. */
-  triggerDisaster(_kind: DisasterKind, _x?: number, _y?: number): boolean {
-    return false;
+  triggerDisaster(kind: DisasterKind, x?: number, y?: number): boolean {
+    return triggerDisaster(this, kind, x, y);
   }
 
   hasDisaster(kind: DisasterKind): boolean {
@@ -378,6 +397,7 @@ export class SimulationEngine {
     this.recordHistory(cityTotals(this));
     const date = dateOf(this.tick);
     if (date.month === 0) this.emit({ type: 'newYear', year: date.year });
+    monthlyDisasters(this);
   }
 
   private recordHistory(totals: CityTotals): void {

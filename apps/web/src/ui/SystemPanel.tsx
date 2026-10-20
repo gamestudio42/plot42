@@ -1,13 +1,21 @@
+import type { DisasterKind } from '@city/shared';
 import type { ReactNode } from 'react';
 import { t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { Panel } from './Panel';
 
+const DISASTERS: DisasterKind[] = ['fire', 'flood', 'earthquake', 'crisis', 'blackout', 'epidemic'];
+
 export function SystemPanel({ session, children }: { session: GameSession; children?: ReactNode }) {
   const grid = useStore(session.ui, (s) => s.grid);
   const underground = useStore(session.ui, (s) => s.underground);
+  const disastersEnabled = useStore(session.ui, (s) => s.stats?.disastersEnabled ?? true);
   const s = t.system;
+  const trigger = async (disaster: DisasterKind) => {
+    const result = await session.client.command({ type: 'triggerDisaster', disaster });
+    if (!result.ok) session.toast('warning', s.cannotTrigger);
+  };
   return (
     <Panel
       title={s.title}
@@ -16,6 +24,32 @@ export function SystemPanel({ session, children }: { session: GameSession; child
       className="system-panel"
     >
       {children}
+      <h3>{s.disasters}</h3>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={disastersEnabled}
+          onChange={(e) =>
+            void session.command({ type: 'setDisasters', enabled: e.target.checked })
+          }
+          data-testid="disasters-enabled"
+        />
+        {s.randomDisasters}
+      </label>
+      <p className="muted small">{s.trigger}</p>
+      <div className="overlay-grid">
+        {DISASTERS.map((d) => (
+          <button
+            key={d}
+            type="button"
+            className="button small"
+            onClick={() => void trigger(d)}
+            data-testid={`trigger-${d}`}
+          >
+            {t.disasters[d]}
+          </button>
+        ))}
+      </div>
       <h3>{s.settings}</h3>
       <label className="check-row">
         <input type="checkbox" checked={grid} onChange={(e) => session.setGrid(e.target.checked)} />
@@ -34,7 +68,7 @@ export function SystemPanel({ session, children }: { session: GameSession; child
         type="button"
         className="button"
         onClick={() => {
-          if (window.confirm(s.confirmLeave)) session.backToMenu();
+          if (window.confirm(s.confirmLeave)) void session.backToMenu();
         }}
         data-testid="back-to-menu"
       >

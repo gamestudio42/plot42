@@ -1,4 +1,4 @@
-import { Fnv1a, type EngineSnapshot } from '@city/shared';
+import { canonicalJson, Fnv1a, type EngineSnapshot } from '@city/shared';
 import type { SimulationEngine } from '../engine';
 
 /** Hash of the complete simulation state; the oracle for determinism and save/load tests. */
@@ -10,7 +10,8 @@ export function hashSnapshot(snapshot: EngineSnapshot): string {
     h.bytes(snapshot.layers[name as keyof EngineSnapshot['layers']]);
   }
   const { heights: _h, layers: _l, ...rest } = snapshot;
-  h.string(JSON.stringify(rest));
+  // Key order is not state: a decoded save may build its objects in a different order.
+  h.string(canonicalJson(rest));
   return h.hex();
 }
 

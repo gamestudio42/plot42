@@ -236,19 +236,61 @@ Starting funds by difficulty: easy 20 000, normal 10 000, hard 5 000.
 
 ## 11. Events and disasters
 
-- **Fire** (tick): intensity grows by 1 per tick; at 100 the tile burns out (building → rubble,
-  trees removed). Each tick, every orthogonal flammable neighbour (building or trees) ignites
-  with probability `0.025 · (1 − 0.8 · cover)`. The fire is extinguished with probability
-  `0.002 + 0.05 · cover`. Monthly random ignition per building: `0.0015 · (1 − cover)`.
-- **Flood:** water spreads from a shore tile onto low land (≤ 1 level above the shore) for 30
-  days; flooded buildings lose condition and may be destroyed.
-- **Earthquake:** radius 20; buildings are destroyed or ignite, networks are cut, with
-  probability decreasing with distance.
+Implemented in `systems/disasters.ts`. Fires and active disasters advance every tick, before
+custom systems; random ignition and random disasters are drawn at the end of the monthly
+pipeline, only when `disastersEnabled` is on (scenario cities built with `flatCity` start with
+it off).
+
+- **Fire** (tick). `cover = fireCover / 255` (station coverage, which reaches tiles through the
+  road network and scales with fire funding).
+  - Flammability: a building tile = 1; a wooded tile = `0.4 · trees / 3`; anything else = 0.
+    Flooded and water tiles never burn.
+  - Each burning tile, in index order: with probability `0.002 + 0.05 · cover` (or always, if
+    flooded) the fire is put out and the building loses `0.25 · intensity` condition.
+    Otherwise every orthogonal neighbour ignites with probability
+    `0.025 · flammability · (1 − 0.8 · cover_neighbour)`, and the intensity grows by 1.
+  - Burnout: at 100 (buildings) or 30 (forest) the tile burns out. The whole building becomes
+    rubble; a forest tile loses its trees.
+  - Spontaneous ignition (monthly): `0.0005 · (1 − cover)` per building.
+  - With full coverage a fire is out in ≈ 19 ticks and rarely spreads; with none, a solid block
+    of buildings burns almost entirely in about three months. Forest fires are subcritical:
+    they die out after burning a patch.
+- **Flood** (needs a shore tile, one at a time): starts at the nearest shore tile to the
+  requested point (or a random one) and lasts 30 days. During the first 10 days, once a day,
+  every land tile next to the water with elevation ≤ origin + 1 floods with probability 0.5,
+  up to 60 tiles. Every day a building touching the water loses 4 condition and is destroyed
+  with probability 0.02. When it ends, the water recedes from every tile.
+- **Earthquake** (instant): epicentre at the requested point or a random building. A building
+  at distance `d < 20` is hit with probability `0.5 · (1 − d / 20)`: 60% collapse into
+  rubble, the rest catch fire. Roads and power lines are cut (rubble) with probability
+  `0.3 · 0.5 · (1 − d / 20)`.
 - **Economic crisis:** 12 months, `crisis = 0.6` in industrial demand, revenue × 0.8.
-- **Blackout:** a random plant is offline for 30 days.
+- **Blackout:** a random running plant is offline for 30 days (supply 0), then restored.
 - **Epidemic:** 6 months; residential occupancy target × (0.85 + 0.15 · health coverage),
   commercial revenue × 0.85.
-- Random disasters (if enabled): 1.5% per month.
+- Crisis and epidemic do not stack. Random disasters (if enabled): 1.5% per month, the kind
+  drawn uniformly among the six.
+- Destroyed buildings emit `buildingDestroyed` with the cause; rubble blocks growth until it
+  is bulldozed.
+
+## 11.1 Save format
+
+`@city/shared/schemas/save.ts`. A save is JSON:
+
+```json
+{ "format": "city-builder-save", "version": 1, "meta": { … }, "state": { … }, "checksum": "…" }
+```
+
+- `state` is the `EngineSnapshot` with every byte layer in base64; `meta` repeats name, seed,
+  size, tick, population, funds and `savedAt` for listing.
+- `checksum` = FNV-1a over the canonical JSON of `state` (sorted keys), so formatting does not
+  matter but any edit does.
+- Decoding order: parse → format → version (newer → refused) → checksum → migrations
+  `n → n + 1` registered in `SAVE_MIGRATIONS` → structural validation (sizes, ranges, known
+  kinds, building overlaps; up to 20 problems reported with their paths) → snapshot.
+- Error codes: `NOT_JSON`, `NOT_A_SAVE`, `NEWER_VERSION`, `UNSUPPORTED_VERSION`, `CHECKSUM`,
+  `MIGRATION_FAILED`, `INVALID`. A failed decode never touches the running city.
+- `hashState` hashes the canonical JSON as well, so a decoded save hashes like the original.
 
 ## 12. Diagnostics
 

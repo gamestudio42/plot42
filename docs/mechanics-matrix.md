@@ -65,6 +65,10 @@ References studied (cloned into the git-ignored `references/` folder):
 | Fire        | Fire spreads to burnable orthogonal neighbours at random    | Code       | `doFire`: 1/8 chance per neighbour per scan.                          |
 | Fire        | Fire station coverage raises the chance of extinction       | Code       | `doFire`: rate 10 → 3 → 2 → 1 with coverage.                          |
 | Fire        | Burnt tiles become rubble                                   | Code       | `randomRubble()`.                                                     |
+| Fire        | Forests burn faster and spread less than buildings          | New        | Keeps forest fires subcritical on wooded maps.                        |
+| Fire        | Coverage spreads along roads and scales with fire funding   | New        | Same service model as police (section 9 of the spec).                 |
+| Disasters   | Flood rises from a shore onto low land, then recedes        | Observed   | SC2000 floods near water; our elevation rule and limits are new.      |
+| Disasters   | Earthquake collapses or ignites buildings, cuts networks    | Observed   | SC2000 / Micropolis earthquake effects; probabilities are ours.       |
 | Disasters   | Fire, flood, earthquake menu and random disasters           | Observed   | SC2000 disaster menu (OpenSC2K `disasters.md`).                       |
 | Disasters   | Economic crisis, blackout, epidemic                         | New        |                                                                       |
 | Diagnostics | "Why is this not growing" panel                             | New        |                                                                       |

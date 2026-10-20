@@ -1,15 +1,27 @@
-import type {
-  CityStats,
-  Command,
-  CommandResult,
-  HistoryEntry,
-  NewCityOptions,
-  RejectReason,
-  SimEvent,
-  Speed,
+import {
+  SAVE_FILE_EXTENSION,
+  type CityStats,
+  type Command,
+  type CommandResult,
+  type HistoryEntry,
+  type LoadResult,
+  type NewCityOptions,
+  type RejectReason,
+  type SimEvent,
+  type Speed,
 } from '@city/shared';
 import { RoadNetwork, type World } from '@city/simulation';
 import { formatNumber, t } from '../i18n/pt-BR';
+import {
+  AUTOSAVE_ID,
+  deleteSave,
+  listSaves,
+  manualSlotId,
+  readSave,
+  SaveStorageError,
+  writeSave,
+  type SaveSlot,
+} from '../persistence/saves';
 import { GameRenderer } from '../renderer/GameRenderer';
 import type { OverlayMode } from '../renderer/chunkDraw';
 import type { Point } from '../renderer/iso';
@@ -49,6 +61,10 @@ export interface UiState {
   /** Client position of the pointer over the map, for the tool tooltip. */
   pointer: Point | null;
   toasts: Toast[];
+  /** Saved cities in IndexedDB, most recent first. */
+  saves: SaveSlot[];
+  /** A save or load is in progress. */
+  busy: boolean;
 }
 
 const initialUi: UiState = {
@@ -68,9 +84,14 @@ const initialUi: UiState = {
   preview: null,
   pointer: null,
   toasts: [],
+  saves: [],
+  busy: false,
 };
 
 const TOAST_MS = 3500;
+/** Real time between autosaves while the game screen is open. */
+const AUTOSAVE_MS = 60_000;
+const AUTOSAVE_CHECK_MS = 5_000;
 
 /** Wires the worker client, the renderer, the tools and the UI store together. */
 export class GameSession {
@@ -86,6 +107,8 @@ export class GameSession {
   private nextToastId = 1;
   private disposed = false;
   private speedBeforePause: Speed = 1;
+  private lastAutosave = { time: 0, tick: -1 };
+  private autosaveTimer: ReturnType<typeof setInterval> | null = null;
 
   async mount(host: HTMLElement): Promise<void> {
     await this.renderer.init(host);
@@ -138,7 +161,16 @@ export class GameSession {
     host.addEventListener('pointerleave', () => this.ui.set({ pointer: null }), {
       signal: this.listeners.signal,
     });
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.visibilityState === 'hidden') void this.autosave(true);
+      },
+      { signal: this.listeners.signal },
+    );
+    this.autosaveTimer = setInterval(() => void this.autosave(false), AUTOSAVE_CHECK_MS);
     installDebugApi(this);
+    void this.refreshSaves();
   }
 
   newCity(options: NewCityOptions): Promise<void> {
@@ -159,26 +191,152 @@ export class GameSession {
   /** Creates a city from the main menu and switches to the game screen. */
   async startCity(options: NewCityOptions): Promise<void> {
     await this.client.newCity(options);
-    this.enterGame();
+    this.enterGame({ tutorial: true });
   }
 
-  /** Shows the game screen after a city was created or loaded. */
-  enterGame(): void {
+  /** Shows the game screen after a city was created or loaded (loaded cities start paused). */
+  enterGame({ tutorial, paused = false }: { tutorial: boolean; paused?: boolean }): void {
     this.ui.set({
       screen: 'game',
       panel: null,
-      tutorial: tutorialDone() ? null : 0,
+      tutorial: tutorial && !tutorialDone() ? 0 : null,
       selected: null,
     });
+    this.lastAutosave = { time: Date.now(), tick: this.client.stats?.tick ?? -1 };
     this.setTool('select');
-    this.setSpeed(1);
+    this.setSpeed(paused ? 0 : 1);
     const w = this.client.world;
     if (w) this.renderer.centerOnTile(Math.floor(w.size / 2), Math.floor(w.size / 2));
   }
 
-  backToMenu(): void {
+  async backToMenu(): Promise<void> {
     this.setSpeed(0);
+    await this.autosave(true);
     this.ui.set({ screen: 'menu', panel: null, tutorial: null, selected: null });
+  }
+
+  // Saves -------------------------------------------------------------------
+
+  async refreshSaves(): Promise<void> {
+    try {
+      this.ui.set({ saves: await listSaves() });
+    } catch (error) {
+      // Without IndexedDB the menu simply shows no saves; export/import still work.
+      console.warn('[saves]', error);
+      this.ui.set({ saves: [] });
+    }
+  }
+
+  /** Saves the current city into its manual slot (or the autosave slot). */
+  async saveGame(autosave = false): Promise<boolean> {
+    if (!this.client.world || this.ui.get().busy) return false;
+    this.ui.set({ busy: true });
+    try {
+      const { text, meta } = await this.client.exportSave(new Date().toISOString());
+      const id = autosave ? AUTOSAVE_ID : manualSlotId(meta.name, meta.seed);
+      await writeSave({ ...meta, id, autosave, bytes: text.length }, text);
+      this.lastAutosave = { time: Date.now(), tick: meta.tick };
+      if (!autosave) this.toast('info', t.save.saved);
+      await this.refreshSaves();
+      return true;
+    } catch (error) {
+      this.reportStorageError(error, t.save.failed);
+      return false;
+    } finally {
+      this.ui.set({ busy: false });
+    }
+  }
+
+  /** Autosaves when the game is on screen and time has passed since the last save. */
+  private async autosave(force: boolean): Promise<void> {
+    const ui = this.ui.get();
+    const tick = this.client.stats?.tick ?? -1;
+    if (ui.screen !== 'game' || ui.busy || tick === this.lastAutosave.tick) return;
+    if (!force && Date.now() - this.lastAutosave.time < AUTOSAVE_MS) return;
+    await this.saveGame(true);
+  }
+
+  async loadSlot(id: string): Promise<LoadResult | null> {
+    try {
+      return await this.importText(await readSave(id));
+    } catch (error) {
+      if (error instanceof SaveStorageError && error.kind === 'missing') {
+        await deleteSave(id).catch(() => undefined);
+        await this.refreshSaves();
+      }
+      this.reportStorageError(error, t.save.loadFailed);
+      return null;
+    }
+  }
+
+  async continueLatest(): Promise<void> {
+    const latest = this.ui.get().saves[0];
+    if (latest) await this.loadSlot(latest.id);
+  }
+
+  async deleteSlot(id: string): Promise<void> {
+    try {
+      await deleteSave(id);
+    } catch (error) {
+      this.reportStorageError(error, t.save.failed);
+    }
+    await this.refreshSaves();
+  }
+
+  /** Validates and loads save text (from IndexedDB or a file). */
+  async importText(text: string): Promise<LoadResult> {
+    this.ui.set({ busy: true });
+    try {
+      const result = await this.client.importSave(text);
+      if (!result.ok) {
+        const first = result.errors[0];
+        console.warn('[saves] invalid save', result.errors);
+        this.toast(
+          'error',
+          `${t.save.loadFailed} ${first ? t.save.errors[first.code] : t.save.errors.INVALID}`,
+        );
+        return result;
+      }
+      this.enterGame({ tutorial: false, paused: true });
+      this.toast('info', t.save.loaded(result.meta.name));
+      if (result.migratedFrom !== null) this.toast('info', t.save.migrated(result.migratedFrom));
+      return result;
+    } finally {
+      this.ui.set({ busy: false });
+    }
+  }
+
+  async importFile(file: File): Promise<LoadResult> {
+    return this.importText(await file.text());
+  }
+
+  /** Downloads the current city as a `.city.json` file. */
+  async exportFile(): Promise<void> {
+    if (!this.client.world) return;
+    const { text, meta } = await this.client.exportSave(new Date().toISOString());
+    const slug =
+      meta.name
+        .normalize('NFD')
+        .replace(/[^\w-]+/g, '-')
+        .replace(/^-|-$/g, '') || 'cidade';
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${slug}${SAVE_FILE_EXTENSION}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    this.toast('info', t.save.exported);
+  }
+
+  private reportStorageError(error: unknown, fallback: string): void {
+    console.warn('[saves]', error);
+    if (error instanceof SaveStorageError && error.kind !== 'unknown') {
+      this.toast('error', t.save[error.kind]);
+    } else {
+      this.toast('error', fallback);
+    }
   }
 
   togglePanel(panel: PanelId): void {
@@ -289,6 +447,7 @@ export class GameSession {
 
   dispose(): void {
     this.disposed = true;
+    if (this.autosaveTimer) clearInterval(this.autosaveTimer);
     this.listeners.abort();
     this.renderer.destroy();
     this.client.dispose();
