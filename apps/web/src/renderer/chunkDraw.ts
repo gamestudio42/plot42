@@ -371,35 +371,47 @@ const GOOD_OVERLAYS = new Set<OverlayMode>([
   'access',
 ]);
 
+export const POWER_ON_COLOR = 0xf8e040;
+export const WATER_ON_COLOR = 0x30a0f0;
+export const UNSERVED_COLOR = 0xd03030;
+
+/** Overlays where a high value is good (green scale) instead of bad (heat scale). */
+export function isGoodOverlay(mode: OverlayMode): boolean {
+  return GOOD_OVERLAYS.has(mode);
+}
+
+/** Colour of tile `i` in an overlay, or null when the tile is not shaded. */
+export function overlayColor(w: World, i: number, mode: OverlayMode): number | null {
+  if (mode === 'none') return null;
+  if (w.terrain[i] === Terrain.Water && mode !== 'traffic') return null;
+  if (mode === 'power' || mode === 'water') {
+    const consumer =
+      (w.buildingId[i] as number) !== 0 ||
+      (w.zone[i] as number) !== 0 ||
+      w.hasInfra(i, mode === 'power' ? Infra.PowerLine : Infra.Pipe);
+    if (!consumer) return null;
+    const served = mode === 'power' ? w.powered[i] === 1 : w.watered[i] === 1;
+    return served ? (mode === 'power' ? POWER_ON_COLOR : WATER_ON_COLOR) : UNSERVED_COLOR;
+  }
+  if (mode === 'traffic') {
+    if (!w.hasInfra(i, Infra.Road)) return null;
+    return heatColor((w.influence.traffic[i] as number) / 200);
+  }
+  const layer = OVERLAY_LAYER[mode];
+  if (!layer) return null;
+  const value = (w.influence[layer][i] as number) / 255;
+  if (!GOOD_OVERLAYS.has(mode) && value < 0.03) return null;
+  return GOOD_OVERLAYS.has(mode) ? goodColor(value) : heatColor(value);
+}
+
 export function drawOverlay(g: Graphics, ctx: DrawContext, area: ChunkArea): void {
   const mode = ctx.overlay;
   if (mode === 'none') return;
   const w = ctx.world;
   const size = w.size;
+  const alpha = mode === 'traffic' ? 0.8 : 0.55;
   forEachTile(area, (x, y) => {
-    const i = y * size + x;
-    if (w.terrain[i] === Terrain.Water && mode !== 'traffic') return;
-    let color: number;
-    let alpha = 0.55;
-    if (mode === 'power' || mode === 'water') {
-      const consumer =
-        (w.buildingId[i] as number) !== 0 ||
-        (w.zone[i] as number) !== 0 ||
-        w.hasInfra(i, mode === 'power' ? Infra.PowerLine : Infra.Pipe);
-      if (!consumer) return;
-      const served = mode === 'power' ? w.powered[i] === 1 : w.watered[i] === 1;
-      color = served ? (mode === 'power' ? 0xf8e040 : 0x30a0f0) : 0xd03030;
-    } else if (mode === 'traffic') {
-      if (!w.hasInfra(i, Infra.Road)) return;
-      color = heatColor((w.influence.traffic[i] as number) / 200);
-      alpha = 0.8;
-    } else {
-      const layer = OVERLAY_LAYER[mode];
-      if (!layer) return;
-      const value = (w.influence[layer][i] as number) / 255;
-      if (!GOOD_OVERLAYS.has(mode) && value < 0.03) return;
-      color = GOOD_OVERLAYS.has(mode) ? goodColor(value) : heatColor(value);
-    }
-    fillQuad(g, tileQuad(w, x, y), color, alpha);
+    const color = overlayColor(w, y * size + x, mode);
+    if (color !== null) fillQuad(g, tileQuad(w, x, y), color, alpha);
   });
 }

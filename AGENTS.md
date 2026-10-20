@@ -58,23 +58,29 @@ Never declare a feature done just because it compiles.
 
 ```
 apps/web/src/
-  renderer/   Pixi isometric renderer, camera, picking, procedural sprites
+  renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays
   tools/      Tool definitions and the pointer-to-command controller
-  hud/        React HUD, toolbar, panels, minimap, charts
-  components/ Generic React components
-  state/      UI store and the CityClient (worker bridge + mirror world)
+  ui/         React screens and panels: menu, HUD, toolbar, minimap, budget, charts,
+              overlays, inspector ("why is it not growing"), tutorial, toasts
+  state/      GameSession (UI store, panels, tutorial), CityClient (worker bridge +
+              mirror world), debug hooks used by Playwright
   worker/     Web Worker host for the engine
-  persistence/IndexedDB saves
   i18n/       Portuguese strings
 packages/simulation/src/
-  world/ terrain/ construction/ zoning/ population/ economy/ utilities/
-  traffic/ services/ disasters/ diagnostics/ persistence/ scenarios/ rng/
-  engine.ts
+  world/ terrain/ commands/ systems/ persistence/ scenarios/ rng/
+  engine.ts      orchestration and the tick/month pipeline
+  diagnostics.ts diagnoseTile(), shared by the engine and the UI inspector
+  report.ts      collectMetrics() for scenario and headless reports
 packages/shared/src/
   types/ commands/ balance/ schemas/ protocol/ util/
-tests/{unit,integration,scenarios,e2e}
+tests/{unit,scenarios,e2e,helpers}
 tools/{headless-sim.ts,benchmark.ts}
 ```
+
+UI conventions: every interactive element that tests touch has a `data-testid`; E2E helpers in
+`tests/e2e/helpers.ts` start a city through the main menu and hide the tutorial unless asked.
+The UI only reads the mirror world and `CityStats`; anything that needs a rule (diagnostics,
+previews) calls a pure function exported by `@city/simulation`.
 
 ## Definition of done
 

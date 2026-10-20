@@ -250,6 +250,11 @@ export class GameRenderer {
     this.input.onCamera?.();
   }
 
+  /** Tells listeners the camera moved after an external change (e.g. the minimap). */
+  notifyCamera(): void {
+    this.input.onCamera?.();
+  }
+
   /** Map-space rectangle currently visible, in tile units, for the minimap. */
   visibleWorldRect(): { x: number; y: number; width: number; height: number } {
     return this.camera.visibleRect();

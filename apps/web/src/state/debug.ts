@@ -35,7 +35,7 @@ declare global {
 
 export function installDebugApi(session: GameSession): void {
   const api: CityDebugApi = {
-    isReady: () => session.ui.get().ready,
+    isReady: () => session.ui.get().ready && session.ui.get().screen === 'game',
     getSelected: () => session.ui.get().selected,
     getHover: () => session.ui.get().hover,
     getTile: (x, y) => {

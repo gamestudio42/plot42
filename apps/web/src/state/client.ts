@@ -181,6 +181,8 @@ export class CityClient {
     for (const b of delta.buildings) this.buildings.set(b.id, b);
     if (delta.heights) world.heights.set(delta.heights);
     if (delta.tiles) {
+      // Raw layer writes bypass World.setInfra, so invalidate derived road data explicitly.
+      world.roadVersion++;
       const { indices, structure, buildingId } = delta.tiles;
       for (const name of STRUCTURE_LAYERS) {
         const target = world.structure[name];

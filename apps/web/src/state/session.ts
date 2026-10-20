@@ -1,12 +1,15 @@
 import type {
   CityStats,
+  Command,
+  CommandResult,
   HistoryEntry,
   NewCityOptions,
   RejectReason,
   SimEvent,
   Speed,
 } from '@city/shared';
-import { t } from '../i18n/pt-BR';
+import { RoadNetwork, type World } from '@city/simulation';
+import { formatNumber, t } from '../i18n/pt-BR';
 import { GameRenderer } from '../renderer/GameRenderer';
 import type { OverlayMode } from '../renderer/chunkDraw';
 import type { Point } from '../renderer/iso';
@@ -15,6 +18,7 @@ import { toolByHotkey, type ToolId } from '../tools/tools';
 import { CityClient } from './client';
 import { installDebugApi } from './debug';
 import { Store } from './store';
+import { markTutorialDone, TUTORIAL_CHECKS, tutorialDone } from './tutorial';
 
 export interface Toast {
   id: number;
@@ -22,7 +26,15 @@ export interface Toast {
   message: string;
 }
 
+export type PanelId = 'budget' | 'charts' | 'overlays' | 'system';
+export type Screen = 'menu' | 'game';
+
 export interface UiState {
+  screen: Screen;
+  /** Floating panel currently open (one at a time). */
+  panel: PanelId | null;
+  /** Current tutorial step, or null when the tutorial is hidden. */
+  tutorial: number | null;
   ready: boolean;
   hover: Point | null;
   selected: Point | null;
@@ -40,6 +52,9 @@ export interface UiState {
 }
 
 const initialUi: UiState = {
+  screen: 'menu',
+  panel: null,
+  tutorial: null,
   ready: false,
   hover: null,
   selected: null,
@@ -64,7 +79,10 @@ export class GameSession {
   readonly ui = new Store<UiState>(initialUi);
   readonly tools = new ToolController(this);
   private readonly eventListeners = new Set<(events: SimEvent[]) => void>();
+  private readonly cameraListeners = new Set<() => void>();
+  private readonly tileListeners = new Set<() => void>();
   private readonly listeners = new AbortController();
+  private roadCache: { world: World; roads: RoadNetwork } | null = null;
   private nextToastId = 1;
   private disposed = false;
   private speedBeforePause: Speed = 1;
@@ -82,12 +100,23 @@ export class GameSession {
       onTiles: (indices, all) => {
         this.renderer.invalidateTiles(all ? null : indices);
         this.tools.refreshCurrent();
+        this.notifyTiles();
       },
-      onBuildings: (changed) => this.renderer.invalidateBuildings(changed),
-      onInfluence: () => this.renderer.invalidateOverlay(),
-      onStats: (stats) => this.ui.set({ stats }),
+      onBuildings: (changed) => {
+        this.renderer.invalidateBuildings(changed);
+        this.notifyTiles();
+      },
+      onInfluence: () => {
+        this.renderer.invalidateOverlay();
+        this.notifyTiles();
+      },
+      onStats: (stats) => {
+        this.ui.set({ stats });
+        this.checkTutorial();
+      },
       onHistory: (history) => this.ui.set({ history }),
       onEvents: (events) => {
+        for (const event of events) this.announce(event);
         for (const listener of this.eventListeners) listener(events);
       },
       onError: (message) => this.toast('error', message),
@@ -101,6 +130,9 @@ export class GameSession {
         if (kind === 'move') this.ui.set({ pointer: { x: event.clientX, y: event.clientY } });
         this.tools.onPointer(kind, tile);
       },
+      onCamera: () => {
+        for (const listener of this.cameraListeners) listener();
+      },
     });
     window.addEventListener('keydown', (e) => this.onKey(e), { signal: this.listeners.signal });
     host.addEventListener('pointerleave', () => this.ui.set({ pointer: null }), {
@@ -113,9 +145,88 @@ export class GameSession {
     return this.client.newCity(options);
   }
 
+  /** Road graph of the mirror world, recomputed lazily when tiles change. */
+  roads(): RoadNetwork | null {
+    const world = this.client.world;
+    if (!world) return null;
+    if (!this.roadCache || this.roadCache.world !== world) {
+      this.roadCache = { world, roads: new RoadNetwork(world) };
+    }
+    this.roadCache.roads.update();
+    return this.roadCache.roads;
+  }
+
+  /** Creates a city from the main menu and switches to the game screen. */
+  async startCity(options: NewCityOptions): Promise<void> {
+    await this.client.newCity(options);
+    this.enterGame();
+  }
+
+  /** Shows the game screen after a city was created or loaded. */
+  enterGame(): void {
+    this.ui.set({
+      screen: 'game',
+      panel: null,
+      tutorial: tutorialDone() ? null : 0,
+      selected: null,
+    });
+    this.setTool('select');
+    this.setSpeed(1);
+    const w = this.client.world;
+    if (w) this.renderer.centerOnTile(Math.floor(w.size / 2), Math.floor(w.size / 2));
+  }
+
+  backToMenu(): void {
+    this.setSpeed(0);
+    this.ui.set({ screen: 'menu', panel: null, tutorial: null, selected: null });
+  }
+
+  togglePanel(panel: PanelId): void {
+    this.ui.set({ panel: this.ui.get().panel === panel ? null : panel });
+    this.checkTutorial();
+  }
+
+  closePanel(): void {
+    this.ui.set({ panel: null });
+  }
+
+  advanceTutorial(): void {
+    const step = this.ui.get().tutorial;
+    if (step === null) return;
+    if (step + 1 >= TUTORIAL_CHECKS.length) {
+      this.skipTutorial();
+      return;
+    }
+    this.ui.set({ tutorial: step + 1 });
+    this.checkTutorial();
+  }
+
+  skipTutorial(): void {
+    markTutorialDone();
+    this.ui.set({ tutorial: null });
+  }
+
+  /** Sends a command and reports a refusal to the player. */
+  async command(command: Command): Promise<CommandResult> {
+    const result = await this.client.command(command);
+    if (!result.ok && result.reason) this.notifyReason(result.reason);
+    return result;
+  }
+
   onEvents(listener: (events: SimEvent[]) => void): () => void {
     this.eventListeners.add(listener);
     return () => this.eventListeners.delete(listener);
+  }
+
+  onCamera(listener: () => void): () => void {
+    this.cameraListeners.add(listener);
+    return () => this.cameraListeners.delete(listener);
+  }
+
+  /** Called when tiles, buildings or influence maps change in the mirror world. */
+  onTilesChanged(listener: () => void): () => void {
+    this.tileListeners.add(listener);
+    return () => this.tileListeners.delete(listener);
   }
 
   setTool(id: ToolId): void {
@@ -172,13 +283,54 @@ export class GameSession {
     );
   }
 
-  onBuilt(_cost: number): void {}
+  onBuilt(_cost: number): void {
+    this.checkTutorial();
+  }
 
   dispose(): void {
     this.disposed = true;
     this.listeners.abort();
     this.renderer.destroy();
     this.client.dispose();
+  }
+
+  private notifyTiles(): void {
+    for (const listener of this.tileListeners) listener();
+  }
+
+  private checkTutorial(): void {
+    const step = this.ui.get().tutorial;
+    if (step === null) return;
+    const check = TUTORIAL_CHECKS[step];
+    if (check?.(this)) this.advanceTutorial();
+  }
+
+  private announce(event: SimEvent): void {
+    const e = t.events;
+    switch (event.type) {
+      case 'fireStarted':
+        return this.toast('error', e.fireStarted);
+      case 'buildingDestroyed':
+        return this.toast('error', e.buildingDestroyed[event.cause]);
+      case 'disasterStarted':
+        return this.toast('error', e.disasterStarted(t.disasters[event.disaster]));
+      case 'disasterEnded':
+        return this.toast('info', e.disasterEnded(t.disasters[event.disaster]));
+      case 'brownout':
+        return this.toast('warning', e.brownout);
+      case 'waterShortage':
+        return this.toast('warning', e.waterShortage);
+      case 'debt':
+        return this.toast('warning', e.debt(event.months));
+      case 'bankrupt':
+        return this.toast('error', e.bankrupt);
+      case 'recovered':
+        return this.toast('info', e.recovered);
+      case 'milestone':
+        return this.toast('info', e.milestone(formatNumber(event.population)));
+      case 'newYear':
+        return this.toast('info', e.newYear(event.year));
+    }
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -189,10 +341,13 @@ export class GameSession {
     )
       return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (this.ui.get().screen !== 'game') return;
     const key = e.key.toLowerCase();
     if (key === 'escape') {
+      if (this.ui.get().panel) return this.closePanel();
       this.tools.cancel();
       this.setTool('select');
+      this.select(null);
       return;
     }
     if (key === 'p') return this.togglePause();

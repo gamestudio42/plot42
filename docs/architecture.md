@@ -54,6 +54,27 @@ flowchart LR
   the UI can run the same pure validation (`previewCommand`) and diagnostic
   (`diagnoseTile`) functions as the engine, without a round trip.
 - **Renderer** (`apps/web/src/renderer`) draws the mirror. It never mutates simulation state.
+- **GameSession** (`apps/web/src/state/session.ts`) wires the client, the renderer and the tools
+  to a small `Store<UiState>`: current screen (menu or game), open panel, tutorial step, tool,
+  overlay, speed and toasts. React components subscribe to slices of that store.
+
+## User interface
+
+| Element   | Component             | Notes                                                        |
+| --------- | --------------------- | ------------------------------------------------------------ |
+| Main menu | `ui/MainMenu.tsx`     | City name, seed, map size, difficulty, terrain sliders       |
+| HUD       | `ui/Hud.tsx`          | Date, funds and monthly net, population, RCI bars, speeds    |
+| Toolbar   | `ui/Toolbar.tsx`      | Tool groups with hotkeys and cost tooltips                   |
+| Minimap   | `ui/Minimap.tsx`      | Isometric diamond, current overlay, view rectangle, recentre |
+| Overlays  | `ui/OverlayPanel.tsx` | Twelve thematic maps with a legend                           |
+| Budget    | `ui/BudgetPanel.tsx`  | Taxes, department funding, monthly ledger, debt warnings     |
+| Charts    | `ui/ChartsPanel.tsx`  | Population, money, demand and environment history            |
+| Inspector | `ui/Inspector.tsx`    | Tile facts and the "why is it (not) growing" problem list    |
+| Tutorial  | `ui/Tutorial.tsx`     | Seven steps, auto-advanced by checks in `state/tutorial.ts`  |
+| System    | `ui/SystemPanel.tsx`  | Grid, underground view, help, back to the menu               |
+
+Only one floating panel is open at a time; the inspector stacks above it in the right column.
+`Esc` closes the panel first, then cancels the tool and clears the selection.
 
 ## World representation
 

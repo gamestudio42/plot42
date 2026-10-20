@@ -8,6 +8,7 @@ export {
   type LoggedCommand,
   type System,
 } from './engine';
+export { diagnoseTile, type DiagnoseContext } from './diagnostics';
 export { hashSnapshot, hashState, hashTerrain } from './persistence/hash';
 export { collectMetrics, type MonthMetrics } from './report';
 export {

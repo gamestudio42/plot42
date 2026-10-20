@@ -8,14 +8,28 @@ export async function waitForCity(page: Page): Promise<void> {
   await page.waitForTimeout(500);
 }
 
+export interface StartOptions {
+  /** Keep the onboarding tutorial (hidden by default so it does not cover the map). */
+  tutorial?: boolean;
+  difficulty?: 'easy' | 'normal' | 'hard';
+}
+
 /** Starts a new city from the main menu with a fixed seed. */
-export async function startCity(page: Page, seed = 'e2e'): Promise<void> {
-  await page.goto('/');
-  const menu = page.getByTestId('main-menu');
-  if (await menu.isVisible().catch(() => false)) {
-    await page.getByTestId('seed-input').fill(seed);
-    await page.getByTestId('start-city').click();
+export async function startCity(
+  page: Page,
+  seed = 'e2e',
+  options: StartOptions = {},
+): Promise<void> {
+  if (!options.tutorial) {
+    await page.addInitScript(() => localStorage.setItem('cityBuilder.tutorialDone', '1'));
   }
+  await page.goto('/');
+  await page.getByTestId('main-menu').waitFor();
+  await page.getByTestId('seed-input').fill(seed);
+  if (options.difficulty) {
+    await page.getByTestId('difficulty-select').selectOption(options.difficulty);
+  }
+  await page.getByTestId('start-city').click();
   await waitForCity(page);
 }
 
