@@ -31,6 +31,28 @@ export function isMonthStart(tick: number): boolean {
   return tick % TICKS_PER_MONTH === 0;
 }
 
+/**
+ * Heavy monthly work is spread over the last ticks of each month (like the phases of the
+ * classic simulation loop) so that no single tick pays for all of it. `close` is the first tick
+ * of the next month, when demand, growth and the budget run on the stage results.
+ */
+export type MonthStage = 'traffic' | 'services' | 'influence' | 'close';
+
+export function monthStage(tick: number): MonthStage | null {
+  switch (tick % TICKS_PER_MONTH) {
+    case 0:
+      return 'close';
+    case TICKS_PER_MONTH - 3:
+      return 'traffic';
+    case TICKS_PER_MONTH - 2:
+      return 'services';
+    case TICKS_PER_MONTH - 1:
+      return 'influence';
+    default:
+      return null;
+  }
+}
+
 export function isYearStart(tick: number): boolean {
   return tick % (TICKS_PER_MONTH * BALANCE.clock.monthsPerYear) === 0;
 }

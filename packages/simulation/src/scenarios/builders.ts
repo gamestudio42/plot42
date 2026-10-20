@@ -1,4 +1,4 @@
-import { ZoneDensity, ZoneType, type Command, type CommandResult } from '@city/shared';
+import { Infra, ZoneDensity, ZoneType, type Command, type CommandResult } from '@city/shared';
 import { createEngine, type SimulationEngine } from '../engine';
 
 /**
@@ -148,6 +148,24 @@ export function maintainTown(engine: SimulationEngine): number {
   if (s.water.supply > 0 && s.water.demand > 0.85 * s.water.supply)
     tryPlace('waterPump', PUMP_SLOTS);
   return added;
+}
+
+/**
+ * A responsive player for runs with disasters: clears rubble, then replays the commands that
+ * built the city (`plan`, e.g. a slice of `engine.commandLog`) so destroyed plants, pumps,
+ * services and network pieces come back. Line tools only build the missing tiles.
+ */
+export function recoverCity(engine: SimulationEngine, plan: readonly Command[]): number {
+  const w = engine.world;
+  let actions = 0;
+  for (let i = 0; i < w.tileCount; i++) {
+    if (!w.hasInfra(i, Infra.Rubble)) continue;
+    const x = i % w.size;
+    const y = (i / w.size) | 0;
+    if (engine.execute({ type: 'demolish', x0: x, y0: y, x1: x, y1: y }).ok) actions++;
+  }
+  for (const command of plan) if (engine.execute(command).ok) actions++;
+  return actions;
 }
 
 /**

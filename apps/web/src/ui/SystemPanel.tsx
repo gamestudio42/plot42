@@ -10,6 +10,7 @@ const DISASTERS: DisasterKind[] = ['fire', 'flood', 'earthquake', 'crisis', 'bla
 export function SystemPanel({ session, children }: { session: GameSession; children?: ReactNode }) {
   const grid = useStore(session.ui, (s) => s.grid);
   const underground = useStore(session.ui, (s) => s.underground);
+  const muted = useStore(session.ui, (s) => s.muted);
   const disastersEnabled = useStore(session.ui, (s) => s.stats?.disastersEnabled ?? true);
   const s = t.system;
   const trigger = async (disaster: DisasterKind) => {
@@ -62,6 +63,15 @@ export function SystemPanel({ session, children }: { session: GameSession; child
           onChange={(e) => session.setUnderground(e.target.checked)}
         />
         {s.underground}
+      </label>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={!muted}
+          onChange={(e) => session.setMuted(!e.target.checked)}
+          data-testid="sound-enabled"
+        />
+        {s.sound}
       </label>
       <p className="muted small">{s.help}</p>
       <button

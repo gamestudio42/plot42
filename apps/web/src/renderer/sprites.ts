@@ -125,6 +125,53 @@ function chimney(g: Graphics, base: Point, height: number, color: number): void 
   g.ellipse(base.x, base.y - height, 4, 2).fill(0x333333);
 }
 
+/** Small isometric block (rooftop machinery) standing on point `p`. */
+function miniBox(g: Graphics, p: Point, size: number, height: number, color: number): void {
+  const b = { x: p.x, y: p.y + size / 2 };
+  const r = { x: p.x + size, y: p.y };
+  const t = { x: p.x, y: p.y - size / 2 };
+  const l = { x: p.x - size, y: p.y };
+  poly(g, [l, b, up(b, height), up(l, height)], shade(color, 0.75));
+  poly(g, [b, r, up(r, height), up(b, height)], shade(color, 0.92));
+  poly(g, [up(t, height), up(r, height), up(b, height), up(l, height)], shade(color, 1.1));
+}
+
+function waterTank(g: Graphics, p: Point): void {
+  g.rect(p.x - 4, p.y - 6, 1.5, 6).fill(0x5a4a3a);
+  g.rect(p.x + 2.5, p.y - 6, 1.5, 6).fill(0x5a4a3a);
+  g.rect(p.x - 5, p.y - 14, 10, 8).fill(0x8a6a4a);
+  g.ellipse(p.x, p.y - 6, 5, 2.5).fill(0x7a5a3a);
+  g.poly([p.x - 5.5, p.y - 14, p.x, p.y - 19, p.x + 5.5, p.y - 14]).fill(0x5a4a3a);
+}
+
+function antenna(g: Graphics, p: Point, height: number): void {
+  g.rect(p.x - 0.75, p.y - height, 1.5, height).fill(0x707070);
+  g.circle(p.x, p.y - height, 1.8).fill(0xff3a30);
+}
+
+/** Point on a box's top face: `u` from the left corner towards the back, `v` towards the front. */
+function onTop(top: Point[], u: number, v: number): Point {
+  const [t, , b, l] = top as [Point, Point, Point, Point];
+  return {
+    x: l.x + u * (t.x - l.x) + v * (b.x - l.x),
+    y: l.y + u * (t.y - l.y) + v * (b.y - l.y),
+  };
+}
+
+/** Factory sawtooth roof: slopes rising towards the front, with glazed vertical faces. */
+function sawtooth(g: Graphics, top: Point[], teeth: number, rise: number, color: number): void {
+  for (let k = 0; k < teeth; k++) {
+    const v0 = k / teeth;
+    const v1 = (k + 1) / teeth;
+    const a0 = onTop(top, 0, v0);
+    const b0 = onTop(top, 1, v0);
+    const a1 = onTop(top, 0, v1);
+    const b1 = onTop(top, 1, v1);
+    poly(g, [a0, b0, up(b1, rise), up(a1, rise)], shade(color, 1.05));
+    poly(g, [a1, b1, up(b1, rise), up(a1, rise)], 0x9fc0d0);
+  }
+}
+
 function smoke(g: Graphics, p: Point): void {
   g.circle(p.x + 2, p.y - 6, 4).fill({ color: 0xdddddd, alpha: 0.7 });
   g.circle(p.x + 6, p.y - 12, 5).fill({ color: 0xcccccc, alpha: 0.55 });
@@ -161,7 +208,7 @@ function drawResidential(g: Graphics, level: number, variant: number, abandoned:
   } else {
     const heights = [0, 0, 0, 40, 68, 104];
     const floors = [0, 0, 0, 4, 7, 11];
-    box(
+    const top = box(
       g,
       1,
       0.1,
@@ -169,6 +216,10 @@ function drawResidential(g: Graphics, level: number, variant: number, abandoned:
       { wall, roof: shade(wall, 0.8), window },
       floors[level] ?? 4,
     );
+    if (abandoned) return;
+    if (variant % 2 === 0) waterTank(g, onTop(top, 0.55, 0.4));
+    else miniBox(g, onTop(top, 0.5, 0.45), 6, 5, shade(wall, 0.7));
+    if (level >= 5) antenna(g, onTop(top, 0.3, 0.7), 16);
   }
 }
 
@@ -179,17 +230,34 @@ function drawCommercial(g: Graphics, level: number, variant: number, abandoned: 
   const window = abandoned ? 0x303030 : 0xd8eefc;
   const heights = [0, 16, 28, 50, 84, 128];
   const floors = [0, 1, 2, 4, 7, 11];
-  box(
-    g,
-    1,
-    level <= 1 ? 0.18 : 0.1,
-    heights[level] ?? 16,
-    { wall, roof, window },
-    floors[level] ?? 1,
-  );
-  if (level <= 2 && !abandoned) {
-    const { b, r } = footprint(1, 0.18);
-    poly(g, [up(b, 9), up(r, 9), up(lerp(r, b, 0), 6), up(lerp(b, b, 0), 6)], 0xd84a4a);
+  const inset = level <= 1 ? 0.18 : 0.1;
+  const top = box(g, 1, inset, heights[level] ?? 16, { wall, roof, window }, floors[level] ?? 1);
+  if (abandoned) return;
+  if (level <= 2) {
+    // Striped awning over the shop front (the south-east facade).
+    const { b, r, l } = footprint(1, inset);
+    const out = { x: (b.x - l.x) * 0.22, y: (b.y - l.y) * 0.22 };
+    const stripes = 4;
+    for (let k = 0; k < stripes; k++) {
+      const a = lerp(b, r, k / stripes);
+      const e = lerp(b, r, (k + 1) / stripes);
+      poly(
+        g,
+        [
+          up(a, 10),
+          up(e, 10),
+          { x: e.x + out.x, y: e.y + out.y - 7 },
+          { x: a.x + out.x, y: a.y + out.y - 7 },
+        ],
+        k % 2 === 0 ? 0xd84a4a : 0xf2efe6,
+      );
+    }
+  } else if (level === 3) {
+    miniBox(g, onTop(top, 0.35, 0.35), 5, 4, 0xb8bcc0);
+    miniBox(g, onTop(top, 0.7, 0.55), 5, 4, 0xb8bcc0);
+  } else {
+    miniBox(g, onTop(top, 0.5, 0.5), 9, 8, shade(roof, 0.9));
+    antenna(g, onTop(top, 0.5, 0.5), level >= 5 ? 30 : 18);
   }
 }
 
@@ -206,6 +274,7 @@ function drawIndustrial(g: Graphics, level: number, variant: number, abandoned: 
     { wall, roof, window: 0x50606a },
     level >= 3 ? 1 : 0,
   );
+  if (level <= 2) sawtooth(g, top, 3, 6, roof);
   if (level >= 3) {
     const c = lerp(top[0] as Point, top[2] as Point, 0.4);
     chimney(g, c, 14 + level * 4, abandoned ? 0x555555 : 0x8a4a3a);

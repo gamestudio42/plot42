@@ -386,7 +386,8 @@ export const ptBR = {
     cannotTrigger: 'Este desastre não pode acontecer agora.',
     grid: 'Mostrar grade',
     underground: 'Vista subterrânea',
-    help: 'Atalhos: Q inspecionar · R estrada · 1–6 zonas · 0 remover zona · E energia · T água · B demolir · N nivelar · F árvores · P pausa · U subterrâneo · G grade · Esc cancelar',
+    sound: 'Efeitos sonoros',
+    help: 'Atalhos: Q inspecionar · R estrada · 1–6 zonas · 0 remover zona · E energia · T água · B demolir · N nivelar · F árvores · P pausa · M som · U subterrâneo · G grade · Esc cancelar',
   },
 };
 

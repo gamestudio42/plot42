@@ -58,9 +58,30 @@ artifacts for visual review. Save tests cover IndexedDB across a reload, file ex
 import, corrupted files (checksum, truncation, foreign JSON) and a simulated
 `QuotaExceededError`.
 
+`tests/e2e/full-run.spec.ts` plays a whole session the way a player would: it starts a 64×64
+city from the menu (name, size, flat terrain, easy), builds a street, residential, commercial
+and industrial zones and a coal plant with the toolbar, lets eighteen months pass, saves from
+the system panel, reloads the page, loads the slot from the menu and checks that the hash,
+population, funds and tiles are identical and that the loaded city runs again. It leaves
+`test-results/full-run.png`. The same file checks that muting the sound survives a reload and
+that `M` toggles it.
+
+## Balancing reports and benchmarks
+
+`pnpm sim` runs a preset city headless for many months and seeds and writes monthly JSON
+reports; `pnpm bench` times every tick of a 128×128 city by category. Usage, presets, the
+current results and the balancing decisions are in [balancing.md](balancing.md). CI runs both
+in short form and uploads `reports/` as an artifact; the benchmark is informational there
+(shared runners are noisy), and `pnpm bench --strict` turns the budgets into a failing exit
+code.
+
 ## Performance budgets
 
-- Monthly tick on a 128×128 balanced city: < 8 ms average (Node, desktop CPU).
+- Heavy ticks on a 128×128 city (each month stage, and a network rebuild): p95 < 8 ms
+  (Node, desktop CPU at full clock).
 - Fast tick: < 0.5 ms average.
-- Rendering: 60 FPS on a common laptop at 1× zoom (checked manually and with the in-game FPS
-  counter).
+- Rendering: 60 FPS on a common laptop at 1× zoom (checked by hand with
+  `window.__cityDebug.fps()`).
+
+On a throttled CPU the raw timings say little about these budgets; the benchmark reports a
+calibration and normalised p95 values for that case (see [balancing.md](balancing.md)).

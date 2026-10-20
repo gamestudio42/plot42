@@ -143,7 +143,7 @@ export class ToolController {
     if (!command) return;
     const result = await this.session.client.command(command);
     if (!result.ok && result.reason) this.session.notifyReason(result.reason);
-    else if (result.ok) this.session.onBuilt(result.cost);
+    else if (result.ok) this.session.onBuilt(command);
     this.refreshCurrent();
   }
 }

@@ -12,6 +12,9 @@ export interface StartOptions {
   /** Keep the onboarding tutorial (hidden by default so it does not cover the map). */
   tutorial?: boolean;
   difficulty?: 'easy' | 'normal' | 'hard';
+  name?: string;
+  size?: 64 | 96 | 128;
+  hills?: number;
 }
 
 /** Starts a new city from the main menu with a fixed seed. */
@@ -26,6 +29,11 @@ export async function startCity(
   await page.goto('/');
   await page.getByTestId('main-menu').waitFor();
   await page.getByTestId('seed-input').fill(seed);
+  if (options.name) await page.getByTestId('city-name-input').fill(options.name);
+  if (options.size) await page.getByTestId('size-select').selectOption(String(options.size));
+  if (options.hills !== undefined) {
+    await page.getByTestId('terrain-hills').fill(String(options.hills));
+  }
   if (options.difficulty) {
     await page.getByTestId('difficulty-select').selectOption(options.difficulty);
   }

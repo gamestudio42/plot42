@@ -30,6 +30,8 @@ export class World {
   influenceDirty = false;
   /** Incremented whenever a road bit changes; derived road data compares against it. */
   roadVersion = 0;
+  /** Incremented when terrain changes after generation (derived terrain data compares it). */
+  terrainVersion = 0;
 
   constructor(size: number) {
     this.size = size;
@@ -146,6 +148,7 @@ export class World {
     if (data[i] !== value) {
       data[i] = value;
       this.markDirty(i);
+      if (layer === 'terrain') this.terrainVersion++;
     }
   }
 

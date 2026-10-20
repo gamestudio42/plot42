@@ -22,6 +22,7 @@ export function addWater(
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) w.terrain[w.index(x, y)] = Terrain.Water;
   }
+  w.terrainVersion++;
 }
 
 /** Raises a hill with its peak at vertex (vx, vy), relaxing slopes around it. */

@@ -71,7 +71,7 @@ flowchart LR
 | Charts    | `ui/ChartsPanel.tsx`  | Population, money, demand and environment history            |
 | Inspector | `ui/Inspector.tsx`    | Tile facts and the "why is it (not) growing" problem list    |
 | Tutorial  | `ui/Tutorial.tsx`     | Seven steps, auto-advanced by checks in `state/tutorial.ts`  |
-| System    | `ui/SystemPanel.tsx`  | Grid, underground view, help, back to the menu               |
+| System    | `ui/SystemPanel.tsx`  | Saves, grid, underground view, sound, help, back to the menu |
 
 Only one floating panel is open at a time; the inspector stacks above it in the right column.
 `Esc` closes the panel first, then cancels the tool and clears the selection.
@@ -103,28 +103,32 @@ footprint of `w × h` tiles.
 
 ## Simulation clock
 
-| Unit  | Value               | Systems                                      |
-| ----- | ------------------- | -------------------------------------------- |
-| Tick  | 1/4 day             | Fires, active disasters, command application |
-| Day   | 4 ticks             | Network rebuilds (power, water) when dirty   |
-| Month | 30 days = 120 ticks | Influence maps, traffic, demand, growth, tax |
-| Year  | 12 months           | Yearly statistics, evaluation                |
+| Unit  | Value               | Systems                                                               |
+| ----- | ------------------- | --------------------------------------------------------------------- |
+| Tick  | 1/4 day             | Fires, active disasters, command application                          |
+| Day   | 4 ticks             | Network rebuilds (power, water) when dirty                            |
+| Month | 30 days = 120 ticks | Traffic, services, influence (last 3 ticks), then demand, growth, tax |
+| Year  | 12 months           | Yearly statistics, evaluation                                         |
 
 Speeds: paused, 1× (20 ticks/s, one month every 6 s), 2× and 4×. The worker accumulates
 real time and runs a whole number of ticks per frame, capped to avoid a spiral of death.
 
 ## Tick pipeline
 
-Each `tick()` runs, in order:
+Each `step()` runs, in order:
 
 1. Apply queued commands (recorded with their tick number for replay).
-2. Rebuild dirty networks (roads, power, water).
-3. Recompute influence maps when the month changes.
-4. Update demand, growth and occupancy (monthly).
-5. Assign traffic and job accessibility (monthly, before growth reads it).
-6. Collect taxes and pay expenses (monthly); yearly statistics.
-7. Advance fires and disasters (every tick).
-8. Publish: mark dirty tiles and buildings for the next delta.
+2. At the start of a day, rebuild the power and water networks if they are dirty.
+3. Advance fires and disasters, then custom systems.
+4. Advance the tick counter and run the month stage of the new tick, if any: traffic and job
+   accessibility (tick 117 of the month), service coverage (118), influence maps (119), and the
+   close (0) with demand, growth, budget, history, yearly events and random disasters.
+5. Publish: the worker sends the dirty tiles and buildings as the next delta.
+
+Spreading the month over four ticks bounds the worst tick by the heaviest stage instead of the
+sum of all of them: on a 128×128 city with 32 000 residents the month costs about 28 ms in
+total, and the p95 of every tick stays under 10 ms even on a CPU throttled to 400 MHz
+(measurements in `docs/balancing.md`).
 
 Systems implement `System { id; update(ctx: SimContext): void }` and are registered in a fixed
 order. The engine only orchestrates; game rules live in the systems.
@@ -171,6 +175,16 @@ classified (`quota`, `unavailable`, `missing`) and shown to the player; export t
 - Building and tree textures are generated procedurally at startup from `Graphics` and cached.
 - Picking inverts the projection for every candidate elevation and keeps the front-most tile
   whose quad contains the cursor.
+
+## Audio
+
+`apps/web/src/audio/sound.ts` synthesizes every sound effect with WebAudio (oscillators and a
+noise buffer), so the project ships no audio files. `GameSession` plays a sound when a tool
+command succeeds (build, zone, demolish), when one is rejected, and for selected engine events
+(fire, destroyed building, disaster, brownout, water shortage, debt, bankruptcy, milestone).
+The `AudioContext` is created lazily and resumed on the first pointer or key press, as
+browsers require. Each sound is rate-limited to one play per 120 ms. Mute is toggled in the
+system panel or with `M`, and is stored in `localStorage['cityBuilder.muted']`.
 
 ## Error handling
 

@@ -92,39 +92,63 @@ function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+/** Extra cost of entering each road tile (-1 off-road), from last month's congestion. */
+function congestionPenalty(world: World, congestion: Float32Array): Float64Array {
+  const { congestionThreshold, congestionCost } = BALANCE.traffic;
+  const infra = world.structure.infra;
+  const penalty = new Float64Array(world.tileCount).fill(-1);
+  for (let i = 0; i < world.tileCount; i++) {
+    if (((infra[i] as number) & Infra.Road) === 0) continue;
+    const excess = Math.max(0, (congestion[i] as number) - congestionThreshold);
+    penalty[i] = congestionCost * excess * excess;
+  }
+  return penalty;
+}
+
 /** Multi-source Dijkstra over road tiles; edge cost grows with last month's congestion. */
 export function roadDijkstra(world: World, sources: number[], congestion: Float32Array): PathTree {
-  const { congestionThreshold, congestionCost, maxCommute, searchFactor } = BALANCE.traffic;
+  return dijkstra(world, sources, congestionPenalty(world, congestion));
+}
+
+function dijkstra(world: World, sources: number[], penalty: Float64Array): PathTree {
+  const { maxCommute, searchFactor } = BALANCE.traffic;
   const maxCost = maxCommute * searchFactor;
   const size = world.size;
   const dist = new Float64Array(world.tileCount).fill(Number.POSITIVE_INFINITY);
   const parent = new Int32Array(world.tileCount).fill(-1);
-  const heap = new MinHeap();
-  for (const s of sources) {
-    if (dist[s] === 0) continue;
-    dist[s] = 0;
-    heap.push(s, 0);
-  }
+  const heap = new MinHeap(4096);
+  // Tiles beyond `maxCost` keep their distance but are never expanded, so they skip the heap.
   const relax = (from: number, to: number, d: number) => {
-    if (!world.hasInfra(to, Infra.Road)) return;
-    const excess = Math.max(0, (congestion[to] as number) - congestionThreshold);
-    const nd = d + 1 + congestionCost * excess * excess;
+    const extra = penalty[to] as number;
+    if (extra < 0) return;
+    const nd = d + 1 + extra;
     if (nd < (dist[to] as number)) {
       dist[to] = nd;
       parent[to] = from;
-      heap.push(to, nd);
+      if (nd <= maxCost) heap.push(to, nd);
     }
   };
+  const lastRow = world.tileCount - size;
+  const expand = (t: number, d: number) => {
+    const x = t % size;
+    if (t >= size) relax(t, t - size, d);
+    if (x < size - 1) relax(t, t + 1, d);
+    if (t < lastRow) relax(t, t + size, d);
+    if (x > 0) relax(t, t - 1, d);
+  };
+  // Sources (key 0) pop before every other key (>= 1) in node order, so they bypass the heap.
+  const starts = Int32Array.from(sources).sort();
+  for (const s of starts) dist[s] = 0;
+  for (let k = 0; k < starts.length; k++) {
+    const s = starts[k] as number;
+    if (k > 0 && s === starts[k - 1]) continue;
+    expand(s, 0);
+  }
   while (heap.size > 0) {
     const t = heap.pop();
     const d = heap.lastKey;
-    if (d > (dist[t] as number) || d > maxCost) continue;
-    const x = t % size;
-    const y = (t / size) | 0;
-    if (y > 0) relax(t, t - size, d);
-    if (x < size - 1) relax(t, t + 1, d);
-    if (y < size - 1) relax(t, t + size, d);
-    if (x > 0) relax(t, t - 1, d);
+    if (d > (dist[t] as number)) continue;
+    expand(t, d);
   }
   return { dist, parent };
 }
@@ -156,9 +180,10 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
     jobSites.push(r);
     homeSites.push(r);
   }
-  const jobs = roadDijkstra(w, jobSites, congestion);
-  const homes = roadDijkstra(w, homeSites, congestion);
-  const shops = roadDijkstra(w, shopSites, congestion);
+  const penalty = congestionPenalty(w, congestion);
+  const jobs = dijkstra(w, jobSites, penalty);
+  const homes = dijkstra(w, homeSites, penalty);
+  const shops = dijkstra(w, shopSites, penalty);
   const comps = componentStats(engine, roads);
 
   // Accessibility of every zoned tile (stored 0..255 in the access layer).

@@ -9,8 +9,10 @@ import {
   type RejectReason,
   type SimEvent,
   type Speed,
+  type ToolCommand,
 } from '@city/shared';
 import { RoadNetwork, type World } from '@city/simulation';
+import { SoundBoard, type SoundName } from '../audio/sound';
 import { formatNumber, t } from '../i18n/pt-BR';
 import {
   AUTOSAVE_ID,
@@ -65,6 +67,8 @@ export interface UiState {
   saves: SaveSlot[];
   /** A save or load is in progress. */
   busy: boolean;
+  /** Sound effects off (persisted in localStorage). */
+  muted: boolean;
 }
 
 const initialUi: UiState = {
@@ -86,6 +90,18 @@ const initialUi: UiState = {
   toasts: [],
   saves: [],
   busy: false,
+  muted: false,
+};
+
+const EVENT_SOUNDS: Partial<Record<SimEvent['type'], SoundName>> = {
+  fireStarted: 'fire',
+  buildingDestroyed: 'demolish',
+  disasterStarted: 'disaster',
+  brownout: 'warning',
+  waterShortage: 'warning',
+  debt: 'warning',
+  bankrupt: 'error',
+  milestone: 'milestone',
 };
 
 const TOAST_MS = 3500;
@@ -97,7 +113,8 @@ const AUTOSAVE_CHECK_MS = 5_000;
 export class GameSession {
   readonly client = new CityClient();
   readonly renderer = new GameRenderer();
-  readonly ui = new Store<UiState>(initialUi);
+  readonly sound = new SoundBoard();
+  readonly ui = new Store<UiState>({ ...initialUi, muted: this.sound.muted });
   readonly tools = new ToolController(this);
   private readonly eventListeners = new Set<(events: SimEvent[]) => void>();
   private readonly cameraListeners = new Set<() => void>();
@@ -158,6 +175,9 @@ export class GameSession {
       },
     });
     window.addEventListener('keydown', (e) => this.onKey(e), { signal: this.listeners.signal });
+    for (const type of ['pointerdown', 'keydown'] as const) {
+      window.addEventListener(type, () => this.sound.unlock(), { signal: this.listeners.signal });
+    }
     host.addEventListener('pointerleave', () => this.ui.set({ pointer: null }), {
       signal: this.listeners.signal,
     });
@@ -435,19 +455,29 @@ export class GameSession {
   }
 
   notifyReason(reason: RejectReason): void {
+    this.sound.play('error');
     this.toast(
       reason === 'INSUFFICIENT_FUNDS' || reason === 'BANKRUPT' ? 'error' : 'warning',
       t.reasons[reason],
     );
   }
 
-  onBuilt(_cost: number): void {
+  onBuilt(command: ToolCommand): void {
+    this.sound.play(
+      command.type === 'zone' ? 'zone' : command.type === 'demolish' ? 'demolish' : 'build',
+    );
     this.checkTutorial();
+  }
+
+  setMuted(muted: boolean): void {
+    this.sound.setMuted(muted);
+    this.ui.set({ muted });
   }
 
   dispose(): void {
     this.disposed = true;
     if (this.autosaveTimer) clearInterval(this.autosaveTimer);
+    this.sound.dispose();
     this.listeners.abort();
     this.renderer.destroy();
     this.client.dispose();
@@ -465,6 +495,8 @@ export class GameSession {
   }
 
   private announce(event: SimEvent): void {
+    const sound = EVENT_SOUNDS[event.type];
+    if (sound) this.sound.play(sound);
     const e = t.events;
     switch (event.type) {
       case 'fireStarted':
@@ -510,6 +542,7 @@ export class GameSession {
       return;
     }
     if (key === 'p') return this.togglePause();
+    if (key === 'm') return this.setMuted(!this.ui.get().muted);
     if (key === 'u') return this.setUnderground(!this.ui.get().underground);
     if (key === 'g') return this.setGrid(!this.ui.get().grid);
     const tool = toolByHotkey(key);

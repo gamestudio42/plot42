@@ -16,7 +16,8 @@ export interface UtilityResult extends UtilityStats {
 }
 
 interface NetworkSpec {
-  conductor(i: number): boolean;
+  /** 1 on tiles that carry the network. */
+  conductors: Uint8Array;
   supply(b: BuildingRecord): number;
   demand(b: BuildingRecord): number;
   /** Adjusts the computed layer before it is written to the world. */
@@ -62,20 +63,25 @@ export function updateUtilities(
   write = true,
 ): { power: UtilityResult; water: UtilityResult } {
   const w = engine.world;
+  const infra = w.structure.infra;
+  const zone = w.zone;
+  const buildingId = w.buildingId;
+  const powerConductors = new Uint8Array(w.tileCount);
+  const waterConductors = new Uint8Array(w.tileCount);
+  for (let i = 0; i < w.tileCount; i++) {
+    const flags = infra[i] as number;
+    const built = (buildingId[i] as number) !== 0;
+    if (built || (flags & Infra.PowerLine) !== 0 || (zone[i] as number) !== ZoneType.None)
+      powerConductors[i] = 1;
+    if (built || (flags & Infra.Pipe) !== 0) waterConductors[i] = 1;
+  }
   const power = solve(
     engine,
     write,
     'powered',
     (b) => b.powered,
     (b, on) => (b.powered = on),
-    {
-      conductor: (i) =>
-        w.hasInfra(i, Infra.PowerLine) ||
-        (w.buildingId[i] as number) !== 0 ||
-        (w.zone[i] as number) !== ZoneType.None,
-      supply: powerSupply,
-      demand: powerDemand,
-    },
+    { conductors: powerConductors, supply: powerSupply, demand: powerDemand },
   );
   const water = solve(
     engine,
@@ -84,7 +90,7 @@ export function updateUtilities(
     (b) => b.watered,
     (b, on) => (b.watered = on),
     {
-      conductor: (i) => w.hasInfra(i, Infra.Pipe) || (w.buildingId[i] as number) !== 0,
+      conductors: waterConductors,
       supply: (b) => waterSupply(w, b),
       demand: waterDemand,
       postProcess: (next) => spreadWaterToEmptyZones(w, next),
@@ -103,9 +109,14 @@ function solve(
 ): UtilityResult {
   const w = engine.world;
   const size = w.size;
+  const count = w.tileCount;
+  const conductors = spec.conductors;
+  const infra = w.structure.infra;
+  const buildingId = w.buildingId;
   const next = new Uint8Array(w.tileCount);
   const visited = new Uint8Array(w.tileCount);
-  const served = new Map<number, boolean>();
+  // Per building id: footprints are contiguous conductors, so each building joins one component.
+  const state = new Uint8Array(engine.buildings.nextId);
   const queue = new Int32Array(w.tileCount);
   const result: UtilityResult = { supply: 0, demand: 0, served: 0, shortage: false };
   let consumers = 0;
@@ -117,40 +128,60 @@ function solve(
     if (visited[start] === 1) continue;
     // Breadth-first discovery from the source footprint.
     let tail = 0;
-    for (const t of engine.buildings.footprint(source)) {
-      visited[t] = 1;
-      queue[tail++] = t;
+    for (let y = source.y; y < source.y + source.h; y++) {
+      for (let x = source.x; x < source.x + source.w; x++) {
+        const t = y * size + x;
+        visited[t] = 1;
+        queue[tail++] = t;
+      }
     }
-    const seen = new Set<number>();
     const order: BuildingRecord[] = [];
-    const firstTile = new Map<number, number>();
+    const firstTile: number[] = [];
     let supply = 0;
     for (let head = 0; head < tail; head++) {
       const t = queue[head] as number;
-      const id = w.buildingId[t] as number;
-      if (id !== 0 && !seen.has(id)) {
-        seen.add(id);
+      const id = buildingId[t] as number;
+      if (id !== 0 && state[id] === UNREACHED) {
         const b = engine.buildings.get(id);
         if (b) {
+          state[id] = UNSERVED;
           supply += spec.supply(b);
           order.push(b);
-          firstTile.set(id, head);
+          firstTile.push(head);
         }
       }
+      // Row bounds compare the index directly; only the column needs a division.
       const tx = t % size;
-      const ty = (t / size) | 0;
-      if (ty > 0)
-        tail = enqueue(w, spec, visited, queue, tail, t - size, ty > 1 ? t - 2 * size : -1);
+      if (t >= size)
+        tail = enqueue(
+          conductors,
+          infra,
+          visited,
+          queue,
+          tail,
+          t - size,
+          t >= 2 * size ? t - 2 * size : -1,
+        );
       if (tx < size - 1)
-        tail = enqueue(w, spec, visited, queue, tail, t + 1, tx < size - 2 ? t + 2 : -1);
-      if (ty < size - 1)
-        tail = enqueue(w, spec, visited, queue, tail, t + size, ty < size - 2 ? t + 2 * size : -1);
-      if (tx > 0) tail = enqueue(w, spec, visited, queue, tail, t - 1, tx > 1 ? t - 2 : -1);
+        tail = enqueue(conductors, infra, visited, queue, tail, t + 1, tx < size - 2 ? t + 2 : -1);
+      if (t < count - size)
+        tail = enqueue(
+          conductors,
+          infra,
+          visited,
+          queue,
+          tail,
+          t + size,
+          t < count - 2 * size ? t + 2 * size : -1,
+        );
+      if (tx > 0)
+        tail = enqueue(conductors, infra, visited, queue, tail, t - 1, tx > 1 ? t - 2 : -1);
     }
     // Nearest-first allocation; the first consumer that does not fit cuts off the rest.
     let remaining = supply;
     let cutoff = Number.POSITIVE_INFINITY;
-    for (const b of order) {
+    for (let k = 0; k < order.length; k++) {
+      const b = order[k] as BuildingRecord;
       const demand = spec.demand(b);
       const isSource = spec.supply(b) > 0;
       if (demand > 0 && !isSource) {
@@ -159,47 +190,61 @@ function solve(
       }
       if (isSource || (cutoff === Number.POSITIVE_INFINITY && remaining >= demand)) {
         remaining -= isSource ? 0 : demand;
-        served.set(b.id, true);
+        state[b.id] = SERVED;
         if (demand > 0 && !isSource) servedConsumers++;
       } else {
-        served.set(b.id, false);
-        if (cutoff === Number.POSITIVE_INFINITY) cutoff = firstTile.get(b.id) as number;
+        if (cutoff === Number.POSITIVE_INFINITY) cutoff = firstTile[k] as number;
         result.shortage = true;
       }
     }
     result.supply += supply;
     for (let k = 0; k < tail; k++) {
       const t = queue[k] as number;
-      const id = w.buildingId[t] as number;
-      next[t] = id !== 0 ? (served.get(id) ? 1 : 0) : k < cutoff ? 1 : 0;
+      const id = buildingId[t] as number;
+      next[t] = id !== 0 ? (state[id] === SERVED ? 1 : 0) : k < cutoff ? 1 : 0;
     }
   }
 
   for (const b of engine.buildings.values()) {
-    const on = served.get(b.id) ?? false;
+    const reached = state[b.id] as number;
+    const on = reached === SERVED;
     if (write && getServed(b) !== on) {
       setServed(b, on);
       engine.buildings.touch(b);
     }
-    if (spec.demand(b) > 0 && spec.supply(b) <= 0 && !served.has(b.id)) {
-      consumers++;
-      result.demand += spec.demand(b);
+    if (reached === UNREACHED) {
+      const demand = spec.demand(b);
+      if (demand > 0 && spec.supply(b) <= 0) {
+        consumers++;
+        result.demand += demand;
+      }
     }
   }
   result.served = consumers === 0 ? 1 : servedConsumers / consumers;
   if (!write) return result;
   spec.postProcess?.(next);
-  for (let i = 0; i < w.tileCount; i++) w.setLayer(layer, i, next[i] as number);
+  const data = w.structure[layer];
+  for (let i = 0; i < w.tileCount; i++) {
+    const v = next[i] as number;
+    if (data[i] !== v) {
+      data[i] = v;
+      w.markDirty(i);
+    }
+  }
   return result;
 }
+
+const UNREACHED = 0;
+const UNSERVED = 1;
+const SERVED = 2;
 
 /**
  * Enqueues neighbour `n`; when `n` is a plain road tile, conduction jumps over it to `beyond`
  * (zones and buildings on both sides of a street stay connected).
  */
 function enqueue(
-  w: World,
-  spec: NetworkSpec,
+  conductors: Uint8Array,
+  infra: Uint8Array,
   visited: Uint8Array,
   queue: Int32Array,
   tail: number,
@@ -207,12 +252,17 @@ function enqueue(
   beyond: number,
 ): number {
   if (visited[n] === 1) return tail;
-  if (spec.conductor(n)) {
+  if (conductors[n] === 1) {
     visited[n] = 1;
     queue[tail] = n;
     return tail + 1;
   }
-  if (beyond < 0 || visited[beyond] === 1 || !w.hasInfra(n, Infra.Road) || !spec.conductor(beyond))
+  if (
+    beyond < 0 ||
+    visited[beyond] === 1 ||
+    ((infra[n] as number) & Infra.Road) === 0 ||
+    conductors[beyond] !== 1
+  )
     return tail;
   visited[beyond] = 1;
   queue[tail] = beyond;

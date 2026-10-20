@@ -187,17 +187,35 @@ unserved, which makes brownouts spread from the far end of the network.
 | Com L1..L5 | −3, 6, 10, 16, 25  | −2, 5, 10, 18, 30                        |
 | Ind L1..L5 | −6, 12, 18, 25, 35 | −4, 8, 14, 20, 28                        |
 
-Networks rebuild immediately after a command and at the start of every day. Network state is
-derived (not serialized): it is a pure function of the saved world, so loading a save does
-not need to rebuild it to keep the state hash identical.
+Networks rebuild immediately after a successful tool command, and at the start of a day only
+when something marked them dirty: growth at the month close (new, upgraded or emptied
+buildings change demand), fires and disasters that destroy buildings, and loading a save.
+Network state is derived (not serialized): it is a pure function of the saved world, so
+loading a save does not need to rebuild it to keep the state hash identical.
+
+The flood fill runs on typed arrays: a per-network conductor mask is built once per refresh,
+and each building is tracked as unreached, unserved or served in a `Uint8Array` indexed by
+building id. The visiting order (and therefore the nearest-first policy) is unchanged.
 
 ## 8.1 Clock
 
 One tick is a quarter of a day; a month is 30 days (120 ticks). Each tick: queued commands run,
-networks rebuild at the start of each day, per-tick systems run (fire), the tick counter
-advances and, when it reaches a month boundary, the monthly pipeline closes the month that just
-ended: roads → traffic → services → influence maps → totals → demand → growth → budget →
-history.
+dirty networks rebuild at the start of a day, fires and disasters advance, custom systems run,
+and the tick counter advances. The heavy monthly work is then staggered over the last ticks of
+the month (`monthStage(tick)` in `time.ts`, keyed on `tick mod 120` after the increment), so no
+single tick pays for all of it:
+
+| `tick mod 120` | Stage     | Work                                                              |
+| -------------- | --------- | ----------------------------------------------------------------- |
+| 117            | traffic   | road graph, trip assignment, job accessibility, traffic map       |
+| 118            | services  | service coverage                                                  |
+| 119            | influence | road graph, pollution, land value, crime                          |
+| 0              | close     | totals, demand, growth, budget, layer statistics, history, events |
+
+Every stage writes its result into serialized layers (`traffic`, `jobAccess`, coverage,
+influence maps), so a save taken between two stages resumes exactly where it stopped. Growth
+recomputes the road component statistics at the close instead of reusing the traffic stage's
+copy, because a city loaded between the stages never ran that stage in memory.
 
 ## 9. Services and influence maps, monthly
 
@@ -212,7 +230,10 @@ history.
   (the blur spreads a source over 25 tiles), minus `4·trees` and 20 near parks.
 - **Land value:** `60 + water proximity (30) + 3·elevation + 2·trees + parks + 0.1·(education +
 health) + 0.05·police + 10·(road access) + city centre bonus max(0, 40 − d/2) − 0.5·pollution −
-0.3·crime − 0.1·traffic`, blurred once. Water tiles are 0.
+0.3·crime − 0.1·traffic`, blurred once. Water tiles are 0. The distance to water is a capped
+  search over the terrain, cached per world and recomputed only when `world.terrainVersion`
+  changes. `setLayer('terrain', …)` bumps that version; code that writes the terrain array
+  directly (tests, generators) must bump it too.
 - **Crime** (developed tiles): `40 + 12·level + 90·abandoned + (128 − landValue)/2 − 0.6·police`,
   blurred once.
 

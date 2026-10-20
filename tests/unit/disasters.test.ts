@@ -114,6 +114,7 @@ describe('flood', () => {
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 3; x++) e.world.terrain[e.world.index(x, y)] = 0;
     }
+    e.world.terrainVersion++;
     return e;
   }
 

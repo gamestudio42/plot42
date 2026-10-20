@@ -37,10 +37,10 @@ import { updateGrowth, type GrowthResult } from './systems/growth';
 import { updateInfluence } from './systems/influence';
 import { RoadNetwork } from './systems/roads';
 import { updateServices } from './systems/services';
-import { updateTraffic, type TrafficResult } from './systems/traffic';
+import { componentStats, updateTraffic, type TrafficResult } from './systems/traffic';
 import { updateUtilities, type UtilityResult } from './systems/utilities';
 import { DEFAULT_TERRAIN, generateTerrain } from './terrain/generate';
-import { dateOf, isDayStart, isMonthStart, monthIndex } from './time';
+import { dateOf, isDayStart, monthIndex, monthStage } from './time';
 import { BuildingStore } from './world/buildings';
 import { World } from './world/world';
 
@@ -223,13 +223,29 @@ export class SimulationEngine {
 
   step(): void {
     while (this.queue.length > 0) this.execute(this.queue.shift() as Command);
-    if (isDayStart(this.tick)) this.refreshUtilities();
+    // Networks only change through commands, growth and disasters, which all mark them dirty.
+    if (isDayStart(this.tick) && this.networksDirty) this.refreshUtilities();
     updateFires(this);
     updateDisasters(this);
     for (const system of this.systems) system.update(this);
     this.tick++;
-    // The month closes at the end of its last tick.
-    if (isMonthStart(this.tick)) this.monthly();
+    // Stage outputs live in serialized layers, so a save between stages resumes identically.
+    switch (monthStage(this.tick)) {
+      case 'traffic':
+        this.roads.update();
+        this.lastTraffic = updateTraffic(this, this.roads);
+        break;
+      case 'services':
+        updateServices(this);
+        break;
+      case 'influence':
+        this.roads.update();
+        updateInfluence(this, this.roads);
+        break;
+      case 'close':
+        this.monthly();
+        break;
+    }
   }
 
   runTicks(count: number): void {
@@ -272,7 +288,7 @@ export class SimulationEngine {
   stats(): CityStats {
     const date = dateOf(this.tick);
     const totals = cityTotals(this);
-    const utilities = this.utilities ?? updateUtilities(this, false);
+    const utilities = (this.utilities ??= updateUtilities(this, false));
     const layer = this.layerStats ?? (this.layerStats = computeLayerStats(this));
     const counts = {
       roads: 0,
@@ -369,9 +385,6 @@ export class SimulationEngine {
     const crisis = this.hasDisaster('crisis');
     const epidemic = this.hasDisaster('epidemic');
     const d = BALANCE.disasters;
-    this.lastTraffic = updateTraffic(this, this.roads);
-    updateServices(this);
-    updateInfluence(this, this.roads);
     const before = cityTotals(this);
     updateDemand(this, {
       totals: before,
@@ -383,11 +396,14 @@ export class SimulationEngine {
     this.lastGrowth = updateGrowth(this, {
       totals: before,
       roads: this.roads,
-      components: this.lastTraffic.components,
+      // Recomputed rather than taken from the traffic stage, which a loaded save never ran.
+      components: componentStats(this, this.roads),
       epidemic: epidemic
         ? d.epidemicResidentialFactor + (1 - d.epidemicResidentialFactor) * healthCover
         : 1,
     });
+    // New, upgraded or emptied buildings change utility demand.
+    this.networksDirty = true;
     const report = computeMonthlyReport(this, {
       crisisRevenue: crisis ? d.crisisRevenueFactor : 1,
       epidemicCommercial: epidemic ? d.epidemicCommercialRevenue : 1,

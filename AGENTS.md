@@ -33,10 +33,14 @@ pnpm test             # unit + integration tests (Vitest)
 pnpm test:simulation  # long scenario tests (Vitest)
 pnpm test:e2e         # Playwright (builds and serves the app)
 pnpm build            # production build of apps/web
-pnpm sim -- --scenario balanced --months 120 --seed 1   # headless JSON report
-pnpm bench            # tick timing benchmark
+pnpm sim --preset balanced --months 120 --seeds 1,2,3   # headless JSON reports
+pnpm sim --list       # simulation presets
+pnpm bench            # tick timing benchmark (128×128 grid city); --strict fails on budgets
 pnpm check            # lint + typecheck + test + test:simulation + build
 ```
+
+Reports go to `reports/` (git-ignored). `docs/balancing.md` holds the reference results; after
+changing a rule or constant, rerun the presets and the benchmark and update it.
 
 Docker: `docker compose up` serves the dev build on port 5173.
 
@@ -65,10 +69,13 @@ apps/web/src/
   state/      GameSession (UI store, panels, tutorial), CityClient (worker bridge +
               mirror world), debug hooks used by Playwright
   worker/     Web Worker host for the engine
+  audio/      Synthesized WebAudio sound effects (no audio files)
   i18n/       Portuguese strings
 packages/simulation/src/
   world/ terrain/ commands/ systems/ persistence/ scenarios/ rng/
-  engine.ts      orchestration and the tick/month pipeline
+  scenarios/presets.ts  scripted cities for `pnpm sim` and `pnpm bench`
+  engine.ts      orchestration and the tick pipeline (month staged over four ticks)
+  time.ts        calendar and monthStage()
   diagnostics.ts diagnoseTile(), shared by the engine and the UI inspector
   report.ts      collectMetrics() for scenario and headless reports
 packages/shared/src/

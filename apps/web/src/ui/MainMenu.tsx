@@ -47,6 +47,7 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
         max={max}
         step={0.01}
         value={terrain[key]}
+        data-testid={`terrain-${key}`}
         onChange={(e) => setTerrain({ ...terrain, [key]: Number(e.target.value) })}
       />
     </label>

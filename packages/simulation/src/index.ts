@@ -17,9 +17,12 @@ export {
   buildTown,
   flatCity,
   maintainTown,
+  recoverCity,
   run,
   type CityLayout,
 } from './scenarios/builders';
+export { buildGridCity, maintainGrid, type GridLayout } from './scenarios/grid';
+export { SIM_PRESETS, type PresetRun, type SimPreset } from './scenarios/presets';
 export {
   cityTotals,
   demandTargets,
@@ -42,7 +45,7 @@ export {
 export { Rng, type RngState } from './rng/rng';
 export { DEFAULT_TERRAIN, generateTerrain, relaxSlopes } from './terrain/generate';
 export { FractalNoise, ValueNoise } from './terrain/noise';
-export { dateOf, monthIndex, START_YEAR, type CityDate } from './time';
+export { dateOf, monthIndex, monthStage, START_YEAR, type CityDate, type MonthStage } from './time';
 export { BuildingStore } from './world/buildings';
 export { Connection, connectionMask } from './world/connections';
 export { tileVariant } from './world/variant';
