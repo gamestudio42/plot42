@@ -11,6 +11,7 @@ export function SystemPanel({ session, children }: { session: GameSession; child
   const grid = useStore(session.ui, (s) => s.grid);
   const underground = useStore(session.ui, (s) => s.underground);
   const muted = useStore(session.ui, (s) => s.muted);
+  const music = useStore(session.ui, (s) => s.music);
   const animations = useStore(session.ui, (s) => s.animations);
   const disastersEnabled = useStore(session.ui, (s) => s.stats?.disastersEnabled ?? true);
   const s = t.system;
@@ -73,6 +74,16 @@ export function SystemPanel({ session, children }: { session: GameSession; child
           data-testid="sound-enabled"
         />
         {s.sound}
+      </label>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={music}
+          disabled={muted}
+          onChange={(e) => session.setMusic(e.target.checked)}
+          data-testid="music-enabled"
+        />
+        {s.music}
       </label>
       <label className="check-row">
         <input

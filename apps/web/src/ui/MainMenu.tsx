@@ -2,6 +2,7 @@ import { DIFFICULTIES, type Difficulty, type TerrainOptions } from '@city/shared
 import { useState, type ReactNode } from 'react';
 import { t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
+import { useStore } from '../state/store';
 import { Logo } from './Logo';
 
 const SIZES = [64, 96, 128] as const;
@@ -56,6 +57,7 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
 
   return (
     <div className="main-menu" data-testid="main-menu">
+      <SoundToggle session={session} />
       <div className="menu-card">
         <h1 className="menu-title">
           <Logo />
@@ -152,5 +154,42 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
         <p className="muted small">{m.credits}</p>
       </div>
     </div>
+  );
+}
+
+/** Speaker button: the menu has no system panel and the M shortcut only works in game. */
+function SoundToggle({ session }: { session: GameSession }) {
+  const muted = useStore(session.ui, (s) => s.muted);
+  const label = muted ? t.menu.soundOff : t.menu.soundOn;
+  return (
+    <button
+      type="button"
+      className="button menu-sound"
+      onClick={() => session.setMuted(!muted)}
+      title={label}
+      aria-label={label}
+      aria-pressed={!muted}
+      data-testid="menu-sound"
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+        {muted ? (
+          <path
+            d="M16 9l5 6M21 9l-5 6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        ) : (
+          <path
+            d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
+      </svg>
+    </button>
   );
 }

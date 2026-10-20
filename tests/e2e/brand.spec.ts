@@ -1,9 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
+import { clientPointOf, waitForCity } from './helpers';
+
+const musicState = (page: Page) => page.evaluate(() => window.__cityDebug?.musicState());
 
 async function openMenu(page: Page): Promise<void> {
   await page.addInitScript(() => localStorage.setItem('cityBuilder.tutorialDone', '1'));
   await page.goto('/');
   await page.getByTestId('main-menu').waitFor();
+}
+
+async function foundCity(page: Page, name: string): Promise<void> {
+  await page.getByTestId('city-name-input').fill(name);
+  await page.getByTestId('seed-input').fill('brand');
+  await page.getByTestId('size-select').selectOption('64');
+  await page.getByTestId('start-city').click();
+  await waitForCity(page);
 }
 
 test('the page carries the Urbe name and icon, and boots before the menu', async ({ page }) => {
@@ -49,4 +60,59 @@ test('the menu shows a live city behind it', async ({ page }) => {
   // Events of the background city never reach the player.
   await expect(page.getByTestId('toasts').locator('.toast')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/brand-menu.png' });
+});
+
+test('music follows the screen, ducks on pause and remembers the toggle', async ({ page }) => {
+  await openMenu(page);
+  expect((await musicState(page))?.playing).toBe(false);
+
+  // The first gesture starts the audio context and the menu track.
+  await page.getByTestId('city-name-input').click();
+  await expect.poll(async () => (await musicState(page))?.playing).toBe(true);
+  expect(await musicState(page)).toMatchObject({ enabled: true, track: 'menu', ducked: false });
+
+  // The speaker button mutes everything, music included.
+  await page.getByTestId('menu-sound').click();
+  await expect(page.getByTestId('menu-sound')).toHaveAttribute('aria-pressed', 'false');
+  expect((await musicState(page))?.playing).toBe(false);
+  await page.getByTestId('menu-sound').click();
+  await expect.poll(async () => (await musicState(page))?.playing).toBe(true);
+
+  await foundCity(page, 'Vila Sonora');
+  expect(await musicState(page)).toMatchObject({ playing: true, track: 'city', ducked: false });
+
+  // Pausing ducks the music and shows the overlay, which does not block the map.
+  await page.getByTestId('speed-0').click();
+  await expect(page.getByTestId('pause-overlay')).toBeVisible();
+  await expect(page.locator('.paused-banner')).toContainText('Pausado');
+  expect((await musicState(page))?.ducked).toBe(true);
+  const flat = await page.evaluate(() => window.__cityDebug?.findFlatArea(1, 1));
+  const { x, y } = flat as { x: number; y: number };
+  const point = await clientPointOf(page, x, y);
+  await page.mouse.click(point.x, point.y);
+  await expect.poll(() => page.evaluate(() => window.__cityDebug?.getSelected())).toEqual({ x, y });
+  // The fade-in can take a while to start in the software-rendered headless browser.
+  await expect(page.getByTestId('pause-overlay')).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: 'test-results/brand-pause.png' });
+  await page.keyboard.press('p');
+  await expect(page.getByTestId('pause-overlay')).toHaveCount(0);
+  expect((await musicState(page))?.ducked).toBe(false);
+
+  // Turning the music off is persisted.
+  await page.getByTestId('open-system').click();
+  await page.getByTestId('music-enabled').uncheck();
+  expect(await musicState(page)).toMatchObject({ enabled: false, playing: false });
+  expect(await page.evaluate(() => localStorage.getItem('cityBuilder.music'))).toBe('0');
+
+  // Back on the menu the player's city stays behind it, with the menu track.
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByTestId('back-to-menu').click();
+  await expect(page.getByTestId('main-menu')).toBeVisible();
+  expect((await page.evaluate(() => window.__cityDebug?.getStats()))?.name).toBe('Vila Sonora');
+  expect((await musicState(page))?.track).toBe('menu');
+
+  await page.reload();
+  await page.getByTestId('main-menu').waitFor();
+  await page.getByTestId('city-name-input').click();
+  expect(await musicState(page)).toMatchObject({ enabled: false, playing: false });
 });

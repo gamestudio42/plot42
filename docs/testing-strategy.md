@@ -7,7 +7,7 @@
 | Unit        | `tests/unit`            | Vitest     | `pnpm test`            | Pure functions: RNG, noise, geometry, validation, networks, save codec |
 | Integration | `tests/integration`     | Vitest     | `pnpm test`            | Engine with several systems: commands + ticks + serialization          |
 | Scenarios   | `tests/scenarios`       | Vitest     | `pnpm test:simulation` | Whole cities simulated for months or years, asserting trends           |
-| End-to-end  | `tests/e2e`             | Playwright | `pnpm test:e2e`        | Real browser: boot, menu, picking, tools, HUD, save/load               |
+| End-to-end  | `tests/e2e`             | Playwright | `pnpm test:e2e`        | Real browser: boot, menu, picking, tools, HUD, save/load, music        |
 | Reports     | `tools/headless-sim.ts` | tsx        | `pnpm sim`             | JSON reports for balancing                                             |
 | Benchmarks  | `tools/benchmark.ts`    | tsx        | `pnpm bench`           | Tick timings and memory against budgets                                |
 
@@ -52,7 +52,8 @@ hashes, which makes any divergence visible immediately.
 
 The web app exposes `window.__cityDebug` (always on, read-only helpers plus `runTicks` for tests):
 the selected tile, tile lookup, statistics, camera helpers to project a tile to screen
-coordinates, the engine hash, save export/import, disaster triggers and the boot step. Playwright uses it to
+coordinates, the engine hash, save export/import, disaster triggers, the boot step and the
+music state. Playwright uses it to
 click specific tiles and to assert results without parsing pixels. Screenshots are kept as
 artifacts for visual review. Save tests cover IndexedDB across a reload, file export and
 import, corrupted files (checksum, truncation, foreign JSON) and a simulated
@@ -75,9 +76,14 @@ rules behind it (lanes, density, routing, vents, dispatch) are unit tested in
 `tests/unit/animation.test.ts`.
 
 `tests/e2e/brand.spec.ts` covers the presentation layer: the page title and SVG favicon, the
-boot screen shown before the menu (the menu is never mounted while booting) and the live city
-behind the menu (population, cars, ticks advancing, the camera drifting, no toasts from it).
-It leaves `test-results/brand-boot.png` and `brand-menu.png`.
+boot screen shown before the menu (the menu is never mounted while booting), the live city
+behind the menu (population, cars, ticks advancing, the camera drifting, no toasts from it),
+and the music through `musicState()`: the menu track after the first click, the speaker
+button muting it, the city track after founding a city, ducking and the pause overlay while
+paused (a tile click still selects through it), and the music toggle surviving a reload. It
+leaves `test-results/brand-boot.png`, `brand-menu.png` and `brand-pause.png`. The composer
+rules (chord and scale membership, bass on beats 1 and 3, melody density, determinism per
+seed) are unit tested in `tests/unit/music.test.ts`.
 
 ## Balancing reports and benchmarks
 

@@ -1,12 +1,18 @@
+import type { TrackId } from './composer';
+import { MusicPlayer, type MusicState } from './music';
+
 /**
- * Synthesized sound effects (WebAudio oscillators and filtered noise, no audio assets).
- * The AudioContext is created on the first user gesture, as browsers require.
+ * Synthesized sound effects and music (WebAudio oscillators and filtered noise, no audio
+ * assets). The AudioContext is created on the first user gesture, as browsers require.
+ * Effects and music have their own buses into one master gain, so mute silences both.
  */
 export type SoundName =
   'build' | 'zone' | 'demolish' | 'error' | 'warning' | 'fire' | 'disaster' | 'milestone';
 
 const STORAGE_KEY = 'cityBuilder.muted';
+const MUSIC_KEY = 'cityBuilder.music';
 const VOLUME = 0.35;
+const MUSIC_VOLUME = 0.85;
 /** The same effect is not replayed within this window (bursts of events or commands). */
 const MIN_INTERVAL_MS = 120;
 
@@ -113,35 +119,82 @@ const RECIPES: Record<SoundName, (v: Voice) => void> = {
   },
 };
 
-function readMuted(): boolean {
+function readFlag(key: string, fallback: boolean): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
+    const stored = localStorage.getItem(key);
+    return stored === null ? fallback : stored === '1';
   } catch {
-    return false;
+    return fallback;
   }
+}
+
+function writeFlag(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? '1' : '0');
+  } catch {
+    // Private mode or disabled storage: the choice lasts for this session only.
+  }
+}
+
+export interface MusicStatus extends MusicState {
+  enabled: boolean;
 }
 
 export class SoundBoard {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private sfx: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private music: MusicPlayer | null = null;
   private unavailable = false;
-  private mutedValue = readMuted();
+  private mutedValue = readFlag(STORAGE_KEY, false);
+  private musicOn = readFlag(MUSIC_KEY, true);
+  private musicTrack: TrackId = 'menu';
+  private musicDucked = false;
   private readonly lastPlayed = new Map<SoundName, number>();
 
   get muted(): boolean {
     return this.mutedValue;
   }
 
+  get musicEnabled(): boolean {
+    return this.musicOn;
+  }
+
   setMuted(muted: boolean): void {
     this.mutedValue = muted;
-    try {
-      localStorage.setItem(STORAGE_KEY, muted ? '1' : '0');
-    } catch {
-      // Private mode or disabled storage: the choice lasts for this session only.
-    }
+    writeFlag(STORAGE_KEY, muted);
     if (this.master) this.master.gain.value = muted ? 0 : VOLUME;
     if (!muted) this.unlock();
+    this.syncMusic();
+  }
+
+  setMusicEnabled(on: boolean): void {
+    this.musicOn = on;
+    writeFlag(MUSIC_KEY, on);
+    if (on) this.unlock();
+    this.syncMusic();
+  }
+
+  /** Track to play; switching crossfades. */
+  setMusicTrack(track: TrackId): void {
+    this.musicTrack = track;
+    this.syncMusic();
+  }
+
+  /** Quieter and darker music, e.g. while the game is paused. */
+  setMusicDucked(ducked: boolean): void {
+    this.musicDucked = ducked;
+    this.syncMusic();
+  }
+
+  musicStatus(): MusicStatus {
+    const state = this.music?.state ?? {
+      playing: false,
+      track: this.musicTrack,
+      ducked: this.musicDucked,
+    };
+    return { enabled: this.musicOn, ...state };
   }
 
   /** Creates or resumes the audio context; call it from a user gesture. */
@@ -149,22 +202,34 @@ export class SoundBoard {
     if (this.mutedValue) return;
     const ctx = this.context();
     if (ctx?.state === 'suspended') void ctx.resume();
+    this.syncMusic();
   }
 
   play(name: SoundName): void {
     if (this.mutedValue) return;
     const ctx = this.context();
     // A suspended context would queue the sound and play it late, after the gesture.
-    if (!ctx || ctx.state !== 'running' || !this.master || !this.noiseBuffer) return;
+    if (!ctx || ctx.state !== 'running' || !this.sfx || !this.noiseBuffer) return;
     const now = ctx.currentTime * 1000;
     if (now - (this.lastPlayed.get(name) ?? Number.NEGATIVE_INFINITY) < MIN_INTERVAL_MS) return;
     this.lastPlayed.set(name, now);
-    RECIPES[name](new Voice(ctx, this.master, this.noiseBuffer));
+    RECIPES[name](new Voice(ctx, this.sfx, this.noiseBuffer));
   }
 
   dispose(): void {
+    this.music?.dispose();
+    this.music = null;
     void this.ctx?.close();
     this.ctx = null;
+  }
+
+  private syncMusic(): void {
+    const music = this.music;
+    if (!music) return;
+    music.setTrack(this.musicTrack);
+    music.setDucked(this.musicDucked);
+    if (this.musicOn && !this.mutedValue) music.start();
+    else music.stop();
   }
 
   private context(): AudioContext | null {
@@ -174,6 +239,11 @@ export class SoundBoard {
       const master = ctx.createGain();
       master.gain.value = this.mutedValue ? 0 : VOLUME;
       master.connect(ctx.destination);
+      const sfx = ctx.createGain();
+      sfx.connect(master);
+      const musicBus = ctx.createGain();
+      musicBus.gain.value = MUSIC_VOLUME;
+      musicBus.connect(master);
       const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       // Fixed LCG: the noise needs no real randomness.
@@ -184,7 +254,9 @@ export class SoundBoard {
       }
       this.ctx = ctx;
       this.master = master;
+      this.sfx = sfx;
       this.noiseBuffer = buffer;
+      this.music = new MusicPlayer(ctx, musicBus, buffer);
     } catch {
       this.unavailable = true;
     }

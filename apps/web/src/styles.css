@@ -354,6 +354,20 @@ input[type='range'] {
   letter-spacing: 0.5px;
 }
 
+.menu-sound {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(18, 26, 38, 0.74);
+  backdrop-filter: blur(6px);
+}
+
 @media (max-width: 720px) {
   .main-menu {
     place-items: center;
@@ -666,20 +680,61 @@ input[type='range'] {
   margin-left: auto;
 }
 
+/* Pause: a vignette over the map (no z-index, so later UI paints above it) and a badge. */
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(8, 12, 20, 0.55) 100%);
+  animation: pause-in 220ms ease-out;
+}
+
 .paused-banner {
   position: absolute;
   top: 60px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 2px 12px;
-  background: rgba(240, 180, 41, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 18px 6px;
+  background: rgba(240, 180, 41, 0.92);
   color: #1d2a38;
-  border-radius: 0 0 6px 6px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   pointer-events: none;
+  animation: pause-pulse 2.4s ease-in-out infinite;
+}
+
+.paused-banner strong {
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.paused-banner span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+@keyframes pause-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pause-pulse {
+  50% {
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pause-overlay,
+  .paused-banner {
+    animation: none;
+  }
 }
 
 /* Minimap */

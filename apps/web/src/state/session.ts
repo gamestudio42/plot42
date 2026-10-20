@@ -75,8 +75,10 @@ export interface UiState {
   saves: SaveSlot[];
   /** A save or load is in progress. */
   busy: boolean;
-  /** Sound effects off (persisted in localStorage). */
+  /** All sound off (persisted in localStorage). */
   muted: boolean;
+  /** Background music on (persisted in localStorage). */
+  music: boolean;
   /** Cars, smoke, water glints and fire engines (persisted in localStorage). */
   animations: boolean;
 }
@@ -102,6 +104,7 @@ const initialUi: UiState = {
   saves: [],
   busy: false,
   muted: false,
+  music: true,
   animations: true,
 };
 
@@ -146,6 +149,7 @@ export class GameSession {
   readonly ui = new Store<UiState>({
     ...initialUi,
     muted: this.sound.muted,
+    music: this.sound.musicEnabled,
     animations: readAnimations(),
   });
   readonly tools = new ToolController(this);
@@ -166,6 +170,7 @@ export class GameSession {
    */
   async boot(host: HTMLElement): Promise<void> {
     this.setBoot('graphics', 0);
+    this.syncMusic();
     this.renderer.setAnimations(this.ui.get().animations);
     this.renderer.setSimSpeed(this.ui.get().speed);
     let graphics = true;
@@ -311,6 +316,7 @@ export class GameSession {
     this.renderer.setHighlight([]);
     this.renderer.setSimSpeed(1);
     this.renderer.setAttract(true);
+    this.syncMusic();
   }
 
   // Saves -------------------------------------------------------------------
@@ -493,6 +499,14 @@ export class GameSession {
     this.client.setSpeed(speed);
     this.renderer.setSimSpeed(speed);
     this.ui.set({ speed });
+    this.syncMusic();
+  }
+
+  /** Menu or city track for the current screen, ducked while the game is paused. */
+  private syncMusic(): void {
+    const { screen, speed } = this.ui.get();
+    this.sound.setMusicTrack(screen === 'game' ? 'city' : 'menu');
+    this.sound.setMusicDucked(screen === 'game' && speed === 0);
   }
 
   togglePause(): void {
@@ -546,6 +560,11 @@ export class GameSession {
   setMuted(muted: boolean): void {
     this.sound.setMuted(muted);
     this.ui.set({ muted });
+  }
+
+  setMusic(music: boolean): void {
+    this.sound.setMusicEnabled(music);
+    this.ui.set({ music });
   }
 
   setAnimations(animations: boolean): void {

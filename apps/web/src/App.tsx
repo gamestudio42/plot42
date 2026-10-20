@@ -10,6 +10,7 @@ import { Inspector } from './ui/Inspector';
 import { MainMenu } from './ui/MainMenu';
 import { Minimap } from './ui/Minimap';
 import { OverlayPanel } from './ui/OverlayPanel';
+import { PauseOverlay } from './ui/PauseOverlay';
 import { SaveControls, SavedCities } from './ui/Saves';
 import { SystemPanel } from './ui/SystemPanel';
 import { Toasts } from './ui/Toasts';
@@ -60,6 +61,7 @@ function Screens({ session }: { session: GameSession }) {
   }
   return (
     <>
+      <PauseOverlay session={session} />
       <Hud session={session} />
       <Toolbar session={session} />
       <Minimap session={session} />

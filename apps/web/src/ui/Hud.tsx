@@ -85,7 +85,6 @@ export function Hud({ session }: { session: GameSession }) {
         {panelButton('overlays', h.overlays)}
         {panelButton('system', h.menu)}
       </nav>
-      {speed === 0 && <div className="paused-banner">{h.paused}</div>}
     </header>
   );
 }

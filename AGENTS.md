@@ -65,13 +65,14 @@ apps/web/src/
   renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays,
               animation/ (cosmetic cars, smoke, water glints, fire engines)
   tools/      Tool definitions and the pointer-to-command controller
-  ui/         React screens and panels: boot screen, logo, menu, HUD, toolbar, minimap,
-              budget, charts, overlays, inspector ("why is it not growing"), tutorial,
-              toasts
+  ui/         React screens and panels: boot screen, logo, menu, HUD, pause overlay,
+              toolbar, minimap, budget, charts, overlays, inspector ("why is it not
+              growing"), tutorial, toasts
   state/      GameSession (UI store, panels, tutorial), CityClient (worker bridge +
               mirror world), debug hooks used by Playwright
   worker/     Web Worker host for the engine
-  audio/      Synthesized WebAudio sound effects (no audio files)
+  audio/      Synthesized WebAudio sound effects and procedural music: composer.ts
+              (pure bar generator) and music.ts (scheduler and voices); no audio files
   i18n/       Portuguese strings
 packages/simulation/src/
   world/ terrain/ commands/ systems/ persistence/ scenarios/ rng/

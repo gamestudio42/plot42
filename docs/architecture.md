@@ -65,6 +65,7 @@ flowchart LR
 | Boot      | `ui/BootScreen.tsx`   | Logo, current step and a progress bar until the menu is up   |
 | Main menu | `ui/MainMenu.tsx`     | City name, seed, map size, difficulty, terrain sliders       |
 | HUD       | `ui/Hud.tsx`          | Date, funds and monthly net, population, RCI bars, speeds    |
+| Pause     | `ui/PauseOverlay.tsx` | Vignette and "Pausado" badge; does not block the map         |
 | Toolbar   | `ui/Toolbar.tsx`      | Tool groups with hotkeys and cost tooltips                   |
 | Minimap   | `ui/Minimap.tsx`      | Isometric diamond, current overlay, view rectangle, recentre |
 | Overlays  | `ui/OverlayPanel.tsx` | Twelve thematic maps with a legend                           |
@@ -72,7 +73,7 @@ flowchart LR
 | Charts    | `ui/ChartsPanel.tsx`  | Population, money, demand and environment history            |
 | Inspector | `ui/Inspector.tsx`    | Tile facts and the "why is it (not) growing" problem list    |
 | Tutorial  | `ui/Tutorial.tsx`     | Seven steps, auto-advanced by checks in `state/tutorial.ts`  |
-| System    | `ui/SystemPanel.tsx`  | Saves, grid, underground view, sound, help, back to the menu |
+| System    | `ui/SystemPanel.tsx`  | Saves, grid, underground, sound, music, help, back to menu   |
 
 Only one floating panel is open at a time; the inspector stacks above it in the right column.
 `Esc` closes the panel first, then cancels the tool and clears the selection.
@@ -239,8 +240,30 @@ noise buffer), so the project ships no audio files. `GameSession` plays a sound 
 command succeeds (build, zone, demolish), when one is rejected, and for selected engine events
 (fire, destroyed building, disaster, brownout, water shortage, debt, bankruptcy, milestone).
 The `AudioContext` is created lazily and resumed on the first pointer or key press, as
-browsers require. Each sound is rate-limited to one play per 120 ms. Mute is toggled in the
-system panel or with `M`, and is stored in `localStorage['cityBuilder.muted']`.
+browsers require. Each sound is rate-limited to one play per 120 ms. Effects and music have
+their own buses into one master gain. Mute silences both; it is toggled in the system panel,
+with `M` in game or with the speaker button on the menu, and is stored in
+`localStorage['cityBuilder.muted']`.
+
+**Music** is procedural ambient lo-fi, also synthesized. `audio/composer.ts` is pure (unit
+tested): `composeBar(track, bar, random)` returns the notes of one 4-beat bar from a seeded
+generator, with a rootless electric-piano chord (strummed, sometimes restruck softer), a pad
+on root, fifth and third, bass on beats 1 and 3 (root, sometimes the fifth) and a sparse
+melody of swung eighths that moves by small steps through the major pentatonic, preferring
+chord tones on strong beats (at most 4 notes per bar). Two tracks: `menu` (70 bpm, D major,
+I–IV–vi–IV) and `city` (84 bpm, F major, ii–V–I–vi), all ninth chords.
+
+`audio/music.ts` (`MusicPlayer`) schedules whole bars on the audio clock with a lookahead
+(200 ms timer, 1.2 s ahead; it restarts from now instead of catching up after a throttled
+tab). Voices: two-operator FM electric piano with a short high "tine" on the attack (keys and
+melody), two detuned triangles through a lowpass with a slow swell (pad), and a sine plus a
+quiet octave triangle (bass). Each voice has its own dry level and sends into a noise-impulse
+convolver reverb (2.6 s) and a 0.42 s feedback delay; a very low bandpassed noise loop adds
+vinyl hiss. Switching tracks crossfades over 2 s; starting fades in over 2 s. While the game is
+paused the music ducks by about 6 dB and its lowpass closes from 5.2 kHz to 1.2 kHz. The
+session picks the track from the screen and passes the pause state from `setSpeed`. Music
+starts with the first gesture, defaults to on and is stored in
+`localStorage['cityBuilder.music']` (system panel checkbox).
 
 ## Error handling
 
