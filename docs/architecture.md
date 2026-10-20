@@ -168,13 +168,48 @@ classified (`quota`, `unavailable`, `missing`) and shown to the player; export t
 - Isometric projection: `screenX = (x - y) · w/2`, `screenY = (x + y) · h/2 - elevation · hₑ`,
   with `w = 64`, `h = 32`, `hₑ = 8` pixels.
 - Terrain uses vertex heights, so slopes are drawn as quads with four independent corners.
-- The map is split into 16×16 chunks. Each chunk owns a terrain `Graphics`, an overlay
-  `Graphics` and an object container (building and tree sprites, depth-sorted by `x + y`).
-  Chunks are ordered by `cx + cy`, so cross-chunk overlap is resolved back to front.
+- The map is split into 16×16 chunks. Each chunk owns, bottom to top, a terrain `Graphics`, a
+  water-glint container, an overlay `Graphics`, a vehicle container and an object container
+  (building and tree sprites); vehicles and objects are depth-sorted by `x + y`. Chunks are
+  ordered by `cx + cy`, so cross-chunk overlap is resolved back to front.
 - Only chunks with dirty tiles are redrawn; off-screen chunks are culled.
-- Building and tree textures are generated procedurally at startup from `Graphics` and cached.
+- Building, tree and vehicle textures are generated procedurally at startup from `Graphics`
+  and cached.
 - Picking inverts the projection for every candidate elevation and keeps the front-most tile
   whose quad contains the cursor.
+
+## Animations
+
+`apps/web/src/renderer/animation/` adds motion on top of the chunks. It is purely cosmetic:
+it reads the mirror world and never sends commands, so turning it off changes nothing in the
+simulation. The rules live in pure modules (unit tested); `AnimationLayer` only maps them to
+Pixi sprites.
+
+- **Cars and trucks** (`vehicles.ts`, `roads.ts`) drive on the right-hand lane of the visible
+  road tiles. Their number follows the simulated traffic layer:
+  `density = min(0.6, 0.15 + 0.9 · traffic / 255)` cars per road tile carrying any traffic
+  (none without traffic), at most 250. Congested tiles slow them down
+  (`speed · (1 − 0.5 · traffic / 255)`) and junction choices favour busier neighbours and
+  going straight on. A car disappears when its road is demolished or it drives out of view.
+- **Chimney smoke** (`smoke.ts`) rises from coal and gas plants while online and from working
+  industry of level 3 or more (powered, occupied, not abandoned). Chimney positions come from
+  `renderer/chimneys.ts`, shared with the building textures, which no longer draw static smoke.
+- **Water glints** (`water.ts`) flash on a stable third of the open-water tiles; they use real
+  time, so they keep shimmering while paused.
+- **Fire engines** (`fireDispatch.ts`) leave a station for fires on covered tiles
+  (`fireCover > 0`), found by scanning the fire layer and from `fireStarted` events (a well
+  covered fire is often out within a few ticks). The route is a road BFS from the tiles around
+  the nearest station to a road tile within three tiles of the fire; the truck parks with its
+  lights flashing for at least two seconds and while anything burns nearby, then drives back
+  and disappears. At most four trucks.
+
+Motion uses game time (`deltaMS × [0, 1, 1.6, 2.2]` for pause and the three speeds), so
+everything freezes while paused. Random choices use the layer's own seeded PRNG
+(`random.ts`), never the engine RNG. Only visible chunks are animated, cars are hidden below
+0.45 zoom and in the underground view, and vehicles and smoke are dimmed while a map overlay is
+shown. The toggle in the system panel is stored in `localStorage['cityBuilder.animations']`;
+it defaults to off when the system asks for reduced motion. On a 128×128 city the layer costs
+about 0.3 ms per frame with ~190 cars (see [balancing.md](balancing.md)).
 
 ## Audio
 

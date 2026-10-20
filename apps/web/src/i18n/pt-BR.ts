@@ -387,6 +387,7 @@ export const ptBR = {
     grid: 'Mostrar grade',
     underground: 'Vista subterrânea',
     sound: 'Efeitos sonoros',
+    animations: 'Animações (carros, fumaça, água)',
     help: 'Atalhos: Q inspecionar · R estrada · 1–6 zonas · 0 remover zona · E energia · T água · B demolir · N nivelar · F árvores · P pausa · M som · U subterrâneo · G grade · Esc cancelar',
   },
 };

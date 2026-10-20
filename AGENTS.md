@@ -62,7 +62,8 @@ Never declare a feature done just because it compiles.
 
 ```
 apps/web/src/
-  renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays
+  renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays,
+              animation/ (cosmetic cars, smoke, water glints, fire engines)
   tools/      Tool definitions and the pointer-to-command controller
   ui/         React screens and panels: menu, HUD, toolbar, minimap, budget, charts,
               overlays, inspector ("why is it not growing"), tutorial, toasts

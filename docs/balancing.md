@@ -125,3 +125,10 @@ produced with it.
 WebGL in software. Check it by hand on a 128×128 city at 1× zoom with
 `window.__cityDebug.fps()` in the browser console. Only chunks with dirty tiles are redrawn
 and off-screen chunks are culled.
+
+With the animations, the grid preset (128×128, 96 months, ~31 000 inhabitants) loaded in a
+GPU-backed Chromium ran at 59–60 FPS (p95 frame 16.8 ms) both with the animations on and off:
+127 cars at 1× zoom and 187 cars at the smallest zoom that still shows them. A CPU profile put
+`AnimationLayer.update` at about 0.3 ms per frame, mostly sprite placement; Pixi's own render
+dominates. Headless Playwright renders WebGL in software (about 3 FPS either way), so it cannot
+measure this.

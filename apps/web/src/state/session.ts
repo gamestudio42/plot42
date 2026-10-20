@@ -69,6 +69,8 @@ export interface UiState {
   busy: boolean;
   /** Sound effects off (persisted in localStorage). */
   muted: boolean;
+  /** Cars, smoke, water glints and fire engines (persisted in localStorage). */
+  animations: boolean;
 }
 
 const initialUi: UiState = {
@@ -91,7 +93,21 @@ const initialUi: UiState = {
   saves: [],
   busy: false,
   muted: false,
+  animations: true,
 };
+
+const ANIMATIONS_KEY = 'cityBuilder.animations';
+
+/** Stored choice, or on unless the system asks for reduced motion. */
+function readAnimations(): boolean {
+  try {
+    const stored = localStorage.getItem(ANIMATIONS_KEY);
+    if (stored !== null) return stored === '1';
+    return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return true;
+  }
+}
 
 const EVENT_SOUNDS: Partial<Record<SimEvent['type'], SoundName>> = {
   fireStarted: 'fire',
@@ -114,7 +130,11 @@ export class GameSession {
   readonly client = new CityClient();
   readonly renderer = new GameRenderer();
   readonly sound = new SoundBoard();
-  readonly ui = new Store<UiState>({ ...initialUi, muted: this.sound.muted });
+  readonly ui = new Store<UiState>({
+    ...initialUi,
+    muted: this.sound.muted,
+    animations: readAnimations(),
+  });
   readonly tools = new ToolController(this);
   private readonly eventListeners = new Set<(events: SimEvent[]) => void>();
   private readonly cameraListeners = new Set<() => void>();
@@ -128,6 +148,8 @@ export class GameSession {
   private autosaveTimer: ReturnType<typeof setInterval> | null = null;
 
   async mount(host: HTMLElement): Promise<void> {
+    this.renderer.setAnimations(this.ui.get().animations);
+    this.renderer.setSimSpeed(this.ui.get().speed);
     await this.renderer.init(host);
     if (this.disposed) return;
     this.client.subscribe({
@@ -156,7 +178,10 @@ export class GameSession {
       },
       onHistory: (history) => this.ui.set({ history }),
       onEvents: (events) => {
-        for (const event of events) this.announce(event);
+        for (const event of events) {
+          this.announce(event);
+          if (event.type === 'fireStarted') this.renderer.reportFire(event.x, event.y);
+        }
         for (const listener of this.eventListeners) listener(events);
       },
       onError: (message) => this.toast('error', message),
@@ -418,6 +443,7 @@ export class GameSession {
   setSpeed(speed: Speed): void {
     if (speed !== 0) this.speedBeforePause = speed;
     this.client.setSpeed(speed);
+    this.renderer.setSimSpeed(speed);
     this.ui.set({ speed });
   }
 
@@ -472,6 +498,16 @@ export class GameSession {
   setMuted(muted: boolean): void {
     this.sound.setMuted(muted);
     this.ui.set({ muted });
+  }
+
+  setAnimations(animations: boolean): void {
+    this.renderer.setAnimations(animations);
+    this.ui.set({ animations });
+    try {
+      localStorage.setItem(ANIMATIONS_KEY, animations ? '1' : '0');
+    } catch {
+      // Private mode or blocked storage: the choice lasts for this session only.
+    }
   }
 
   dispose(): void {

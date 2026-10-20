@@ -1,7 +1,18 @@
 import type { BuildingRecord } from '@city/shared';
 import { Container, Graphics, type Renderer, type Texture } from 'pixi.js';
+import {
+  COAL_PLANT_BOX,
+  GAS_PLANT_BOX,
+  INDUSTRIAL_HEIGHTS,
+  INDUSTRIAL_INSET,
+  chimneys,
+  footprint,
+  lerp,
+  up,
+} from './chimneys';
 import { TILE_H, TILE_W, type Point } from './iso';
 import { shade } from './palette';
+import type { VehicleKind } from './animation/vehicles';
 
 export interface SpriteTexture {
   texture: Texture;
@@ -17,23 +28,6 @@ interface BoxColors {
 
 const HALF_W = TILE_W / 2;
 const HALF_H = TILE_H / 2;
-
-/** Footprint diamond of n×n tiles whose front (south) vertex is at the origin. */
-function footprint(n: number, inset: number): { b: Point; r: Point; t: Point; l: Point } {
-  const s = n - inset * 2;
-  const ox = 0;
-  const oy = -inset * TILE_H;
-  return {
-    b: { x: ox, y: oy },
-    r: { x: ox + s * HALF_W, y: oy - s * HALF_H },
-    t: { x: ox, y: oy - s * TILE_H },
-    l: { x: ox - s * HALF_W, y: oy - s * HALF_H },
-  };
-}
-
-function up(p: Point, h: number): Point {
-  return { x: p.x, y: p.y - h };
-}
 
 function poly(g: Graphics, points: Point[], color: number, alpha = 1): void {
   g.poly(points.flatMap((p) => [p.x, p.y])).fill({ color, alpha });
@@ -86,10 +80,6 @@ function windows(
       poly(g, [up(a, z0), up(b, z0), up(b, z1), up(a, z1)], color);
     }
   }
-}
-
-function lerp(a: Point, b: Point, t: number): Point {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 /** Pitched roof on top of a 1-tile box (ridge along the x axis). */
@@ -170,12 +160,6 @@ function sawtooth(g: Graphics, top: Point[], teeth: number, rise: number, color:
     poly(g, [a0, b0, up(b1, rise), up(a1, rise)], shade(color, 1.05));
     poly(g, [a1, b1, up(b1, rise), up(a1, rise)], 0x9fc0d0);
   }
-}
-
-function smoke(g: Graphics, p: Point): void {
-  g.circle(p.x + 2, p.y - 6, 4).fill({ color: 0xdddddd, alpha: 0.7 });
-  g.circle(p.x + 6, p.y - 12, 5).fill({ color: 0xcccccc, alpha: 0.55 });
-  g.circle(p.x + 11, p.y - 19, 6).fill({ color: 0xbbbbbb, alpha: 0.4 });
 }
 
 const RES_PALETTES = [
@@ -265,44 +249,56 @@ function drawIndustrial(g: Graphics, level: number, variant: number, abandoned: 
   const p = IND_PALETTES[variant % IND_PALETTES.length] ?? IND_PALETTES[0]!;
   const wall = abandoned ? 0x6a6560 : p.wall;
   const roof = abandoned ? 0x4f4a45 : p.roof;
-  const heights = [0, 12, 18, 22, 28, 34];
   const top = box(
     g,
     1,
-    0.12,
-    heights[level] ?? 12,
+    INDUSTRIAL_INSET,
+    INDUSTRIAL_HEIGHTS[level] ?? 12,
     { wall, roof, window: 0x50606a },
     level >= 3 ? 1 : 0,
   );
   if (level <= 2) sawtooth(g, top, 3, 6, roof);
-  if (level >= 3) {
-    const c = lerp(top[0] as Point, top[2] as Point, 0.4);
-    chimney(g, c, 14 + level * 4, abandoned ? 0x555555 : 0x8a4a3a);
-    if (!abandoned) smoke(g, up(c, 14 + level * 4));
+  for (const c of chimneys('industrial', level, 1)) {
+    chimney(g, c.base, c.height, abandoned ? 0x555555 : c.color);
   }
-  if (level >= 5)
-    chimney(g, lerp(top[0] as Point, top[2] as Point, 0.75), 26, abandoned ? 0x555555 : 0x7a4a3a);
 }
 
 function drawPlaceable(g: Graphics, kind: string, size: number): void {
   switch (kind) {
     case 'coalPlant': {
-      const top = box(g, size, 0.08, 26, { wall: 0x8c8378, roof: 0x5a524a, window: 0xd8b860 }, 2);
-      const c1 = lerp(top[0] as Point, top[2] as Point, 0.3);
-      const c2 = lerp(top[0] as Point, top[2] as Point, 0.6);
-      chimney(g, c1, 50, 0x9a5040);
-      chimney(g, c2, 50, 0x9a5040);
-      smoke(g, up(c1, 50));
-      smoke(g, up(c2, 50));
+      box(
+        g,
+        size,
+        COAL_PLANT_BOX.inset,
+        COAL_PLANT_BOX.height,
+        {
+          wall: 0x8c8378,
+          roof: 0x5a524a,
+          window: 0xd8b860,
+        },
+        2,
+      );
+      for (const c of chimneys(kind, 1, size)) chimney(g, c.base, c.height, c.color);
       break;
     }
     case 'gasPlant': {
-      const top = box(g, size, 0.1, 20, { wall: 0xa8b0b0, roof: 0x707a80, window: 0xd8c070 }, 1);
+      const top = box(
+        g,
+        size,
+        GAS_PLANT_BOX.inset,
+        GAS_PLANT_BOX.height,
+        {
+          wall: 0xa8b0b0,
+          roof: 0x707a80,
+          window: 0xd8c070,
+        },
+        1,
+      );
       const c = lerp(top[0] as Point, top[2] as Point, 0.5);
       g.ellipse(c.x - 14, c.y + 2, 10, 5).fill(0xd0d4d8);
       g.rect(c.x - 24, c.y - 16, 20, 18).fill(0xc0c4c8);
       g.ellipse(c.x - 14, c.y - 16, 10, 5).fill(0xe0e4e8);
-      chimney(g, lerp(top[0] as Point, top[2] as Point, 0.7), 30, 0x8a8a8a);
+      for (const ch of chimneys(kind, 1, size)) chimney(g, ch.base, ch.height, ch.color);
       break;
     }
     case 'windTurbine': {
@@ -394,6 +390,49 @@ const TREE_SPOTS: Point[] = [
   { x: 6, y: -10 },
 ];
 
+const CAR_BODY = [0xd04040, 0x3f6fd0, 0xe8c040, 0xeeeeee, 0x3fa060, 0x45505c];
+
+/** Screen offset of a ground point given in grid units from the origin. */
+function isoProject(gx: number, gy: number): Point {
+  return { x: (gx - gy) * HALF_W, y: (gx + gy) * HALF_H };
+}
+
+/** Ground rectangle (back, right, front, left) centred on the origin, `length` along `axis`. */
+function groundRect(axis: 'x' | 'y', length: number, width: number): Point[] {
+  const hx = (axis === 'x' ? length : width) / 2;
+  const hy = (axis === 'x' ? width : length) / 2;
+  return [isoProject(-hx, -hy), isoProject(hx, -hy), isoProject(hx, hy), isoProject(-hx, hy)];
+}
+
+function groundShadow(g: Graphics, axis: 'x' | 'y', length: number, width: number): void {
+  poly(g, groundRect(axis, length, width), 0x000000, 0.22);
+}
+
+/** Box standing on the ground rectangle, lifted by `z0`; returns its top face. */
+function groundBox(
+  g: Graphics,
+  axis: 'x' | 'y',
+  length: number,
+  width: number,
+  z0: number,
+  height: number,
+  color: number,
+  sideColor?: number,
+): Point[] {
+  const [t, r, b, l] = groundRect(axis, length, width).map((p) => up(p, z0)) as [
+    Point,
+    Point,
+    Point,
+    Point,
+  ];
+  const side = sideColor ?? color;
+  poly(g, [l, b, up(b, height), up(l, height)], shade(side, 0.75));
+  poly(g, [b, r, up(r, height), up(b, height)], shade(side, 0.92));
+  const top = [up(t, height), up(r, height), up(b, height), up(l, height)];
+  poly(g, top, color);
+  return top;
+}
+
 /** Generates and caches procedural textures. */
 export class SpriteFactory {
   private readonly cache = new Map<string, SpriteTexture>();
@@ -432,6 +471,60 @@ export class SpriteFactory {
     return this.get('pole', (g) => {
       g.rect(-1, -22, 2, 22).fill(0x6a4a2a);
       g.rect(-6, -21, 12, 2).fill(0x5a3a1a);
+    });
+  }
+
+  /** Vehicle seen from above, its ground centre at the origin; `axis` is its travel axis. */
+  vehicle(kind: VehicleKind, axis: 'x' | 'y', color: number, light = false): SpriteTexture {
+    const key = `v:${kind}:${axis}:${kind === 'car' ? color % CAR_BODY.length : 0}:${light ? 1 : 0}`;
+    return this.get(key, (g) => {
+      const length = kind === 'car' ? 0.32 : 0.42;
+      const width = kind === 'car' ? 0.17 : 0.19;
+      groundShadow(g, axis, length + 0.04, width + 0.04);
+      if (kind === 'car') {
+        const body = CAR_BODY[color % CAR_BODY.length] as number;
+        groundBox(g, axis, length, width, 0, 3.5, body);
+        groundBox(g, axis, length * 0.5, width * 0.86, 3.5, 2.5, shade(body, 1.08), 0x2a3a4a);
+      } else if (kind === 'truck') {
+        groundBox(g, axis, length, width, 0, 6, 0xd8d8d0);
+      } else {
+        const [t, r, b, l] = groundBox(g, axis, length, width, 0, 5, 0xc8302a) as [
+          Point,
+          Point,
+          Point,
+          Point,
+        ];
+        // Ladder along the travel axis.
+        const from = axis === 'x' ? lerp(t, l, 0.5) : lerp(t, r, 0.5);
+        const to = axis === 'x' ? lerp(r, b, 0.5) : lerp(l, b, 0.5);
+        const a = lerp(from, to, 0.15);
+        const e = lerp(from, to, 0.85);
+        g.moveTo(a.x, a.y).lineTo(e.x, e.y).stroke({ width: 1.2, color: 0xd8d8d8 });
+        groundBox(
+          g,
+          axis,
+          0.06,
+          width * 0.8,
+          5,
+          1.6,
+          light ? 0x4a8cff : 0x5a2a2a,
+          light ? 0xff3a30 : 0x6a2020,
+        );
+      }
+    });
+  }
+
+  smokePuff(): SpriteTexture {
+    return this.get('smoke', (g) => {
+      g.circle(0, 0, 9).fill({ color: 0xbcbcb8, alpha: 0.7 });
+      g.circle(-2.5, -2.5, 6).fill({ color: 0xe4e4e0, alpha: 0.65 });
+    });
+  }
+
+  /** Short glint on water, aligned with the isometric grid. */
+  sparkle(): SpriteTexture {
+    return this.get('sparkle', (g) => {
+      g.poly([-5, 0, 0, -1.3, 5, 0, 0, 1.3]).fill({ color: 0xffffff, alpha: 0.95 });
     });
   }
 

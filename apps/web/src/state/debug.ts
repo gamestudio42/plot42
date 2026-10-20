@@ -9,6 +9,7 @@ import {
   type Tile,
 } from '@city/shared';
 import type { SaveSlot } from '../persistence/saves';
+import type { AnimationStats, VehicleSample } from '../renderer/animation/AnimationLayer';
 import type { Point } from '../renderer/iso';
 import type { GameSession } from './session';
 
@@ -28,6 +29,10 @@ export interface CityDebugApi {
   hash(): Promise<string>;
   terrainHash(): string | null;
   fps(): number;
+  /** Live cars, fire engines, smoke puffs and visible water glints. */
+  animationStats(): AnimationStats;
+  /** Screen positions of a few vehicles. */
+  vehicleSample(): VehicleSample[];
   /** Encoded save of the current city. */
   exportText(): Promise<string>;
   importText(text: string): Promise<LoadResult>;
@@ -76,6 +81,8 @@ export function installDebugApi(session: GameSession): void {
       return w ? new Fnv1a().bytes(w.heights).bytes(w.terrain).bytes(w.trees).hex() : null;
     },
     fps: () => session.renderer.fps,
+    animationStats: () => session.renderer.animationStats(),
+    vehicleSample: () => session.renderer.vehicleSample(),
     exportText: async () => (await session.client.exportSave(new Date().toISOString())).text,
     importText: (text) => session.importText(text),
     saveGame: (autosave) => session.saveGame(autosave),

@@ -66,6 +66,14 @@ population, funds and tiles are identical and that the loaded city runs again. I
 `test-results/full-run.png`. The same file checks that muting the sound survives a reload and
 that `M` toggles it.
 
+`tests/e2e/animation.spec.ts` builds a small town with a coal plant and a fire station through
+debug commands and checks the cosmetic layer with `animationStats()` and `vehicleSample()`:
+cars and smoke appear once the town has traffic, vehicles keep their positions while paused, a
+fire brings a fire engine, water tiles glint, and the system-panel toggle removes everything
+and is remembered. It leaves `test-results/animation.png` and `animation-fire.png`. The pure
+rules behind it (lanes, density, routing, vents, dispatch) are unit tested in
+`tests/unit/animation.test.ts`.
+
 ## Balancing reports and benchmarks
 
 `pnpm sim` runs a preset city headless for many months and seeds and writes monthly JSON

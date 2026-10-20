@@ -1,6 +1,11 @@
-import { BALANCE, type BuildingRecord } from '@city/shared';
+import { BALANCE, type BuildingRecord, type Speed } from '@city/shared';
 import type { World } from '@city/simulation';
 import { Application, Container, Graphics } from 'pixi.js';
+import {
+  AnimationLayer,
+  type AnimationStats,
+  type VehicleSample,
+} from './animation/AnimationLayer';
 import { Camera } from './camera';
 import {
   buildObjects,
@@ -21,7 +26,9 @@ interface Chunk {
   area: ChunkArea;
   root: Container;
   ground: Graphics;
+  water: Container;
   overlay: Graphics;
+  vehicles: Container;
   objects: Container;
   wires: Graphics;
   bounds: { x: number; y: number; width: number; height: number };
@@ -59,6 +66,9 @@ export class GameRenderer {
   private chunks: Chunk[] = [];
   private chunksPerSide = 0;
   private factory: SpriteFactory | null = null;
+  private animation: AnimationLayer | null = null;
+  private animationsEnabled = true;
+  private simSpeed: Speed = 1;
   private world: World | null = null;
   private buildings: Map<number, BuildingRecord> = new Map();
   private overlay: OverlayMode = 'none';
@@ -92,7 +102,10 @@ export class GameRenderer {
     host.appendChild(this.app.canvas);
     this.app.canvas.classList.add('game-canvas');
     this.factory = new SpriteFactory(this.app.renderer);
-    this.root.addChild(this.chunkLayer, this.highlight);
+    this.animation = new AnimationLayer(this.factory);
+    this.animation.setEnabled(this.animationsEnabled);
+    this.animation.setSpeed(this.simSpeed);
+    this.root.addChild(this.chunkLayer, this.animation.smoke, this.highlight);
     this.app.stage.addChild(this.root);
     this.attachInput(this.app.canvas);
     this.app.ticker.add(() => this.frame());
@@ -110,6 +123,29 @@ export class GameRenderer {
 
   get fps(): number {
     return this.app.ticker?.FPS ?? 0;
+  }
+
+  /** Simulation speed, so animations freeze while paused and hurry at 2× and 3×. */
+  setSimSpeed(speed: Speed): void {
+    this.simSpeed = speed;
+    this.animation?.setSpeed(speed);
+  }
+
+  setAnimations(on: boolean): void {
+    this.animationsEnabled = on;
+    this.animation?.setEnabled(on);
+  }
+
+  animationStats(): AnimationStats {
+    return this.animation?.stats() ?? { cars: 0, trucks: 0, puffs: 0, sparkles: 0 };
+  }
+
+  vehicleSample(): VehicleSample[] {
+    return this.animation?.sample() ?? [];
+  }
+
+  reportFire(x: number, y: number): void {
+    this.animation?.reportFire(x, y);
   }
 
   setWorld(world: World, buildings: Map<number, BuildingRecord>): void {
@@ -133,7 +169,9 @@ export class GameRenderer {
           area,
           root: new Container(),
           ground: new Graphics(),
+          water: new Container(),
           overlay: new Graphics(),
+          vehicles: new Container({ sortableChildren: true }),
           objects: new Container(),
           wires: new Graphics(),
           bounds: { x: 0, y: 0, width: 0, height: 0 },
@@ -141,7 +179,15 @@ export class GameRenderer {
           overlayDirty: true,
           hasFire: false,
         };
-        chunk.root.addChild(chunk.ground, chunk.overlay, chunk.objects, chunk.wires);
+        // Vehicles sit under the objects, so buildings in front of a road hide them.
+        chunk.root.addChild(
+          chunk.ground,
+          chunk.water,
+          chunk.overlay,
+          chunk.vehicles,
+          chunk.objects,
+          chunk.wires,
+        );
         this.chunks.push(chunk);
         order.push(chunk);
       }
@@ -150,6 +196,7 @@ export class GameRenderer {
     order.sort((a, b) => a.area.x0 + a.area.y0 - (b.area.x0 + b.area.y0) || a.area.x0 - b.area.x0);
     for (const c of order) this.chunkLayer.addChild(c.root);
     for (const c of this.chunks) this.computeBounds(c);
+    this.animation?.setWorld(world, buildings, this.chunks, (x, y) => this.chunkAt(x, y));
 
     const left = vertexToScreen(0, world.size, 0);
     const right = vertexToScreen(world.size, 0, 0);
@@ -194,6 +241,7 @@ export class GameRenderer {
 
   invalidateBuildings(changed: BuildingRecord[]): void {
     for (const b of changed) this.markChunkAt(b.x + b.w - 1, b.y + b.h - 1);
+    this.animation?.buildingsChanged();
   }
 
   invalidateOverlay(): void {
@@ -266,10 +314,16 @@ export class GameRenderer {
     if (this.initialized) this.app.destroy(true, { children: true });
   }
 
+  private chunkAt(x: number, y: number): Chunk | null {
+    if (!this.world || x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return null;
+    return (
+      this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerSide + Math.floor(x / CHUNK_SIZE)] ??
+      null
+    );
+  }
+
   private markChunkAt(x: number, y: number): void {
-    if (!this.world || x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return;
-    const c =
-      this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerSide + Math.floor(x / CHUNK_SIZE)];
+    const c = this.chunkAt(x, y);
     if (c) {
       c.dirty = true;
       c.overlayDirty = true;
@@ -335,6 +389,13 @@ export class GameRenderer {
         c.overlayDirty = false;
       }
     }
+    this.animation?.update({
+      deltaMS: this.app.ticker.deltaMS,
+      view,
+      zoom: this.camera.zoom,
+      underground: this.underground,
+      overlay: this.overlay !== 'none',
+    });
     if (this.highlightDirty) this.drawHighlight();
   }
 
@@ -344,6 +405,7 @@ export class GameRenderer {
     buildObjects(c.objects, ctx, this.factory as SpriteFactory, c.area);
     c.wires.clear();
     drawWires(c.wires, ctx, c.area);
+    this.animation?.rebuildWater(c);
     c.dirty = false;
     c.hasFire = false;
     const w = ctx.world;

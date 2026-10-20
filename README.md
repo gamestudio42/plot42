@@ -21,7 +21,9 @@ Pick a name, seed, map size, difficulty and terrain in the menu. Lay roads, zone
 commercial and industrial areas, and connect them to power and water; the city grows where
 there is demand, access and services. The toolbar shows each tool's cost and hotkey; `Esc`
 cancels, `P` pauses, `M` toggles the sound and the system panel lists every shortcut.
-Cities are saved in the browser (IndexedDB, with autosave) and can be exported to a
+Cars follow the simulated traffic, chimneys smoke, water shimmers and fire engines drive to
+covered fires; the animations can be switched off in the system panel (they never change the
+simulation). Cities are saved in the browser (IndexedDB, with autosave) and can be exported to a
 `.city.json` file.
 
 ## Scripts
