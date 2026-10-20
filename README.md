@@ -7,6 +7,13 @@
 <p align="center"><strong>You set the conditions. The city decides the rest.</strong></p>
 
 <p align="center">
+  <a href="https://gamestudio42.github.io/urbe/"><img src="https://img.shields.io/badge/Play-33ff66?style=for-the-badge&labelColor=0a0f0a&color=33ff66" alt="Play Urbe"></a>
+  <a href="https://github.com/gamestudio42/urbe/stargazers"><img src="https://img.shields.io/github/stars/gamestudio42/urbe?style=for-the-badge&labelColor=0a0f0a&color=33ff66" alt="Stars"></a>
+  <a href="https://github.com/gamestudio42/urbe/fork"><img src="https://img.shields.io/github/forks/gamestudio42/urbe?style=for-the-badge&labelColor=0a0f0a&color=1f9d4a" alt="Forks"></a>
+  <a href="https://github.com/gamestudio42"><img src="https://img.shields.io/badge/Game_Studio_42-0a0f0a?style=for-the-badge&labelColor=0a0f0a&color=1f9d4a" alt="Game Studio 42"></a>
+</p>
+
+<p align="center">
   An isometric city builder that runs in the browser.
   Zone the land, connect power and water, keep the budget alive —
   then watch demand, traffic and disasters do the rest.
@@ -80,7 +87,28 @@ Every push to `main` publishes `apps/web/dist` to GitHub Pages. To host it elsew
 BASE_PATH=/path/ pnpm build
 ```
 
-Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md)
+Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
+
+## Fork & remix
+
+Urbe is MIT-licensed. Fork it, change the rules, ship your own city on GitHub Pages.
+
+```sh
+git clone https://github.com/gamestudio42/urbe.git
+cd urbe
+pnpm install
+pnpm dev
+```
+
+Enable Pages on your fork (the workflow in `.github/workflows/deploy.yml` already
+publishes `apps/web/dist`). Or host the build anywhere:
+
+```sh
+BASE_PATH=/your-path/ pnpm build
+```
+
+Ideas and patches: [good first issues](https://github.com/gamestudio42/urbe/labels/good%20first%20issue)
+and [discussions](https://github.com/gamestudio42/urbe/discussions).
 
 ## Licence
 

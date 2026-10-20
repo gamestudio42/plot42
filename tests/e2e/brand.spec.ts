@@ -17,6 +17,16 @@ async function foundCity(page: Page, name: string): Promise<void> {
   await waitForCity(page);
 }
 
+test('the share card points at the Open Graph image', async ({ page }) => {
+  await page.goto('/');
+  const image = await page.locator('meta[property="og:image"]').getAttribute('content');
+  expect(image).toMatch(/og\.jpg$/);
+  const card = await page.locator('meta[name="twitter:card"]').getAttribute('content');
+  expect(card).toBe('summary_large_image');
+  const response = await page.request.get('/og.jpg');
+  expect(response.ok()).toBe(true);
+});
+
 test('the page carries the Urbe name and icon, and boots before the menu', async ({ page }) => {
   await page.goto('/', { waitUntil: 'commit' });
   await expect(page).toHaveTitle(/Urbe/);

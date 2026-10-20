@@ -1,0 +1,11 @@
+{
+  "title": "Urbe",
+  "tagline": {
+    "en": "You set the conditions. The city decides the rest.",
+    "pt": "Você cria as condições. A cidade decide o resto."
+  },
+  "cover": "docs/screenshots/menu.jpg",
+  "genre": "city-builder",
+  "tech": ["TypeScript", "PixiJS", "Web Worker"],
+  "order": 1
+}
