@@ -13,6 +13,7 @@ import {
 import { RoadNetwork, type World } from '@city/simulation';
 import { SoundBoard, type SoundName } from '../audio/sound';
 import { formatNumber, t } from '../i18n/pt-BR';
+import { prefersReducedMotion } from '../motion';
 import {
   AUTOSAVE_ID,
   deleteSave,
@@ -43,7 +44,14 @@ export interface Toast {
 export type PanelId = 'budget' | 'charts' | 'overlays' | 'system';
 export type Screen = 'menu' | 'game';
 
+export interface BootState {
+  step: 'graphics' | 'city' | 'done';
+  /** 0..1 across both steps. */
+  progress: number;
+}
+
 export interface UiState {
+  boot: BootState;
   screen: Screen;
   /** Floating panel currently open (one at a time). */
   panel: PanelId | null;
@@ -74,6 +82,7 @@ export interface UiState {
 }
 
 const initialUi: UiState = {
+  boot: { step: 'graphics', progress: 0 },
   screen: 'menu',
   panel: null,
   tutorial: null,
@@ -103,7 +112,7 @@ function readAnimations(): boolean {
   try {
     const stored = localStorage.getItem(ANIMATIONS_KEY);
     if (stored !== null) return stored === '1';
-    return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    return !prefersReducedMotion();
   } catch {
     return true;
   }
@@ -124,6 +133,10 @@ const TOAST_MS = 3500;
 /** Real time between autosaves while the game screen is open. */
 const AUTOSAVE_MS = 60_000;
 const AUTOSAVE_CHECK_MS = 5_000;
+/** Scripted city behind the main menu; months are simulated during boot. */
+const MENU_CITY = { seed: 'urbe-menu', size: 64, months: 60 } as const;
+/** Share of the boot progress bar taken by the graphics step. */
+const GRAPHICS_SHARE = 0.25;
 
 /** Wires the worker client, the renderer, the tools and the UI store together. */
 export class GameSession {
@@ -147,11 +160,44 @@ export class GameSession {
   private lastAutosave = { time: 0, tick: -1 };
   private autosaveTimer: ReturnType<typeof setInterval> | null = null;
 
-  async mount(host: HTMLElement): Promise<void> {
+  /**
+   * Starts the renderer, wires input and builds the live city behind the main menu. The boot
+   * always ends in the `done` step, so a failure only costs the menu background.
+   */
+  async boot(host: HTMLElement): Promise<void> {
+    this.setBoot('graphics', 0);
     this.renderer.setAnimations(this.ui.get().animations);
     this.renderer.setSimSpeed(this.ui.get().speed);
-    await this.renderer.init(host);
+    let graphics = true;
+    try {
+      await this.renderer.init(host);
+    } catch (error) {
+      graphics = false;
+      console.error('[boot] renderer', error);
+    }
     if (this.disposed) return;
+    this.wire(host);
+    if (graphics) {
+      this.setBoot('city', GRAPHICS_SHARE);
+      try {
+        await this.client.demoCity(MENU_CITY, (done, total) =>
+          this.setBoot('city', GRAPHICS_SHARE + ((1 - GRAPHICS_SHARE) * done) / total),
+        );
+        if (this.disposed) return;
+        this.renderer.setAttract(true);
+      } catch (error) {
+        console.warn('[boot] menu city', error);
+      }
+    }
+    if (this.disposed) return;
+    this.setBoot('done', 1);
+  }
+
+  private setBoot(step: BootState['step'], progress: number): void {
+    this.ui.set({ boot: { step, progress } });
+  }
+
+  private wire(host: HTMLElement): void {
     this.client.subscribe({
       onInit: () => {
         const world = this.client.world;
@@ -178,8 +224,9 @@ export class GameSession {
       },
       onHistory: (history) => this.ui.set({ history }),
       onEvents: (events) => {
+        const inGame = this.ui.get().screen === 'game';
         for (const event of events) {
-          this.announce(event);
+          if (inGame) this.announce(event);
           if (event.type === 'fireStarted') this.renderer.reportFire(event.x, event.y);
         }
         for (const listener of this.eventListeners) listener(events);
@@ -248,16 +295,22 @@ export class GameSession {
       selected: null,
     });
     this.lastAutosave = { time: Date.now(), tick: this.client.stats?.tick ?? -1 };
+    this.renderer.setAttract(false);
     this.setTool('select');
     this.setSpeed(paused ? 0 : 1);
     const w = this.client.world;
     if (w) this.renderer.centerOnTile(Math.floor(w.size / 2), Math.floor(w.size / 2));
   }
 
+  /** Back to the menu: the player's city stays behind it, paused, with animations running. */
   async backToMenu(): Promise<void> {
     this.setSpeed(0);
     await this.autosave(true);
-    this.ui.set({ screen: 'menu', panel: null, tutorial: null, selected: null });
+    this.tools.cancel();
+    this.ui.set({ screen: 'menu', panel: null, tutorial: null, selected: null, hover: null });
+    this.renderer.setHighlight([]);
+    this.renderer.setSimSpeed(1);
+    this.renderer.setAttract(true);
   }
 
   // Saves -------------------------------------------------------------------

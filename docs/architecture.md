@@ -1,6 +1,6 @@
 # Architecture
 
-City Builder is a single-player, browser-based isometric city simulation. There is no
+Urbe is a single-player, browser-based isometric city simulation. There is no
 backend: the whole game runs on the client, and saves live in IndexedDB or in exported files.
 
 ## Packages
@@ -62,6 +62,7 @@ flowchart LR
 
 | Element   | Component             | Notes                                                        |
 | --------- | --------------------- | ------------------------------------------------------------ |
+| Boot      | `ui/BootScreen.tsx`   | Logo, current step and a progress bar until the menu is up   |
 | Main menu | `ui/MainMenu.tsx`     | City name, seed, map size, difficulty, terrain sliders       |
 | HUD       | `ui/Hud.tsx`          | Date, funds and monthly net, population, RCI bars, speeds    |
 | Toolbar   | `ui/Toolbar.tsx`      | Tool groups with hotkeys and cost tooltips                   |
@@ -75,6 +76,23 @@ flowchart LR
 
 Only one floating panel is open at a time; the inspector stacks above it in the right column.
 `Esc` closes the panel first, then cancels the tool and clears the selection.
+
+**Boot and menu background.** `index.html` carries a static splash (logo and "Carregando…")
+inside `#root`, so something shows before the bundle runs; React replaces it with the boot
+screen, which looks the same plus a step label and a progress bar. `GameSession.boot()` goes
+through `UiState.boot.step`: `graphics` (Pixi init), then `city`, where the worker builds the
+menu city (`demoCity` message: the `grid` preset on a 64×64 map, `urbe-menu` seed, 60 months
+simulated up front with the preset's automated player, `demoProgress` every 6 months; about
+0.7 s in the worker), then `done`. The menu mounts only at `done`, and a failure in either step
+still ends there (the menu then has no city behind it). The boot screen fades out in 300 ms
+(instantly with reduced motion).
+
+Behind the translucent menu card the renderer runs in attract mode (`setAttract`): keyboard
+panning is ignored and the camera drifts around the map centre on a slow loop (150 s, zoom
+0.9), shifted right of the card; it stands still with reduced motion. The background city keeps
+simulating at normal speed, but its events never produce toasts or sounds (`announce()` only
+runs on the game screen). Going back to the menu keeps the player's city behind it, paused,
+with its animations running.
 
 ## World representation
 

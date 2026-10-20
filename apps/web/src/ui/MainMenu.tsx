@@ -2,6 +2,7 @@ import { DIFFICULTIES, type Difficulty, type TerrainOptions } from '@city/shared
 import { useState, type ReactNode } from 'react';
 import { t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
+import { Logo } from './Logo';
 
 const SIZES = [64, 96, 128] as const;
 
@@ -56,7 +57,9 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
   return (
     <div className="main-menu" data-testid="main-menu">
       <div className="menu-card">
-        <h1>{t.appTitle}</h1>
+        <h1 className="menu-title">
+          <Logo />
+        </h1>
         <p className="muted">{m.subtitle}</p>
         <form
           className="menu-form"

@@ -1,6 +1,6 @@
-# City Builder
+# Urbe
 
-An isometric city builder that runs in the browser, inspired by the mechanics of classic
+Urbe is an isometric city builder that runs in the browser, inspired by the mechanics of classic
 city simulators: zoning, growth driven by demand, power and water networks, traffic, budget,
 public services, pollution, crime, land value and disasters.
 
@@ -21,6 +21,7 @@ Pick a name, seed, map size, difficulty and terrain in the menu. Lay roads, zone
 commercial and industrial areas, and connect them to power and water; the city grows where
 there is demand, access and services. The toolbar shows each tool's cost and hotkey; `Esc`
 cancels, `P` pauses, `M` toggles the sound and the system panel lists every shortcut.
+A scripted city lives behind the main menu while you pick the options.
 Cars follow the simulated traffic, chimneys smoke, water shimmers and fire engines drive to
 covered fires; the animations can be switched off in the system panel (they never change the
 simulation). Cities are saved in the browser (IndexedDB, with autosave) and can be exported to a

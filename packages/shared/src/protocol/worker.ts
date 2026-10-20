@@ -37,7 +37,12 @@ export type ToWorkerMessage =
   /** Encodes the current city as a save file (the host supplies the timestamp). */
   | { type: 'exportSave'; id: number; savedAt: string }
   /** Decodes and validates a save; on success it replaces the current city. */
-  | { type: 'importSave'; id: number; text: string };
+  | { type: 'importSave'; id: number; text: string }
+  /**
+   * Builds the scripted city shown behind the main menu, simulating `months` months up front
+   * (reports `demoProgress`, then `init`), and keeps it running at normal speed.
+   */
+  | { type: 'demoCity'; seed: string; size: number; months: number };
 
 export type LoadResult =
   { ok: true; meta: SaveMeta; migratedFrom: number | null } | { ok: false; errors: SaveError[] };
@@ -82,4 +87,6 @@ export type FromWorkerMessage =
   | { type: 'saveData'; id: number; text: string; meta: SaveMeta }
   /** Sent after the `init` of the loaded city when the load succeeded. */
   | { type: 'loadResult'; id: number; result: LoadResult }
+  /** Months of the menu city simulated so far. */
+  | { type: 'demoProgress'; done: number; total: number }
   | { type: 'error'; message: string };

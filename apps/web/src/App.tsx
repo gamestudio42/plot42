@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { t } from './i18n/pt-BR';
 import { GameSession } from './state/session';
 import { useStore } from './state/store';
+import { BootScreen, BootView } from './ui/BootScreen';
 import { BudgetPanel } from './ui/BudgetPanel';
 import { ChartsPanel } from './ui/ChartsPanel';
 import { Hud } from './ui/Hud';
@@ -24,27 +25,31 @@ export function App() {
     const host = hostRef.current;
     if (!host) return;
     const s = new GameSession();
-    let cancelled = false;
-    void s.mount(host).then(() => {
-      if (!cancelled) setSession(s);
-    });
-    return () => {
-      cancelled = true;
-      s.dispose();
-    };
+    setSession(s);
+    void s.boot(host);
+    return () => s.dispose();
   }, []);
 
   return (
     <div className="app">
       <div ref={hostRef} className="viewport" />
-      {session && <Screens session={session} />}
+      {session ? (
+        <>
+          <Screens session={session} />
+          <BootScreen session={session} />
+        </>
+      ) : (
+        <BootView boot={{ step: 'graphics', progress: 0 }} />
+      )}
     </div>
   );
 }
 
 function Screens({ session }: { session: GameSession }) {
+  const booted = useStore(session.ui, (s) => s.boot.step === 'done');
   const screen = useStore(session.ui, (s) => s.screen);
   const panel = useStore(session.ui, (s) => s.panel);
+  if (!booted) return null;
   if (screen === 'menu') {
     return (
       <>

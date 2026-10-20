@@ -13,7 +13,7 @@ import {
   type StructureLayer,
   type ToWorkerMessage,
 } from '@city/shared';
-import { createEngine, hashState, SimulationEngine } from '@city/simulation';
+import { createEngine, hashState, SIM_PRESETS, SimulationEngine } from '@city/simulation';
 
 interface WorkerScope {
   postMessage(message: FromWorkerMessage): void;
@@ -23,6 +23,7 @@ interface WorkerScope {
 const scope = self as unknown as WorkerScope;
 const FRAME_MS = 50;
 const MAX_TICKS_PER_FRAME = 40;
+const DEMO_PROGRESS_MONTHS = 6;
 
 let engine: SimulationEngine | null = null;
 let speed: Speed = 1;
@@ -201,6 +202,23 @@ scope.onmessage = (event) => {
           id: message.id,
           result: { ok: true, meta: decoded.meta, migratedFrom: decoded.migratedFrom },
         });
+        break;
+      }
+      case 'demoCity': {
+        const preset = SIM_PRESETS.grid;
+        if (!preset) throw new Error('Missing grid preset');
+        const run = preset.create(message.seed, message.size);
+        for (let month = 1; month <= message.months; month++) {
+          run.engine.runMonths(1);
+          run.onMonth(run.engine);
+          if (month % DEMO_PROGRESS_MONTHS === 0 || month === message.months) {
+            post({ type: 'demoProgress', done: month, total: message.months });
+          }
+        }
+        engine = run.engine;
+        speed = 1;
+        accumulator = 0;
+        post({ type: 'init', state: fullState(engine) });
         break;
       }
     }

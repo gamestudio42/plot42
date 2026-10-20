@@ -1,4 +1,4 @@
-export const GAME_NAME = 'City Builder';
+export const GAME_NAME = 'Urbe';
 
 export * from './balance/balance';
 export * from './commands/commands';

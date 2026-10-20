@@ -16,11 +16,18 @@ import {
   type DrawContext,
   type OverlayMode,
 } from './chunkDraw';
+import { prefersReducedMotion } from '../motion';
 import { HEIGHT_STEP, pickTile, tileCenter, tileQuad, vertexToScreen, type Point } from './iso';
 import { SpriteFactory } from './sprites';
 
 export const CHUNK_SIZE = 16;
 const REDRAW_BUDGET = 12;
+/** Menu background camera: zoom, seconds per loop and loop radius as a fraction of the map. */
+const ATTRACT_ZOOM = 0.9;
+const ATTRACT_PERIOD_S = 150;
+const ATTRACT_RADIUS = 0.16;
+/** Start of the loop, also the fixed view when the system asks for reduced motion. */
+const ATTRACT_START = 0.6;
 
 interface Chunk {
   area: ChunkArea;
@@ -83,6 +90,8 @@ export class GameRenderer {
   private panning: { x: number; y: number } | null = null;
   private readonly listeners = new AbortController();
   private readonly keys = new Set<string>();
+  /** Seconds into the menu camera loop, or null outside the menu. */
+  private attract: { time: number; still: boolean } | null = null;
   private initialized = false;
   private destroyed = false;
 
@@ -146,6 +155,27 @@ export class GameRenderer {
 
   reportFire(x: number, y: number): void {
     this.animation?.reportFire(x, y);
+  }
+
+  /**
+   * Menu background mode: keyboard panning is ignored and the camera drifts slowly around the
+   * map centre (held still when the system asks for reduced motion).
+   */
+  setAttract(on: boolean): void {
+    if (on === (this.attract !== null)) return;
+    if (on) {
+      this.attract = { time: 0, still: prefersReducedMotion() };
+      this.keys.clear();
+      this.panning = null;
+      this.setHover(null);
+    } else {
+      this.attract = null;
+      this.camera.zoom = 1;
+    }
+  }
+
+  get attractMode(): boolean {
+    return this.attract !== null;
   }
 
   setWorld(world: World, buildings: Map<number, BuildingRecord>): void {
@@ -363,8 +393,9 @@ export class GameRenderer {
     if (!ctx || !this.factory) return;
     this.camera.viewWidth = this.app.screen.width;
     this.camera.viewHeight = this.app.screen.height;
-    this.applyKeyboardPan();
-    this.camera.apply(this.root);
+    if (this.attract) this.driftCamera(this.attract, ctx.world);
+    else this.applyKeyboardPan();
+    this.camera.apply(this.root, this.attract === null);
 
     this.animationTimer += this.app.ticker.deltaMS;
     if (this.animationTimer > 250) {
@@ -511,6 +542,22 @@ export class GameRenderer {
       },
     );
     window.addEventListener('blur', () => this.keys.clear(), { signal });
+  }
+
+  private driftCamera(attract: { time: number; still: boolean }, world: World): void {
+    if (!attract.still) attract.time += this.app.ticker.deltaMS / 1000;
+    const angle = (ATTRACT_START + attract.time / ATTRACT_PERIOD_S) * Math.PI * 2;
+    const half = world.size / 2;
+    const radius = world.size * ATTRACT_RADIUS;
+    const focus = vertexToScreen(
+      half + radius * Math.cos(angle),
+      half + radius * Math.sin(angle),
+      0,
+    );
+    this.camera.zoom = ATTRACT_ZOOM;
+    // Keep the focus right of centre so the menu card on the left does not cover it.
+    const shift = this.camera.viewWidth > 900 ? (this.camera.viewWidth * 0.17) / ATTRACT_ZOOM : 0;
+    this.camera.centerOn(focus.x - shift, focus.y);
   }
 
   private applyKeyboardPan(): void {

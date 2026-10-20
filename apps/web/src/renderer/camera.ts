@@ -13,12 +13,12 @@ export class Camera {
   viewHeight = 1;
   bounds = { minX: -1000, maxX: 1000, minY: -1000, maxY: 1000 };
 
-  apply(root: Container): void {
+  /** `snap` rounds to whole pixels (crisp sprites); slow continuous drifts look smoother without. */
+  apply(root: Container, snap = true): void {
     root.scale.set(this.zoom);
-    root.position.set(
-      Math.round(this.viewWidth / 2 - this.x * this.zoom),
-      Math.round(this.viewHeight / 2 - this.y * this.zoom),
-    );
+    const x = this.viewWidth / 2 - this.x * this.zoom;
+    const y = this.viewHeight / 2 - this.y * this.zoom;
+    root.position.set(snap ? Math.round(x) : x, snap ? Math.round(y) : y);
   }
 
   screenToWorld(sx: number, sy: number): Point {

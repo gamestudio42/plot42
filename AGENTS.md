@@ -4,8 +4,8 @@ Guidance for AI agents and humans working on this repository.
 
 ## Mission
 
-Build an original isometric city builder inspired by the mechanics of classic city simulators,
-playable in the browser. The player creates conditions; the simulator decides the outcome.
+Build Urbe, an original isometric city builder inspired by the mechanics of classic city
+simulators, playable in the browser. The player creates conditions; the simulator decides the outcome.
 
 ## Golden rules
 
@@ -65,8 +65,9 @@ apps/web/src/
   renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays,
               animation/ (cosmetic cars, smoke, water glints, fire engines)
   tools/      Tool definitions and the pointer-to-command controller
-  ui/         React screens and panels: menu, HUD, toolbar, minimap, budget, charts,
-              overlays, inspector ("why is it not growing"), tutorial, toasts
+  ui/         React screens and panels: boot screen, logo, menu, HUD, toolbar, minimap,
+              budget, charts, overlays, inspector ("why is it not growing"), tutorial,
+              toasts
   state/      GameSession (UI store, panels, tutorial), CityClient (worker bridge +
               mirror world), debug hooks used by Playwright
   worker/     Web Worker host for the engine

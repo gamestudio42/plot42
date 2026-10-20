@@ -11,7 +11,7 @@ import {
 import type { SaveSlot } from '../persistence/saves';
 import type { AnimationStats, VehicleSample } from '../renderer/animation/AnimationLayer';
 import type { Point } from '../renderer/iso';
-import type { GameSession } from './session';
+import type { BootState, GameSession } from './session';
 
 /** Read-mostly hooks used by Playwright tests and for debugging in the console. */
 export interface CityDebugApi {
@@ -33,6 +33,8 @@ export interface CityDebugApi {
   animationStats(): AnimationStats;
   /** Screen positions of a few vehicles. */
   vehicleSample(): VehicleSample[];
+  /** Steps of the loading screen. */
+  bootStep(): BootState['step'];
   /** Encoded save of the current city. */
   exportText(): Promise<string>;
   importText(text: string): Promise<LoadResult>;
@@ -83,6 +85,7 @@ export function installDebugApi(session: GameSession): void {
     fps: () => session.renderer.fps,
     animationStats: () => session.renderer.animationStats(),
     vehicleSample: () => session.renderer.vehicleSample(),
+    bootStep: () => session.ui.get().boot.step,
     exportText: async () => (await session.client.exportSave(new Date().toISOString())).text,
     importText: (text) => session.importText(text),
     saveGame: (autosave) => session.saveGame(autosave),

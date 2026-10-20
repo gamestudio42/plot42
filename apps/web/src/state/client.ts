@@ -34,6 +34,17 @@ export interface ClientListener {
 
 type Pending = (message: FromWorkerMessage) => void;
 
+export interface DemoCityOptions {
+  seed: string;
+  size: number;
+  months: number;
+}
+
+interface PendingDemo {
+  onProgress?: (done: number, total: number) => void;
+  fail(error: Error): void;
+}
+
 /**
  * Main-thread bridge to the simulation worker. Keeps a read-only mirror of the world so the
  * renderer and the UI can read state and run validation locally.
@@ -51,12 +62,14 @@ export class CityClient {
   private readonly pending = new Map<number, Pending>();
   private nextId = 1;
   private initResolvers: Array<() => void> = [];
+  private demo: PendingDemo | null = null;
 
   constructor() {
     this.worker = new Worker(new URL('../worker/sim.worker.ts', import.meta.url), {
       type: 'module',
     });
     this.worker.onmessage = (event: MessageEvent<FromWorkerMessage>) => this.handle(event.data);
+    this.worker.onerror = (event) => this.demo?.fail(new Error(event.message || 'Worker failed'));
   }
 
   subscribe(listener: ClientListener): () => void {
@@ -70,6 +83,32 @@ export class CityClient {
 
   loadCity(snapshot: EngineSnapshot): Promise<void> {
     return this.waitInit(() => this.send({ type: 'loadCity', snapshot }));
+  }
+
+  /**
+   * Builds the city shown behind the main menu. Resolves once its mirror world is loaded and
+   * rejects if the worker reports an error before that.
+   */
+  demoCity(
+    options: DemoCityOptions,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const settle = () => {
+        this.demo = null;
+        resolve();
+      };
+      this.demo = {
+        ...(onProgress ? { onProgress } : {}),
+        fail: (error) => {
+          this.demo = null;
+          this.initResolvers = this.initResolvers.filter((r) => r !== settle);
+          reject(error);
+        },
+      };
+      this.initResolvers.push(settle);
+      this.send({ type: 'demoCity', ...options });
+    });
   }
 
   command(command: Command): Promise<CommandResult> {
@@ -153,8 +192,15 @@ export class CityClient {
       case 'delta':
         this.applyDelta(message.delta);
         break;
+      case 'demoProgress':
+        this.demo?.onProgress?.(message.done, message.total);
+        break;
       case 'error':
         console.error('[simulation]', message.message);
+        if (this.demo) {
+          this.demo.fail(new Error(message.message));
+          break;
+        }
         this.emit('onError', message.message);
         break;
       default: {

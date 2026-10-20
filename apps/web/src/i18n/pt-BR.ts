@@ -14,7 +14,7 @@ import type { ToolGroup, ToolId } from '../tools/tools';
 
 /** All player-facing text. Code identifiers stay in English; only strings live here. */
 export const ptBR = {
-  appTitle: 'City Builder',
+  appTitle: 'Urbe',
   tools: {
     select: 'Inspecionar',
     road: 'Estrada',
@@ -209,6 +209,12 @@ export const ptBR = {
     noSaves: 'Nenhuma cidade salva ainda.',
     credits: 'Inspirado nos clássicos de simulação urbana. Código e arte originais.',
   },
+  boot: {
+    graphics: 'Preparando os gráficos…',
+    city: 'Erguendo a cidade…',
+    done: 'Pronto',
+    failed: 'Não foi possível preparar a cidade de fundo.',
+  },
   save: {
     title: 'Salvar e carregar',
     saveNow: 'Salvar agora',
@@ -232,7 +238,7 @@ export const ptBR = {
     loadFailed: 'Não foi possível carregar a cidade:',
     errors: {
       NOT_JSON: 'o arquivo não é um JSON válido (corrompido ou incompleto).',
-      NOT_A_SAVE: 'o arquivo não é um save do City Builder.',
+      NOT_A_SAVE: 'o arquivo não é um save do Urbe.',
       NEWER_VERSION: 'o save foi criado por uma versão mais nova do jogo.',
       UNSUPPORTED_VERSION: 'esta versão de save não é suportada.',
       CHECKSUM: 'o conteúdo foi alterado ou corrompido (checksum inválido).',
