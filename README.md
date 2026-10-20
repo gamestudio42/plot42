@@ -6,6 +6,8 @@ public services, pollution, crime, land value and disasters.
 
 The game interface is in Brazilian Portuguese. Code and docs are in English.
 
+Play it at [gamestudio42.github.io/urbe](https://gamestudio42.github.io/urbe/).
+
 ## Quick start
 
 ```sh
@@ -43,9 +45,9 @@ simulation). Cities are saved in the browser (IndexedDB, with autosave) and can 
 
 ## Deploy
 
-The game is a static site. `.github/workflows/deploy.yml` builds it with
-`BASE_PATH=/<repository>/` and publishes `apps/web/dist` to GitHub Pages on every push to
-`main` (enable Pages with "GitHub Actions" as the source). To host it elsewhere, run
+The game is a static site. Every push to `main` builds `apps/web/dist` with
+`BASE_PATH=/urbe/` and publishes it to GitHub Pages at
+https://gamestudio42.github.io/urbe/. To host it elsewhere, run
 `BASE_PATH=/path/ pnpm build` and serve the `dist` folder.
 
 ## Documentation
