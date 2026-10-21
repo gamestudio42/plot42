@@ -1,4 +1,4 @@
-import type { BuildingRecord, Speed } from '@city/shared';
+import { Infra, type BuildingRecord, type Speed } from '@city/shared';
 import type { World } from '@city/simulation';
 import { Container, Sprite } from 'pixi.js';
 import { tileLocalToScreen, tileQuad, vertexToScreen } from '../iso';
@@ -70,6 +70,8 @@ export interface HubSample {
   visible: boolean;
   tileX?: number;
   tileY?: number;
+  /** The boat is on a water road tile and is drawn under the deck. */
+  underSpan?: boolean;
 }
 
 interface VentPosition {
@@ -269,6 +271,8 @@ export class AnimationLayer {
       const sprite = this.boatSprites.get(boat.id);
       if (!sprite) continue;
       const pose = boatPose(boat, size);
+      const tx = Math.min(size - 1, Math.max(0, Math.floor(pose.x)));
+      const ty = Math.min(size - 1, Math.max(0, Math.floor(pose.y)));
       list.push({
         id: boat.id,
         kind: 'boat',
@@ -277,6 +281,7 @@ export class AnimationLayer {
         visible: sprite.visible,
         tileX: pose.x,
         tileY: pose.y,
+        underSpan: this.world ? underSpan(this.world, tx, ty) : false,
       });
     }
     for (const [id, s] of this.planeSprites) {
@@ -410,7 +415,10 @@ export class AnimationLayer {
         sprite.texture = tex.texture;
       }
       sprite.anchor.set(tex.anchorX, tex.anchorY);
-      if (sprite.parent !== chunk.boats) chunk.boats.addChild(sprite);
+      // Only a hull on the span itself goes under the deck. In front of the
+      // bridge the boat stays with the cars, above the roads.
+      const layer = underSpan(world, tx, ty) ? chunk.boats : chunk.vehicles;
+      if (sprite.parent !== layer) layer.addChild(sprite);
       const p = tileLocalToScreen(tileQuad(world, tx, ty), pose.x - tx, pose.y - ty);
       sprite.position.set(p.x, p.y);
       sprite.zIndex = pose.x + pose.y;
@@ -507,4 +515,10 @@ export class AnimationLayer {
 
 function spriteKey(v: Vehicle): number {
   return v.kind === 'fireTruck' ? -v.id : v.id;
+}
+
+/** A boat on a water road is under the span; everywhere else it stays above the roads. */
+function underSpan(world: World, x: number, y: number): boolean {
+  const i = world.index(x, y);
+  return world.isWater(i) && world.hasInfra(i, Infra.Road);
 }

@@ -233,8 +233,9 @@ export class GameRenderer {
           overlayDirty: true,
           hasFire: false,
         };
-        // Boats sit under roads (a span covers a boat). Cars sit under objects so a
-        // building in front of a street hides them.
+        // Boats on a span sit under roads; boats in open water sit with the cars,
+        // so a hull in front of a bridge is not painted under the deck. Cars stay
+        // under objects so a building in front of a street hides them.
         chunk.root.addChild(
           chunk.ground,
           chunk.water,
