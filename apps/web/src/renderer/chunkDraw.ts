@@ -7,6 +7,7 @@ import {
 } from '@city/shared';
 import { Connection, connectionMask, type World } from '@city/simulation';
 import { Container, Sprite, type Graphics } from 'pixi.js';
+import { BRIDGE_DECK, BRIDGE_INSET, ROAD_INSET, isLandRoad } from './bridge';
 import { HEIGHT_STEP, tileLocalToScreen, tileQuad, vertexToScreen, type Point } from './iso';
 import {
   BRIDGE_COLOR,
@@ -72,6 +73,11 @@ function forEachTile(area: ChunkArea, fn: (x: number, y: number) => void): void 
   }
 }
 
+/** Pumps and wells are the only buildings that matter while laying pipes. */
+function isWaterSource(kind: string): boolean {
+  return kind === 'waterPump' || kind === 'well';
+}
+
 function fillQuad(g: Graphics, q: Point[], color: number, alpha = 1): void {
   g.poly(q.flatMap((p) => [p.x, p.y])).fill({ color, alpha });
 }
@@ -104,7 +110,12 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
     const jitter = 0.975 + tileHash(x, y) * 0.05;
     const light = 1 + 0.16 * (e - w) + 0.1 * (s - n) + 0.025 * Math.min(n, e, s, w);
     let color = shade(TERRAIN_COLORS[terrain] ?? 0x777777, jitter * light);
-    if (ctx.underground) color = shade(0x6a5a48, 0.75 + 0.1 * light);
+    if (ctx.underground) {
+      color =
+        terrain === Terrain.Water
+          ? shade(0x3a5060, 0.8 + 0.12 * light)
+          : shade(0x6a5a48, 0.75 + 0.1 * light);
+    }
 
     // Map edge skirts.
     if (y === size - 1) skirt(g, q[3], q[2], w, s);
@@ -117,6 +128,13 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
     }
 
     if (ctx.underground) {
+      const id = world.buildingId[i] as number;
+      if (id !== 0) {
+        const b = ctx.buildings.get(id);
+        if (b && isWaterSource(b.kind)) {
+          fillQuad(g, rect(q, 0.06, 0.06, 0.94, 0.94), WATER_ON_COLOR, 0.45);
+        }
+      }
       if (infra & Infra.Pipe) drawPipe(g, ctx, x, y, q);
       if (infra & Infra.Road) fillQuad(g, rect(q, 0.35, 0.35, 0.65, 0.65), 0x3a3a3a, 0.5);
       if (ctx.grid) outline(g, q, 0.08);
@@ -284,8 +302,6 @@ function skirt(g: Graphics, a: Point, b: Point, ha: number, hb: number): void {
   ]).fill(SKIRT_COLOR);
 }
 
-/** Cosmetic lift of a bridge deck above the water, in pixels. */
-const BRIDGE_DECK = HEIGHT_STEP;
 const BRIDGE_PIER = 0x3d2e22;
 const BRIDGE_RAIL = 0xe4d4b4;
 const BRIDGE_SIDE = 0x5a4a3a;
@@ -296,12 +312,6 @@ function lift(p: Point, h: number): Point {
 
 function liftAll(pts: Point[], h: number): Point[] {
   return pts.map((p) => lift(p, h));
-}
-
-function landRoad(world: World, x: number, y: number): boolean {
-  if (!world.inBounds(x, y)) return false;
-  const i = world.index(x, y);
-  return world.hasInfra(i, Infra.Road) && !world.isWater(i);
 }
 
 function drawRoad(
@@ -318,12 +328,16 @@ function drawRoad(
   const south = (mask & Connection.South) !== 0;
   const west = (mask & Connection.West) !== 0;
   const base = bridge ? BRIDGE_COLOR : ROAD_COLOR;
-  const lo = bridge ? 0.28 : 0.22;
-  const hi = bridge ? 0.72 : 0.78;
+  const lo = bridge ? BRIDGE_INSET : ROAD_INSET;
+  const hi = 1 - lo;
   const deck = bridge ? BRIDGE_DECK : 0;
   const any = north || east || south || west;
   const band = (u0: number, v0: number, u1: number, v1: number) =>
     liftAll(rect(q, u0, v0, u1, v1), deck);
+  const landN = bridge && isLandRoad(ctx.world, x, y - 1);
+  const landS = bridge && isLandRoad(ctx.world, x, y + 1);
+  const landW = bridge && isLandRoad(ctx.world, x - 1, y);
+  const landE = bridge && isLandRoad(ctx.world, x + 1, y);
 
   if (bridge) drawBridgeSupports(g, ctx.world, x, y, q, north, east, south, west);
 
@@ -332,10 +346,12 @@ function drawRoad(
     return;
   }
   fillQuad(g, band(lo, lo, hi, hi), base);
-  if (north) fillQuad(g, band(lo, 0, hi, lo), base);
-  if (south) fillQuad(g, band(lo, hi, hi, 1), base);
-  if (west) fillQuad(g, band(0, lo, lo, hi), base);
-  if (east) fillQuad(g, band(hi, lo, 1, hi), base);
+  // Land approaches are sloped ramps drawn in drawBridgeSupports — a lifted band
+  // here would leave an 8px cliff against the asphalt.
+  if (north && !landN) fillQuad(g, band(lo, 0, hi, lo), base);
+  if (south && !landS) fillQuad(g, band(lo, hi, hi, 1), base);
+  if (west && !landW) fillQuad(g, band(0, lo, lo, hi), base);
+  if (east && !landE) fillQuad(g, band(hi, lo, 1, hi), base);
 
   const edge = (a: Point, b: Point, color: number, width: number) =>
     g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width, color, alpha: 0.9 });
@@ -374,8 +390,10 @@ function drawBridgeSupports(
   south: boolean,
   west: boolean,
 ): void {
-  const lo = 0.28;
-  const hi = 0.72;
+  const lo = BRIDGE_INSET;
+  const hi = 1 - BRIDGE_INSET;
+  const rLo = ROAD_INSET;
+  const rHi = 1 - ROAD_INSET;
   const straightX = (east || west) && !north && !south;
   // Posts sit on the front edge of the deck so a flat top does not hide them.
   const spots: Array<[number, number]> = straightX
@@ -405,26 +423,31 @@ function drawBridgeSupports(
   face(lo, hi, hi, hi);
   face(hi, lo, hi, hi);
 
-  const ramp = (u0: number, v0: number, u1: number, v1: number) => {
-    const innerU0 = u0 === 0 ? lo : u0 === 1 ? hi : u0;
-    const innerV0 = v0 === 0 ? lo : v0 === 1 ? hi : v0;
-    const innerU1 = u1 === 0 ? lo : u1 === 1 ? hi : u1;
-    const innerV1 = v1 === 0 ? lo : v1 === 1 ? hi : v1;
+  const approach = (
+    ou0: number,
+    ov0: number,
+    ou1: number,
+    ov1: number,
+    iu0: number,
+    iv0: number,
+    iu1: number,
+    iv1: number,
+  ) => {
     fillQuad(
       g,
       [
-        tileLocalToScreen(q, u0, v0),
-        tileLocalToScreen(q, u1, v1),
-        lift(tileLocalToScreen(q, innerU1, innerV1), BRIDGE_DECK),
-        lift(tileLocalToScreen(q, innerU0, innerV0), BRIDGE_DECK),
+        tileLocalToScreen(q, ou0, ov0),
+        tileLocalToScreen(q, ou1, ov1),
+        lift(tileLocalToScreen(q, iu1, iv1), BRIDGE_DECK),
+        lift(tileLocalToScreen(q, iu0, iv0), BRIDGE_DECK),
       ],
-      shade(BRIDGE_COLOR, 0.85),
+      ROAD_COLOR,
     );
   };
-  if (north && landRoad(world, x, y - 1)) ramp(lo, 0, hi, 0);
-  if (south && landRoad(world, x, y + 1)) ramp(lo, 1, hi, 1);
-  if (west && landRoad(world, x - 1, y)) ramp(0, lo, 0, hi);
-  if (east && landRoad(world, x + 1, y)) ramp(1, lo, 1, hi);
+  if (north && isLandRoad(world, x, y - 1)) approach(rLo, 0, rHi, 0, lo, lo, hi, lo);
+  if (south && isLandRoad(world, x, y + 1)) approach(rLo, 1, rHi, 1, lo, hi, hi, hi);
+  if (west && isLandRoad(world, x - 1, y)) approach(0, rLo, 0, rHi, lo, lo, lo, hi);
+  if (east && isLandRoad(world, x + 1, y)) approach(1, rLo, 1, rHi, hi, lo, hi, hi);
 }
 
 function drawPipe(
@@ -498,9 +521,25 @@ export function buildObjects(
   area: ChunkArea,
 ): void {
   for (const child of container.removeChildren()) child.destroy();
-  if (ctx.underground) return;
   const w = ctx.world;
   const size = w.size;
+  if (ctx.underground) {
+    forEachTile(area, (x, y) => {
+      const id = w.buildingId[y * size + x] as number;
+      if (id === 0) return;
+      const b = ctx.buildings.get(id);
+      if (!b || !isWaterSource(b.kind)) return;
+      if (b.x + b.w - 1 !== x || b.y + b.h - 1 !== y) return;
+      const tex = factory.building(b);
+      const sprite = new Sprite(tex.texture);
+      sprite.anchor.set(tex.anchorX, tex.anchorY);
+      const front = vertexToScreen(b.x + b.w, b.y + b.h, w.corners(x, y)[2]);
+      sprite.position.set(front.x, front.y);
+      sprite.alpha = 0.6;
+      container.addChild(sprite);
+    });
+    return;
+  }
   const alpha = ctx.overlay === 'none' ? 1 : 0.45;
   forEachTile(area, (x, y) => {
     const i = y * size + x;
