@@ -1,20 +1,50 @@
 # Architecture
 
-Urbe is a single-player, browser-based isometric city simulation. There is no
-backend: the whole game runs on the client, and saves live in IndexedDB or in exported files.
+This repository is **Plot 42**, a static browser game platform. There is no backend:
+each title runs on the client, and saves live in IndexedDB or in exported files.
+
+The city builder **Urbe** is one of the games. Its simulation spec is unchanged;
+this document still describes that engine in detail after the platform map.
 
 ## Packages
 
-| Package               | Responsibility                                                         | May depend on      |
-| --------------------- | ---------------------------------------------------------------------- | ------------------ |
-| `packages/shared`     | Tile constants, command and message types, balance tables, save schema | nothing            |
-| `packages/simulation` | Deterministic engine: world, systems, commands, persistence, scenarios | `@city/shared`     |
-| `apps/web`            | Vite + React UI, PixiJS renderer, Web Worker host, IndexedDB saves     | shared, simulation |
-| `tools/`              | Headless simulation reports and benchmarks (run with `tsx`)            | shared, simulation |
-| `tests/`              | Unit, integration, scenario (Vitest) and end-to-end (Playwright) tests | everything         |
+| Package               | Responsibility                                                         | May depend on                         |
+| --------------------- | ---------------------------------------------------------------------- | ------------------------------------- |
+| `packages/kernel`     | RNG, hash, base64, save envelope, command queue, tick runner           | nothing                               |
+| `packages/bridge`     | Worker clock and RPC inbox shared by every game                        | nothing                               |
+| `packages/view-iso`   | Isometric projection, camera, 16×16 chunk grid                         | pixi.js                               |
+| `packages/chrome`     | Store, boot/pause/toasts, Logo, SoundToggle, SfxBoard, locale, saves   | react                                 |
+| `packages/shared`     | City tile constants, commands, balance, save schema                    | `@shell/kernel`                       |
+| `packages/simulation` | City engine: world, systems, commands, persistence, scenarios          | `@city/shared`, `@shell/kernel`       |
+| `packages/horta`      | Horta: plant / grow / harvest grid and `horta-save` envelope           | `@shell/kernel`                       |
+| `packages/posto`      | Posto: 10×10 tactics, deterministic enemy turn, `posto-save`           | `@shell/kernel`                       |
+| `apps/lobby`          | Plot 42 landing page (marks, LocaleSelect, five locales)               | react + chrome                        |
+| `apps/web`            | Urbe: Vite + React UI, Pixi renderer, worker host                      | city packages + shell                 |
+| `apps/horta`          | Horta web app                                                          | horta + shell                         |
+| `apps/posto`          | Posto web app                                                          | posto + shell                         |
+| `tools/`              | Headless city reports, benchmarks, `build-site`                        | shared, simulation                    |
+| `tests/`              | Unit, integration, scenario (Vitest) and end-to-end (Playwright) tests | everything                            |
 
 Packages expose their TypeScript sources directly (`"exports": "./src/index.ts"`). Vite, Vitest
 and `tsx` compile them on the fly, so there is no package build step.
+
+## Static site
+
+`pnpm build:site` (`tools/build-site.ts`) builds the lobby plus the three games with
+`BASE_PATH` prefixes and copies them into `site/`:
+
+| Path        | App            |
+| ----------- | -------------- |
+| `/`         | `apps/lobby`   |
+| `/urbe/`    | `apps/web`     |
+| `/horta/`   | `apps/horta`   |
+| `/posto/`   | `apps/posto`   |
+
+Development uses one Vite port per app (`5173` Urbe, `5174` Horta, `5175` Posto, `5176`
+lobby) with `base: '/'`. `pnpm preview:site` serves the assembled folder. GitHub Pages
+publishes `site/` (`BASE_PATH` from the repository name).
+
+IndexedDB names stay per title: Urbe `city-builder`, Horta `horta`, Posto `posto`.
 
 The simulation package compiles with `lib: ["ES2023"]` and no ambient types, so any accidental
 use of DOM or Node APIs fails the type check. ESLint additionally bans `Math.random`, `Date`,
