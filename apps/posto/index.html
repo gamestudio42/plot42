@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Posto: hold the grid. A Plot 42 outpost." />
+    <meta name="theme-color" content="#1c1812" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <title>Posto</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #1c1812;
+      }
+      .static-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: radial-gradient(circle at 50% 40%, #3a2e22 0%, #1c1812 70%);
+        color: #f3ece0;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+      .static-splash img {
+        width: 96px;
+        height: 96px;
+      }
+      .static-splash strong {
+        font-size: 40px;
+        font-weight: 800;
+        letter-spacing: 0.3em;
+        margin-right: -0.3em;
+      }
+      .static-splash span {
+        color: #b5a48c;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="static-splash" aria-busy="true">
+        <img src="%BASE_URL%favicon.svg" alt="" />
+        <strong>POSTO</strong>
+        <span>Loading…</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
