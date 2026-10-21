@@ -1,15 +1,6 @@
 import type { BuildingRecord } from '@city/shared';
 import { Container, Graphics, type Renderer, type Texture } from 'pixi.js';
-import {
-  COAL_PLANT_BOX,
-  GAS_PLANT_BOX,
-  INDUSTRIAL_HEIGHTS,
-  INDUSTRIAL_INSET,
-  chimneys,
-  footprint,
-  lerp,
-  up,
-} from './chimneys';
+import { COAL_PLANT_BOX, GAS_PLANT_BOX, chimneys, footprint, lerp, up } from './chimneys';
 import {
   BOAT_COLORS,
   HEADINGS,
@@ -23,6 +14,7 @@ import {
 import { TILE_H, TILE_W, type Point } from './iso';
 import { shade } from './palette';
 import type { VehicleKind } from './animation/vehicles';
+import { drawCommercial, drawIndustrial, drawResidential } from './zoneSprites';
 
 export interface SpriteTexture {
   texture: Texture;
@@ -92,15 +84,6 @@ function windows(
   }
 }
 
-/** Pitched roof on top of a 1-tile box (ridge along the x axis). */
-function pitchedRoof(g: Graphics, top: Point[], rise: number, color: number): void {
-  const [t, r, b, l] = top as [Point, Point, Point, Point];
-  const ridgeA = up(lerp(t, l, 0.5), rise);
-  const ridgeB = up(lerp(r, b, 0.5), rise);
-  poly(g, [l, b, ridgeB, ridgeA], shade(color, 0.85));
-  poly(g, [t, r, ridgeB, ridgeA], shade(color, 1.1));
-}
-
 function chimney(g: Graphics, base: Point, height: number, color: number): void {
   poly(
     g,
@@ -123,154 +106,6 @@ function chimney(g: Graphics, base: Point, height: number, color: number): void 
     color,
   );
   g.ellipse(base.x, base.y - height, 4, 2).fill(0x333333);
-}
-
-/** Small isometric block (rooftop machinery) standing on point `p`. */
-function miniBox(g: Graphics, p: Point, size: number, height: number, color: number): void {
-  const b = { x: p.x, y: p.y + size / 2 };
-  const r = { x: p.x + size, y: p.y };
-  const t = { x: p.x, y: p.y - size / 2 };
-  const l = { x: p.x - size, y: p.y };
-  poly(g, [l, b, up(b, height), up(l, height)], shade(color, 0.75));
-  poly(g, [b, r, up(r, height), up(b, height)], shade(color, 0.92));
-  poly(g, [up(t, height), up(r, height), up(b, height), up(l, height)], shade(color, 1.1));
-}
-
-function waterTank(g: Graphics, p: Point): void {
-  g.rect(p.x - 4, p.y - 6, 1.5, 6).fill(0x5a4a3a);
-  g.rect(p.x + 2.5, p.y - 6, 1.5, 6).fill(0x5a4a3a);
-  g.rect(p.x - 5, p.y - 14, 10, 8).fill(0x8a6a4a);
-  g.ellipse(p.x, p.y - 6, 5, 2.5).fill(0x7a5a3a);
-  g.poly([p.x - 5.5, p.y - 14, p.x, p.y - 19, p.x + 5.5, p.y - 14]).fill(0x5a4a3a);
-}
-
-function antenna(g: Graphics, p: Point, height: number): void {
-  g.rect(p.x - 0.75, p.y - height, 1.5, height).fill(0x707070);
-  g.circle(p.x, p.y - height, 1.8).fill(0xff3a30);
-}
-
-/** Point on a box's top face: `u` from the left corner towards the back, `v` towards the front. */
-function onTop(top: Point[], u: number, v: number): Point {
-  const [t, , b, l] = top as [Point, Point, Point, Point];
-  return {
-    x: l.x + u * (t.x - l.x) + v * (b.x - l.x),
-    y: l.y + u * (t.y - l.y) + v * (b.y - l.y),
-  };
-}
-
-/** Factory sawtooth roof: slopes rising towards the front, with glazed vertical faces. */
-function sawtooth(g: Graphics, top: Point[], teeth: number, rise: number, color: number): void {
-  for (let k = 0; k < teeth; k++) {
-    const v0 = k / teeth;
-    const v1 = (k + 1) / teeth;
-    const a0 = onTop(top, 0, v0);
-    const b0 = onTop(top, 1, v0);
-    const a1 = onTop(top, 0, v1);
-    const b1 = onTop(top, 1, v1);
-    poly(g, [a0, b0, up(b1, rise), up(a1, rise)], shade(color, 1.05));
-    poly(g, [a1, b1, up(b1, rise), up(a1, rise)], 0x9fc0d0);
-  }
-}
-
-const RES_PALETTES = [
-  { wall: 0xe8dcc0, roof: 0xb6483a },
-  { wall: 0xd8c8a8, roof: 0x5a6f8c },
-  { wall: 0xf0e6d2, roof: 0x7a5a3a },
-];
-const COM_PALETTES = [
-  { wall: 0x9fb8d8, roof: 0x5f7fa8 },
-  { wall: 0xb8c8d8, roof: 0x7088a0 },
-  { wall: 0x88a8c8, roof: 0x48688f },
-];
-const IND_PALETTES = [
-  { wall: 0xb0aaa0, roof: 0xd0a030 },
-  { wall: 0xa0a4a8, roof: 0x8a8070 },
-  { wall: 0xb8a890, roof: 0x707070 },
-];
-
-function drawResidential(g: Graphics, level: number, variant: number, abandoned: boolean): void {
-  const p = RES_PALETTES[variant % RES_PALETTES.length] ?? RES_PALETTES[0]!;
-  const wall = abandoned ? 0x77706a : p.wall;
-  const roof = abandoned ? 0x55504c : p.roof;
-  const window = abandoned ? 0x333333 : 0x6fa8d8;
-  if (level <= 1) {
-    const top = box(g, 1, 0.22, 12, { wall, roof, window }, 1);
-    pitchedRoof(g, top, 9, roof);
-  } else if (level === 2) {
-    const top = box(g, 1, 0.15, 22, { wall, roof, window }, 2);
-    pitchedRoof(g, top, 10, roof);
-  } else {
-    const heights = [0, 0, 0, 40, 68, 104];
-    const floors = [0, 0, 0, 4, 7, 11];
-    const top = box(
-      g,
-      1,
-      0.1,
-      heights[level] ?? 40,
-      { wall, roof: shade(wall, 0.8), window },
-      floors[level] ?? 4,
-    );
-    if (abandoned) return;
-    if (variant % 2 === 0) waterTank(g, onTop(top, 0.55, 0.4));
-    else miniBox(g, onTop(top, 0.5, 0.45), 6, 5, shade(wall, 0.7));
-    if (level >= 5) antenna(g, onTop(top, 0.3, 0.7), 16);
-  }
-}
-
-function drawCommercial(g: Graphics, level: number, variant: number, abandoned: boolean): void {
-  const p = COM_PALETTES[variant % COM_PALETTES.length] ?? COM_PALETTES[0]!;
-  const wall = abandoned ? 0x6f7276 : p.wall;
-  const roof = abandoned ? 0x505357 : p.roof;
-  const window = abandoned ? 0x303030 : 0xd8eefc;
-  const heights = [0, 16, 28, 50, 84, 128];
-  const floors = [0, 1, 2, 4, 7, 11];
-  const inset = level <= 1 ? 0.18 : 0.1;
-  const top = box(g, 1, inset, heights[level] ?? 16, { wall, roof, window }, floors[level] ?? 1);
-  if (abandoned) return;
-  if (level <= 2) {
-    // Striped awning over the shop front (the south-east facade).
-    const { b, r, l } = footprint(1, inset);
-    const out = { x: (b.x - l.x) * 0.22, y: (b.y - l.y) * 0.22 };
-    const stripes = 4;
-    for (let k = 0; k < stripes; k++) {
-      const a = lerp(b, r, k / stripes);
-      const e = lerp(b, r, (k + 1) / stripes);
-      poly(
-        g,
-        [
-          up(a, 10),
-          up(e, 10),
-          { x: e.x + out.x, y: e.y + out.y - 7 },
-          { x: a.x + out.x, y: a.y + out.y - 7 },
-        ],
-        k % 2 === 0 ? 0xd84a4a : 0xf2efe6,
-      );
-    }
-  } else if (level === 3) {
-    miniBox(g, onTop(top, 0.35, 0.35), 5, 4, 0xb8bcc0);
-    miniBox(g, onTop(top, 0.7, 0.55), 5, 4, 0xb8bcc0);
-  } else {
-    miniBox(g, onTop(top, 0.5, 0.5), 9, 8, shade(roof, 0.9));
-    antenna(g, onTop(top, 0.5, 0.5), level >= 5 ? 30 : 18);
-  }
-}
-
-function drawIndustrial(g: Graphics, level: number, variant: number, abandoned: boolean): void {
-  const p = IND_PALETTES[variant % IND_PALETTES.length] ?? IND_PALETTES[0]!;
-  const wall = abandoned ? 0x6a6560 : p.wall;
-  const roof = abandoned ? 0x4f4a45 : p.roof;
-  const top = box(
-    g,
-    1,
-    INDUSTRIAL_INSET,
-    INDUSTRIAL_HEIGHTS[level] ?? 12,
-    { wall, roof, window: 0x50606a },
-    level >= 3 ? 1 : 0,
-  );
-  if (level <= 2) sawtooth(g, top, 3, 6, roof);
-  for (const c of chimneys('industrial', level, 1)) {
-    chimney(g, c.base, c.height, abandoned ? 0x555555 : c.color);
-  }
 }
 
 function drawPlaceable(g: Graphics, kind: string, size: number): void {
@@ -462,7 +297,7 @@ export class SpriteFactory {
     side = 0,
   ): SpriteTexture {
     const level = Math.max(1, b.level);
-    const key = `b:${b.kind}:${level}:${b.variant % 3}:${b.abandoned ? 1 : 0}:${side}`;
+    const key = `b:${b.kind}:${level}:${b.variant & 3}:${b.abandoned ? 1 : 0}:${side}`;
     return this.get(key, (g) => {
       if (b.kind === 'residential') drawResidential(g, level, b.variant, b.abandoned);
       else if (b.kind === 'commercial') drawCommercial(g, level, b.variant, b.abandoned);
