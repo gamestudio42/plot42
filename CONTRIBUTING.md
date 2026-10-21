@@ -1,7 +1,8 @@
 # Contributing to Urbe
 
 Thanks for wanting to remix the city. Code, comments and docs are in English.
-Player-facing text is in Brazilian Portuguese (`apps/web/src/i18n/pt-BR.ts`).
+Player-facing text lives in `apps/web/src/i18n/` (`en`, `pt-BR`, `es`, `fr`, `de`).
+English is the type source.
 
 ## Quick start
 
@@ -42,5 +43,6 @@ and [discussions](https://github.com/gamestudio42/urbe/discussions).
 - Run `pnpm check`. Run `pnpm test:e2e` when the UI changes.
 - If a rule or constant changes, update the docs and compare a headless run
   (`pnpm sim`) with the numbers in `docs/balancing.md`.
-- Conventional commits (`feat:`, `fix:`, `test:`, `docs:`).
+- Conventional commits (`feat:`, `fix:`, `test:`, `docs:`). Write PR titles and
+  bodies in English.
 - No new dependency without a written reason in the commit message.
