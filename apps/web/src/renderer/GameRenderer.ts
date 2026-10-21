@@ -4,6 +4,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import {
   AnimationLayer,
   type AnimationStats,
+  type HubSample,
   type VehicleSample,
 } from './animation/AnimationLayer';
 import { Camera } from './camera';
@@ -114,7 +115,7 @@ export class GameRenderer {
     this.animation = new AnimationLayer(this.factory);
     this.animation.setEnabled(this.animationsEnabled);
     this.animation.setSpeed(this.simSpeed);
-    this.root.addChild(this.chunkLayer, this.animation.smoke, this.highlight);
+    this.root.addChild(this.chunkLayer, this.animation.smoke, this.animation.sky, this.highlight);
     this.app.stage.addChild(this.root);
     this.attachInput(this.app.canvas);
     this.app.ticker.add(() => this.frame());
@@ -146,11 +147,17 @@ export class GameRenderer {
   }
 
   animationStats(): AnimationStats {
-    return this.animation?.stats() ?? { cars: 0, trucks: 0, puffs: 0, sparkles: 0 };
+    return (
+      this.animation?.stats() ?? { cars: 0, trucks: 0, puffs: 0, sparkles: 0, boats: 0, planes: 0 }
+    );
   }
 
   vehicleSample(): VehicleSample[] {
     return this.animation?.sample() ?? [];
+  }
+
+  hubSample(): HubSample[] {
+    return this.animation?.hubSample() ?? [];
   }
 
   reportFire(x: number, y: number): void {

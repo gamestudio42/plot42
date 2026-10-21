@@ -4,6 +4,8 @@ import { Container, Sprite } from 'pixi.js';
 import { tileLocalToScreen, tileQuad, vertexToScreen } from '../iso';
 import type { SpriteFactory } from '../sprites';
 import { FireDispatch, type FireView, type StationFootprint } from './fireDispatch';
+import { RUNWAY } from '../hubSprites';
+import { HubTraffic, boatPose, flightState } from './hubs';
 import { createRandom } from './random';
 import { headingAt, lanePoint, worldRoadView, type RoadView } from './roads';
 import { SmokeSim, puffLook, smokeVents } from './smoke';
@@ -41,7 +43,15 @@ export interface AnimationStats {
   trucks: number;
   puffs: number;
   sparkles: number;
+  boats: number;
+  planes: number;
 }
+
+/** Boats are too small to read below this zoom. */
+const BOAT_MIN_ZOOM = 0.35;
+const PLANE_SHADOW_ALPHA = 0.25;
+/** Screen shift of a plane's shadow per pixel of altitude (light from the upper left). */
+const SHADOW_SHIFT = { x: 0.35, y: 0.12 } as const;
 
 export interface VehicleSample {
   id: number;
@@ -49,6 +59,14 @@ export interface VehicleSample {
   tile: number;
   x: number;
   y: number;
+}
+
+export interface HubSample {
+  id: number;
+  kind: 'boat' | 'plane';
+  x: number;
+  y: number;
+  visible: boolean;
 }
 
 interface VentPosition {
@@ -64,12 +82,14 @@ interface WaterGlints {
 }
 
 /**
- * Cosmetic animation: cars, fire engines, chimney smoke and water glints. Reads the mirror
- * world and never changes it; motion runs on game time, so it stops while the game is paused.
+ * Cosmetic animation: cars, fire engines, chimney smoke, water glints, boats and planes. Reads
+ * the mirror world and never changes it; motion runs on game time, so it stops while paused.
  */
 export class AnimationLayer {
   /** Smoke rises above every chunk; the renderer adds this container over the chunk layer. */
   readonly smoke = new Container();
+  /** Planes and their shadows, above the smoke. */
+  readonly sky = new Container();
   private world: World | null = null;
   private buildings: Map<number, BuildingRecord> = new Map();
   private chunks: readonly AnimatedChunk[] = [];
@@ -79,6 +99,7 @@ export class AnimationLayer {
   private cars = new VehicleSim(createRandom(1));
   private trucks = new FireDispatch();
   private puffs = new SmokeSim(createRandom(2));
+  private hubs = new HubTraffic(createRandom(3));
   private vents: VentPosition[] = [];
   private stations: StationFootprint[] = [];
   private buildingsDirty = true;
@@ -89,6 +110,8 @@ export class AnimationLayer {
   private speed: Speed = 1;
   private readonly vehicleSprites = new Map<number, Sprite>();
   private readonly puffSprites: Sprite[] = [];
+  private readonly boatSprites = new Map<number, Sprite>();
+  private readonly planeSprites = new Map<number, { plane: Sprite; shadow: Sprite }>();
   private readonly glints = new Map<AnimatedChunk, WaterGlints>();
 
   constructor(private readonly factory: SpriteFactory) {}
@@ -111,10 +134,13 @@ export class AnimationLayer {
     };
     // The previous chunks were destroyed with their children, including vehicle sprites.
     this.vehicleSprites.clear();
+    this.boatSprites.clear();
+    this.clearPlanes();
     this.glints.clear();
     this.cars = new VehicleSim(createRandom(world.size * 7919 + 1));
     this.trucks = new FireDispatch();
     this.puffs = new SmokeSim(createRandom(world.size * 7919 + 2));
+    this.hubs = new HubTraffic(createRandom(world.size * 7919 + 3));
     this.buildingsDirty = true;
     this.sinceVents = VENT_REFRESH;
     this.sincePopulate = POPULATE_INTERVAL;
@@ -195,10 +221,13 @@ export class AnimationLayer {
     if (this.buildingsDirty && this.sinceVents >= VENT_REFRESH) this.refreshBuildings(world);
     this.trucks.step(fireView, this.stations, dt);
     this.puffs.step(frame.underground ? [] : this.ventsInView(frame.view), dt);
+    this.hubs.step(dt);
 
     const alpha = frame.overlay ? OVERLAY_ALPHA : 1;
     this.syncVehicles(world, !frame.underground, alpha);
     this.syncPuffs(!frame.underground, alpha, frame.zoom);
+    this.syncBoats(world, !frame.underground && frame.zoom >= BOAT_MIN_ZOOM, alpha);
+    this.syncPlanes(world, !frame.underground, alpha);
   }
 
   stats(): AnimationStats {
@@ -213,6 +242,8 @@ export class AnimationLayer {
       trucks: this.trucks.trucks.length,
       puffs: this.puffs.puffs.length,
       sparkles,
+      boats: this.hubs.boats.length,
+      planes: this.hubs.planes.length,
     };
   }
 
@@ -227,13 +258,37 @@ export class AnimationLayer {
     return list;
   }
 
+  /** Screen positions of boats and planes (tests check that they move). */
+  hubSample(): HubSample[] {
+    const list: HubSample[] = [];
+    for (const [id, sprite] of this.boatSprites) {
+      list.push({ id, kind: 'boat', x: sprite.x, y: sprite.y, visible: sprite.visible });
+    }
+    for (const [id, s] of this.planeSprites) {
+      list.push({ id, kind: 'plane', x: s.plane.x, y: s.plane.y, visible: s.plane.visible });
+    }
+    return list;
+  }
+
   private clearMoving(): void {
     this.cars.clear();
     this.trucks.clear();
     this.puffs.clear();
+    this.hubs.clear();
     for (const sprite of this.vehicleSprites.values()) sprite.destroy();
     this.vehicleSprites.clear();
+    for (const sprite of this.boatSprites.values()) sprite.destroy();
+    this.boatSprites.clear();
+    this.clearPlanes();
     for (const sprite of this.puffSprites) sprite.visible = false;
+  }
+
+  private clearPlanes(): void {
+    for (const s of this.planeSprites.values()) {
+      s.plane.destroy();
+      s.shadow.destroy();
+    }
+    this.planeSprites.clear();
   }
 
   private isTileVisible(tile: number): boolean {
@@ -271,6 +326,7 @@ export class AnimationLayer {
     for (const b of this.buildings.values()) {
       if (b.kind === 'fireStation') this.stations.push({ x: b.x, y: b.y, w: b.w, h: b.h });
     }
+    this.hubs.setSites(world, this.buildings.values());
   }
 
   private ventsInView(view: AnimationFrame['view']): VentPosition[] {
@@ -317,6 +373,80 @@ export class AnimationLayer {
       if (live.has(key)) continue;
       sprite.destroy();
       this.vehicleSprites.delete(key);
+    }
+  }
+
+  private syncBoats(world: World, show: boolean, alpha: number): void {
+    const live = new Set<number>();
+    for (const boat of this.hubs.boats) {
+      live.add(boat.id);
+      const pose = boatPose(boat, world.size);
+      const tx = Math.min(world.size - 1, Math.max(0, Math.floor(pose.x)));
+      const ty = Math.min(world.size - 1, Math.max(0, Math.floor(pose.y)));
+      const chunk = this.chunkAt(tx, ty);
+      if (!chunk) continue;
+      const moving = boat.pause <= 0;
+      const tex = this.factory.boat(boat.kind, pose.heading, boat.color, moving);
+      let sprite = this.boatSprites.get(boat.id);
+      if (!sprite) {
+        sprite = new Sprite(tex.texture);
+        this.boatSprites.set(boat.id, sprite);
+      } else {
+        sprite.texture = tex.texture;
+      }
+      sprite.anchor.set(tex.anchorX, tex.anchorY);
+      if (sprite.parent !== chunk.vehicles) chunk.vehicles.addChild(sprite);
+      const p = tileLocalToScreen(tileQuad(world, tx, ty), pose.x - tx, pose.y - ty);
+      sprite.position.set(p.x, p.y);
+      sprite.zIndex = pose.x + pose.y;
+      sprite.alpha = alpha;
+      sprite.visible = show;
+    }
+    for (const [id, sprite] of this.boatSprites) {
+      if (live.has(id)) continue;
+      sprite.destroy();
+      this.boatSprites.delete(id);
+    }
+  }
+
+  private syncPlanes(world: World, show: boolean, alpha: number): void {
+    const live = new Set<number>();
+    for (const plane of this.hubs.planes) {
+      const site = this.hubs.site(plane.site);
+      if (!site) continue;
+      live.add(plane.id);
+      const state = flightState(plane.mode, plane.time);
+      const ground = vertexToScreen(
+        site.x + state.u,
+        site.y + RUNWAY.v,
+        world.elevation(site.x, site.y),
+      );
+      let s = this.planeSprites.get(plane.id);
+      if (!s) {
+        const shadowTex = this.factory.planeShadow(0);
+        const planeTex = this.factory.plane(0);
+        s = { plane: new Sprite(planeTex.texture), shadow: new Sprite(shadowTex.texture) };
+        s.shadow.anchor.set(shadowTex.anchorX, shadowTex.anchorY);
+        s.plane.anchor.set(planeTex.anchorX, planeTex.anchorY);
+        this.sky.addChild(s.shadow, s.plane);
+        this.planeSprites.set(plane.id, s);
+      }
+      s.shadow.position.set(
+        ground.x + state.altitude * SHADOW_SHIFT.x,
+        ground.y + state.altitude * SHADOW_SHIFT.y,
+      );
+      s.shadow.alpha =
+        PLANE_SHADOW_ALPHA * state.alpha * alpha * Math.max(0, 1 - state.altitude / 300);
+      s.plane.position.set(ground.x, ground.y - state.altitude);
+      s.plane.alpha = state.alpha * alpha;
+      s.shadow.visible = show;
+      s.plane.visible = show;
+    }
+    for (const [id, s] of this.planeSprites) {
+      if (live.has(id)) continue;
+      s.plane.destroy();
+      s.shadow.destroy();
+      this.planeSprites.delete(id);
     }
   }
 

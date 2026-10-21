@@ -1,5 +1,20 @@
-import { BALANCE, isZoneKind, type BuildingRecord, type Problem } from '@city/shared';
-import { diagnoseTile, ZONE_KIND } from '@city/simulation';
+import {
+  BALANCE,
+  PLACEABLE_SPECS,
+  isZoneKind,
+  type BuildingRecord,
+  type PlaceableKind,
+  type PlaceableSpec,
+  type Problem,
+} from '@city/shared';
+import {
+  diagnoseTile,
+  hubRoad,
+  isOperatingHub,
+  RoadNetwork,
+  ZONE_KIND,
+  type World,
+} from '@city/simulation';
 import { useEffect, useMemo, useState } from 'react';
 import { formatNumber, t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
@@ -26,6 +41,8 @@ interface Snapshot {
     education: number;
   };
   problems: Problem[];
+  /** The building is an operating gateway hub with a road. */
+  regional: boolean;
 }
 
 const SEVERITY_CLASS = ['info', 'minor', 'major', 'blocking'] as const;
@@ -38,6 +55,7 @@ function inspect(session: GameSession, x: number, y: number): Snapshot | null {
   const id = w.buildingId[i] as number;
   const inf = w.influence;
   const roads = session.roads();
+  const building = id === 0 ? null : (session.client.buildings.get(id) ?? null);
   return {
     terrain: w.terrain[i] as number,
     elevation: w.elevation(x, y),
@@ -46,7 +64,7 @@ function inspect(session: GameSession, x: number, y: number): Snapshot | null {
     trees: w.trees[i] as number,
     powered: w.powered[i] === 1,
     watered: w.watered[i] === 1,
-    building: id === 0 ? null : (session.client.buildings.get(id) ?? null),
+    building,
     influence: {
       pollution: inf.pollution[i] as number,
       crime: inf.crime[i] as number,
@@ -69,10 +87,57 @@ function inspect(session: GameSession, x: number, y: number): Snapshot | null {
       x,
       y,
     ),
+    regional: building !== null && isGateway(w, roads, building),
   };
 }
 
+function isGateway(w: World, roads: RoadNetwork | null, b: BuildingRecord): boolean {
+  if (!isOperatingHub(b) || !PLACEABLE_SPECS[b.kind as PlaceableKind].gateway) return false;
+  const network = roads ?? new RoadNetwork(w);
+  network.update();
+  return hubRoad(w, network, b) >= 0;
+}
+
 const pct = (v: number) => `${Math.round((v / 255) * 100)}%`;
+
+function HubFacts({
+  building: b,
+  spec,
+  regional,
+}: {
+  building: BuildingRecord;
+  spec: PlaceableSpec;
+  regional: boolean;
+}) {
+  const h = t.inspector.hub;
+  const operating = b.occupancy > 0;
+  return (
+    <>
+      <dt>{h.status}</dt>
+      <dd data-testid="hub-status">{operating ? h.operating : h.idle}</dd>
+      <dt>{h.jobs}</dt>
+      <dd data-testid="hub-jobs">
+        {formatNumber(b.occupancy)} / {formatNumber(b.capacity)}{' '}
+        {spec.jobKind ? h.jobKind[spec.jobKind] : ''}
+        <small className="fact-note">
+          {h.growth(spec.jobsPer1000, formatNumber(spec.maxJobs))}
+        </small>
+      </dd>
+      {spec.gateway && (
+        <>
+          <dt>{h.regional}</dt>
+          <dd data-testid="hub-regional">{regional ? h.regionalOn : h.regionalOff}</dd>
+        </>
+      )}
+      {spec.landValue !== 0 && (
+        <>
+          <dt>{h.surroundings}</dt>
+          <dd>{h.landValue(spec.landValue, spec.landValueRadius)}</dd>
+        </>
+      )}
+    </>
+  );
+}
 
 export function Inspector({ session }: { session: GameSession }) {
   const selected = useStore(session.ui, (s) => s.selected);
@@ -94,6 +159,8 @@ export function Inspector({ session }: { session: GameSession }) {
   const n = t.inspector;
   const b = s.building;
   const zoneKind = ZONE_KIND[s.zone];
+  const hub =
+    b && !isZoneKind(b.kind) && PLACEABLE_SPECS[b.kind].jobs > 0 ? PLACEABLE_SPECS[b.kind] : null;
   const title = b
     ? t.buildings[b.kind]
     : zoneKind
@@ -141,6 +208,7 @@ export function Inspector({ session }: { session: GameSession }) {
                 <dd>{Math.round(b.attractiveness * 100)}%</dd>
               </>
             )}
+            {hub && <HubFacts building={b} spec={hub} regional={s.regional} />}
             <dt>{n.age}</dt>
             <dd>
               {b.age} {n.months}

@@ -102,6 +102,7 @@ export class ToolController {
         building: (id) => client.buildings.get(id),
         funds: stats.funds,
         bankrupt: stats.bankrupt,
+        population: stats.population,
       },
       command,
     );

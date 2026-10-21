@@ -1,4 +1,4 @@
-import { Infra, type BuildingKind } from '@city/shared';
+import { Infra, Terrain, type BuildingKind } from '@city/shared';
 import { describe, expect, it } from 'vitest';
 import {
   FireDispatch,
@@ -8,7 +8,15 @@ import {
   type FireView,
   type StationFootprint,
 } from '../../apps/web/src/renderer/animation/fireDispatch';
+import {
+  HubTraffic,
+  MAX_BOATS_PER_MARINA,
+  boatPose,
+  flightState,
+  waterReach,
+} from '../../apps/web/src/renderer/animation/hubs';
 import { createRandom } from '../../apps/web/src/renderer/animation/random';
+import { RUNWAY } from '../../apps/web/src/renderer/hubSprites';
 import {
   DX,
   DY,
@@ -372,5 +380,158 @@ describe('fire trucks', () => {
     const present = run(dispatch, view, 30);
     expect(present).toBeGreaterThan(MIN_WORK_TIME);
     expect(dispatch.trucks).toHaveLength(0);
+  });
+});
+
+describe('hub traffic', () => {
+  /** Sea along the south rows, a jetty notch of land, and a marina on the shore. */
+  function harbour(powered: boolean) {
+    const e = flatEngine(32);
+    addWater(e, 0, 20, 31, 31);
+    // A spit of land in the water that boats must sail around, not across.
+    addLand(e, 12, 24, 12, 31);
+    const marina = e.buildings.add({
+      kind: 'marina',
+      x: 4,
+      y: 17,
+      w: 3,
+      h: 3,
+      level: 1,
+      capacity: 0,
+      occupancy: 0,
+      condition: 100,
+      age: 0,
+      abandoned: false,
+      emptyMonths: 0,
+      variant: 0,
+      powered,
+      watered: false,
+      offline: 0,
+      attractiveness: 0,
+    });
+    return { e, marina };
+  }
+
+  function addLand(
+    e: ReturnType<typeof flatEngine>,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number,
+  ) {
+    const w = e.world;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) w.terrain[w.index(x, y)] = Terrain.Grass;
+    }
+    w.terrainVersion++;
+  }
+
+  it('routes boats over water only, without cutting land corners', () => {
+    const { e, marina } = harbour(true);
+    const w = e.world;
+    const { id, x, y } = marina;
+    const reach = waterReach(w, { id, kind: 'marina', x, y, w: 3, h: 3 });
+    expect(reach.ends.length).toBeGreaterThan(0);
+    for (const [tile, parent] of reach.parent) {
+      expect(w.isWater(tile)).toBe(true);
+      if (parent < 0) continue;
+      const dx = (tile % 32) - (parent % 32);
+      const dy = Math.floor(tile / 32) - Math.floor(parent / 32);
+      expect(Math.abs(dx)).toBeLessThanOrEqual(1);
+      expect(Math.abs(dy)).toBeLessThanOrEqual(1);
+      if (dx !== 0 && dy !== 0) {
+        expect(w.isWater(parent + dx)).toBe(true);
+        expect(w.isWater(parent + dy * 32)).toBe(true);
+      }
+    }
+  });
+
+  it('sends boats out from an operating marina and brings them back', () => {
+    const lit = harbour(true);
+    const traffic = new HubTraffic(createRandom(5));
+    traffic.setSites(lit.e.world, lit.e.buildings.values());
+    let seen = 0;
+    for (let k = 0; k < 400; k++) {
+      traffic.step(0.1);
+      seen = Math.max(seen, traffic.boats.length);
+      for (const boat of traffic.boats) {
+        const pose = boatPose(boat, 32);
+        const tile = Math.floor(pose.y) * 32 + Math.floor(pose.x);
+        expect(lit.e.world.isWater(tile)).toBe(true);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    expect(seen).toBeLessThanOrEqual(MAX_BOATS_PER_MARINA);
+    const first = traffic.boats[0];
+    if (first) expect(first.path.length).toBeGreaterThan(1);
+
+    const dark = harbour(false);
+    const idle = new HubTraffic(createRandom(5));
+    idle.setSites(dark.e.world, dark.e.buildings.values());
+    for (let k = 0; k < 200; k++) idle.step(0.1);
+    expect(idle.boats).toHaveLength(0);
+  });
+
+  it('flies a takeoff up and away and lands a plane to a stop on the runway', () => {
+    expect(flightState('takeoff', 0).altitude).toBe(0);
+    let last = flightState('takeoff', 0);
+    let t = 0;
+    while (!last.done && t < 60) {
+      t += 0.1;
+      const next = flightState('takeoff', t);
+      expect(next.u).toBeGreaterThan(last.u);
+      expect(next.altitude).toBeGreaterThanOrEqual(last.altitude);
+      last = next;
+    }
+    expect(last.done).toBe(true);
+    expect(last.altitude).toBeGreaterThan(200);
+
+    const approach = flightState('landing', 0);
+    expect(approach.altitude).toBeGreaterThan(50);
+    expect(approach.u).toBeLessThan(0);
+    const stopped = flightState('landing', 9);
+    expect(stopped.altitude).toBe(0);
+    expect(stopped.u).toBeGreaterThan(RUNWAY.u0);
+    expect(stopped.u).toBeLessThan(RUNWAY.u1);
+    expect(flightState('landing', 9.5).u).toBeCloseTo(stopped.u);
+    expect(flightState('landing', 30).done).toBe(true);
+  });
+
+  it('alternates takeoffs and landings, one flight at a time per airport', () => {
+    const e = flatEngine(32);
+    e.buildings.add({
+      kind: 'airport',
+      x: 10,
+      y: 10,
+      w: 4,
+      h: 4,
+      level: 1,
+      capacity: 0,
+      occupancy: 0,
+      condition: 100,
+      age: 0,
+      abandoned: false,
+      emptyMonths: 0,
+      variant: 0,
+      powered: true,
+      watered: false,
+      offline: 0,
+      attractiveness: 0,
+    });
+    const traffic = new HubTraffic(createRandom(9));
+    traffic.setSites(e.world, e.buildings.values());
+    const modes: string[] = [];
+    let lastId = 0;
+    for (let k = 0; k < 1200; k++) {
+      traffic.step(0.1);
+      expect(traffic.planes.length).toBeLessThanOrEqual(1);
+      const plane = traffic.planes[0];
+      if (plane && plane.id !== lastId) {
+        lastId = plane.id;
+        modes.push(plane.mode);
+      }
+    }
+    expect(modes.length).toBeGreaterThanOrEqual(3);
+    for (let k = 1; k < modes.length; k++) expect(modes[k]).not.toBe(modes[k - 1]);
   });
 });

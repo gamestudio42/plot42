@@ -94,6 +94,18 @@ const ICONS: Record<ToolId, ReactElement> = {
       <path d="M2 19 H22" stroke="#f0d050" strokeWidth="2" />
     </>
   ),
+  raise: (
+    <>
+      <path d="M2 20 L8 14 L12 17 L16 12 L22 20 Z" fill="#7a9a50" />
+      <path d="M12 11 L12 3 M9 6 L12 3 L15 6" stroke="#f0d050" strokeWidth="2" fill="none" />
+    </>
+  ),
+  lower: (
+    <>
+      <path d="M2 8 L8 14 L12 11 L16 16 L22 8 Z" fill="#7a9a50" />
+      <path d="M12 13 L12 21 M9 18 L12 21 L15 18" stroke="#f0d050" strokeWidth="2" fill="none" />
+    </>
+  ),
   trees: (
     <>
       <path d="M8 3 L3 14 H13 Z" fill="#3f9f3f" />
@@ -114,6 +126,13 @@ const ICONS: Record<ToolId, ReactElement> = {
     '#2070c0',
     '#5aa0e0',
     <path d="M12 12 Q9 16 12 18 Q15 16 12 12 Z" fill="#fff" />,
+  ),
+  well: (
+    <>
+      <ellipse cx="12" cy="18" rx="7" ry="3" fill="#5aa0e0" />
+      <rect x="7" y="10" width="10" height="8" fill="#3f88c8" />
+      <ellipse cx="12" cy="10" rx="5" ry="2.2" fill="#8fc0e8" />
+    </>
   ),
   policeStation: building(
     '#2040a0',
@@ -140,6 +159,21 @@ const ICONS: Record<ToolId, ReactElement> = {
       <circle cx="9" cy="10" r="5" fill="#2e7d32" />
       <rect x="8" y="13" width="2" height="5" fill="#6b4a2a" />
       <circle cx="17" cy="16" r="2" fill="#81d4fa" />
+    </>
+  ),
+  marina: (
+    <>
+      <rect x="3" y="10" width="10" height="8" fill="#8a6a48" />
+      <path d="M3 10 L8 5 L13 10 Z" fill="#6a4a30" />
+      <rect x="14" y="16" width="8" height="3" fill="#c4a070" />
+      <rect x="16" y="13" width="6" height="2" fill="#d4b080" />
+    </>
+  ),
+  airport: (
+    <>
+      <rect x="3" y="16" width="18" height="4" rx="1" fill="#8a8a90" />
+      <rect x="11" y="5" width="3" height="11" fill="#d0d4dc" />
+      <path d="M6 11 H19 L14 14 H9 Z" fill="#e8eef4" />
     </>
   ),
 };

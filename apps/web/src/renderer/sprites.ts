@@ -10,6 +10,16 @@ import {
   lerp,
   up,
 } from './chimneys';
+import {
+  BOAT_COLORS,
+  HEADINGS,
+  drawAirport,
+  drawBoat,
+  drawMarina,
+  drawPlane,
+  drawPlaneShadow,
+  type BoatKind,
+} from './hubSprites';
 import { TILE_H, TILE_W, type Point } from './iso';
 import { shade } from './palette';
 import type { VehicleKind } from './animation/vehicles';
@@ -323,6 +333,13 @@ function drawPlaceable(g: Graphics, kind: string, size: number): void {
       g.ellipse(c.x, c.y - 26, 9, 4).fill(0x8fc0e8);
       break;
     }
+    case 'well': {
+      box(g, size, 0.22, 8, { wall: 0x6a90b0, roof: 0x4a7088, window: 0xcfe8ff }, 0);
+      g.rect(-5, -22, 10, 16).fill(0x4f88b8);
+      g.ellipse(0, -22, 5, 2.4).fill(0x8fc0e8);
+      g.ellipse(0, -6, 5, 2.2).fill(0x3a6a90);
+      break;
+    }
     case 'policeStation': {
       const top = box(g, size, 0.1, 24, { wall: 0x5f78b8, roof: 0x3a4f88, window: 0xd8e8ff }, 2);
       const c = lerp(top[0] as Point, top[2] as Point, 0.5);
@@ -439,17 +456,49 @@ export class SpriteFactory {
 
   constructor(private readonly renderer: Renderer) {}
 
+  /** `side` turns buildings that face something (the marina faces its water, 0..3). */
   building(
     b: Pick<BuildingRecord, 'kind' | 'level' | 'variant' | 'abandoned' | 'w'>,
+    side = 0,
   ): SpriteTexture {
     const level = Math.max(1, b.level);
-    const key = `b:${b.kind}:${level}:${b.variant % 3}:${b.abandoned ? 1 : 0}`;
+    const key = `b:${b.kind}:${level}:${b.variant % 3}:${b.abandoned ? 1 : 0}:${side}`;
     return this.get(key, (g) => {
       if (b.kind === 'residential') drawResidential(g, level, b.variant, b.abandoned);
       else if (b.kind === 'commercial') drawCommercial(g, level, b.variant, b.abandoned);
       else if (b.kind === 'industrial') drawIndustrial(g, level, b.variant, b.abandoned);
+      else if (b.kind === 'marina') drawMarina(g, side);
+      else if (b.kind === 'airport') drawAirport(g);
       else drawPlaceable(g, b.kind, b.w);
     });
+  }
+
+  /** Boat centred on its position; `heading` indexes `HEADINGS`. */
+  boat(kind: BoatKind, heading: number, color: number, moving: boolean): SpriteTexture {
+    const c = color % BOAT_COLORS.length;
+    return this.get(`boat:${kind}:${heading}:${c}:${moving ? 1 : 0}`, (g) =>
+      drawBoat(
+        g,
+        { x: 0, y: 0 },
+        HEADINGS[heading] as Point,
+        kind,
+        BOAT_COLORS[c] as number,
+        moving,
+      ),
+    );
+  }
+
+  /** Airliner centred on its ground position (lift it by its altitude when placing it). */
+  plane(heading: number): SpriteTexture {
+    return this.get(`plane:${heading}`, (g) =>
+      drawPlane(g, { x: 0, y: 0 }, HEADINGS[heading] as Point),
+    );
+  }
+
+  planeShadow(heading: number): SpriteTexture {
+    return this.get(`planeShadow:${heading}`, (g) =>
+      drawPlaneShadow(g, { x: 0, y: 0 }, HEADINGS[heading] as Point),
+    );
   }
 
   trees(density: number, variant: number): SpriteTexture {

@@ -1,5 +1,5 @@
 import { BALANCE, PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
-import { formatMoney, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { TOOL_GROUPS, TOOLS, type ToolDef } from '../tools/tools';
@@ -23,6 +23,8 @@ function costLabel(tool: ToolDef): string | null {
     case 'zoneIndDense':
       return `${formatMoney(c.zoneDense)}/lote`;
     case 'level':
+    case 'raise':
+    case 'lower':
       return `${formatMoney(c.levelPerUnit)}/unidade de altura`;
     case 'trees':
       return `${formatMoney(c.plantTree)}/lote`;
@@ -37,15 +39,20 @@ function costLabel(tool: ToolDef): string | null {
 
 export function Toolbar({ session }: { session: GameSession }) {
   const active = useStore(session.ui, (s) => s.tool);
+  const population = useStore(session.ui, (s) => s.stats?.population ?? 0);
   return (
     <nav className="toolbar" aria-label="Ferramentas" data-testid="toolbar">
       {TOOL_GROUPS.map((group) => (
         <div key={group} className="tool-group" role="group" aria-label={t.toolGroups[group]}>
           {TOOLS.filter((tool) => tool.group === group).map((tool) => {
+            const spec =
+              tool.id in PLACEABLE_SPECS ? PLACEABLE_SPECS[tool.id as PlaceableKind] : undefined;
+            const locked = Boolean(spec && spec.minPopulation > population);
             const cost = costLabel(tool);
             const title = [
               t.tools[tool.id],
               cost,
+              locked && spec ? t.hud.unlockAt(formatNumber(spec.minPopulation)) : null,
               tool.hotkey ? `Atalho: ${tool.hotkey.toUpperCase()}` : null,
             ]
               .filter(Boolean)
@@ -54,7 +61,7 @@ export function Toolbar({ session }: { session: GameSession }) {
               <button
                 key={tool.id}
                 type="button"
-                className={`tool-button${active === tool.id ? ' active' : ''}`}
+                className={`tool-button${active === tool.id ? ' active' : ''}${locked ? ' locked' : ''}`}
                 title={title}
                 aria-label={t.tools[tool.id]}
                 aria-pressed={active === tool.id}

@@ -1,4 +1,5 @@
-import { formatMoney, t } from '../i18n/pt-BR';
+import { PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
+import { formatMoney, formatNumber, t } from '../i18n/pt-BR';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { toolById } from '../tools/tools';
@@ -25,7 +26,12 @@ export function ToolTooltip({ session }: { session: GameSession }) {
         </div>
       )}
       {showReason && preview.reason && (
-        <div className="tool-tooltip-reason">{t.reasons[preview.reason]}</div>
+        <div className="tool-tooltip-reason">
+          {t.reasons[preview.reason]}
+          {preview.reason === 'LOCKED' && tool.id in PLACEABLE_SPECS
+            ? ` ${t.hud.unlockAt(formatNumber(PLACEABLE_SPECS[tool.id as PlaceableKind].minPopulation))}`
+            : null}
+        </div>
       )}
     </div>
   );

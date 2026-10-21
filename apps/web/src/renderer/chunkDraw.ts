@@ -26,6 +26,7 @@ import {
   shade,
   tileHash,
 } from './palette';
+import { BOAT_COLORS, HEADINGS, drawBoat } from './hubSprites';
 import type { SpriteFactory } from './sprites';
 
 export type OverlayMode =
@@ -112,6 +113,7 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
     fillQuad(g, q, color);
     if (terrain === Terrain.Water && !ctx.underground) {
       g.poly(q.flatMap((p) => [p.x, p.y])).stroke({ width: 1, color: WATER_EDGE, alpha: 0.25 });
+      drawMarinaPiers(g, ctx, x, y, q);
     }
 
     if (ctx.underground) {
@@ -160,6 +162,96 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
   });
 }
 
+function marinaAt(ctx: DrawContext, x: number, y: number): boolean {
+  if (!ctx.world.inBounds(x, y)) return false;
+  const id = ctx.world.buildingId[ctx.world.index(x, y)] as number;
+  if (id === 0) return false;
+  return ctx.buildings.get(id)?.kind === 'marina';
+}
+
+/** Side of a building with the most water beside it: 0 = +y, 1 = +x, 2 = -y, 3 = -x. */
+export function waterSide(world: World, b: Pick<BuildingRecord, 'x' | 'y' | 'w' | 'h'>): number {
+  const count = [0, 0, 0, 0];
+  const water = (x: number, y: number) => world.inBounds(x, y) && world.isWater(world.index(x, y));
+  for (let k = 0; k < b.w; k++) {
+    if (water(b.x + k, b.y + b.h)) count[0]!++;
+    if (water(b.x + k, b.y - 1)) count[2]!++;
+  }
+  for (let k = 0; k < b.h; k++) {
+    if (water(b.x + b.w, b.y + k)) count[1]!++;
+    if (water(b.x - 1, b.y + k)) count[3]!++;
+  }
+  let best = 0;
+  for (let s = 1; s < 4; s++) if ((count[s] as number) > (count[best] as number)) best = s;
+  return best;
+}
+
+const PIER_WOOD = 0xb88a55;
+const PIER_SIDE = 0x6e5236;
+const PIER_LIFT = 2;
+
+/**
+ * Jetty on a water tile beside a marina: a walkway out from the quay, two finger piers and
+ * boats moored between them (chosen by a stable hash of the tile).
+ */
+function drawMarinaPiers(
+  g: Graphics,
+  ctx: DrawContext,
+  x: number,
+  y: number,
+  q: [Point, Point, Point, Point],
+): void {
+  // Tile-local (u, v) of a point `out` tiles from the quay and `along` it.
+  let local: ((along: number, out: number) => [number, number]) | null = null;
+  let heading = 0;
+  if (marinaAt(ctx, x, y - 1)) {
+    local = (a, o) => [a, o];
+    heading = 0;
+  } else if (marinaAt(ctx, x - 1, y)) {
+    local = (a, o) => [o, a];
+    heading = 2;
+  } else if (marinaAt(ctx, x, y + 1)) {
+    local = (a, o) => [a, 1 - o];
+    heading = 0;
+  } else if (marinaAt(ctx, x + 1, y)) {
+    local = (a, o) => [1 - o, a];
+    heading = 2;
+  }
+  if (!local) return;
+  const at = (a: number, o: number, lift = 0) => {
+    const [u, v] = (local as (a: number, o: number) => [number, number])(a, o);
+    const p = tileLocalToScreen(q, u, v);
+    return { x: p.x, y: p.y - lift };
+  };
+  const deck = (a0: number, o0: number, a1: number, o1: number) => {
+    const corners = [at(a0, o0), at(a1, o0), at(a1, o1), at(a0, o1)];
+    fillQuad(g, corners, PIER_SIDE);
+    fillQuad(
+      g,
+      corners.map((p) => ({ x: p.x, y: p.y - PIER_LIFT })),
+      PIER_WOOD,
+    );
+  };
+  const boatAt = (a: number, o: number, slot: number) => {
+    const roll = tileHash(x * 7 + slot, y * 13 + slot);
+    if (roll < 0.25) return;
+    const kind = roll > 0.62 ? 'sail' : 'motor';
+    const color = BOAT_COLORS[Math.floor(roll * 97) % BOAT_COLORS.length] as number;
+    drawBoat(g, at(a, o), HEADINGS[heading] as Point, kind, color, false, 0.85);
+  };
+  boatAt(0.27, 0.26, 0);
+  boatAt(0.73, 0.26, 1);
+  deck(0.44, 0, 0.56, 0.95);
+  deck(0.08, 0.44, 0.92, 0.52);
+  boatAt(0.27, 0.7, 2);
+  boatAt(0.73, 0.7, 3);
+  deck(0.18, 0.88, 0.82, 0.95);
+  for (const a of [0.44, 0.56]) {
+    const p = at(a, 0.95, PIER_LIFT);
+    g.rect(p.x - 0.5, p.y, 1, 3).fill(PIER_SIDE);
+  }
+}
+
 function outline(g: Graphics, q: Point[], alpha: number): void {
   g.poly(q.flatMap((p) => [p.x, p.y])).stroke({ width: 1, color: 0x000000, alpha });
 }
@@ -178,6 +270,26 @@ function skirt(g: Graphics, a: Point, b: Point, ha: number, hb: number): void {
   ]).fill(SKIRT_COLOR);
 }
 
+/** Cosmetic lift of a bridge deck above the water, in pixels. */
+const BRIDGE_DECK = HEIGHT_STEP;
+const BRIDGE_PIER = 0x3d2e22;
+const BRIDGE_RAIL = 0xe4d4b4;
+const BRIDGE_SIDE = 0x5a4a3a;
+
+function lift(p: Point, h: number): Point {
+  return { x: p.x, y: p.y - h };
+}
+
+function liftAll(pts: Point[], h: number): Point[] {
+  return pts.map((p) => lift(p, h));
+}
+
+function landRoad(world: World, x: number, y: number): boolean {
+  if (!world.inBounds(x, y)) return false;
+  const i = world.index(x, y);
+  return world.hasInfra(i, Infra.Road) && !world.isWater(i);
+}
+
 function drawRoad(
   g: Graphics,
   ctx: DrawContext,
@@ -192,42 +304,113 @@ function drawRoad(
   const south = (mask & Connection.South) !== 0;
   const west = (mask & Connection.West) !== 0;
   const base = bridge ? BRIDGE_COLOR : ROAD_COLOR;
-  const lo = 0.22;
-  const hi = 0.78;
+  const lo = bridge ? 0.28 : 0.22;
+  const hi = bridge ? 0.72 : 0.78;
+  const deck = bridge ? BRIDGE_DECK : 0;
   const any = north || east || south || west;
+  const band = (u0: number, v0: number, u1: number, v1: number) =>
+    liftAll(rect(q, u0, v0, u1, v1), deck);
+
+  if (bridge) drawBridgeSupports(g, ctx.world, x, y, q, north, east, south, west);
+
   if (!any) {
-    fillQuad(g, rect(q, 0.15, 0.15, 0.85, 0.85), base);
+    fillQuad(g, band(0.2, 0.2, 0.8, 0.8), base);
     return;
   }
-  fillQuad(g, rect(q, lo, lo, hi, hi), base);
-  if (north) fillQuad(g, rect(q, lo, 0, hi, lo), base);
-  if (south) fillQuad(g, rect(q, lo, hi, hi, 1), base);
-  if (west) fillQuad(g, rect(q, 0, lo, lo, hi), base);
-  if (east) fillQuad(g, rect(q, hi, lo, 1, hi), base);
-  // Kerbs along sides without a connection.
-  const kerb = (pts: Point[]) =>
-    g
-      .moveTo(pts[0]!.x, pts[0]!.y)
-      .lineTo(pts[1]!.x, pts[1]!.y)
-      .stroke({ width: 1, color: ROAD_EDGE, alpha: 0.9 });
-  if (!north) kerb([tileLocalToScreen(q, lo, lo), tileLocalToScreen(q, hi, lo)]);
-  if (!south) kerb([tileLocalToScreen(q, lo, hi), tileLocalToScreen(q, hi, hi)]);
-  if (!west) kerb([tileLocalToScreen(q, lo, lo), tileLocalToScreen(q, lo, hi)]);
-  if (!east) kerb([tileLocalToScreen(q, hi, lo), tileLocalToScreen(q, hi, hi)]);
-  // Lane markings on straight segments.
+  fillQuad(g, band(lo, lo, hi, hi), base);
+  if (north) fillQuad(g, band(lo, 0, hi, lo), base);
+  if (south) fillQuad(g, band(lo, hi, hi, 1), base);
+  if (west) fillQuad(g, band(0, lo, lo, hi), base);
+  if (east) fillQuad(g, band(hi, lo, 1, hi), base);
+
+  const edge = (a: Point, b: Point, color: number, width: number) =>
+    g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width, color, alpha: 0.9 });
+  const side = (u0: number, v0: number, u1: number, v1: number) => {
+    const a = lift(tileLocalToScreen(q, u0, v0), deck);
+    const b = lift(tileLocalToScreen(q, u1, v1), deck);
+    edge(a, b, bridge ? BRIDGE_RAIL : ROAD_EDGE, bridge ? 2 : 1);
+  };
+  if (!north) side(lo, lo, hi, lo);
+  if (!south) side(lo, hi, hi, hi);
+  if (!west) side(lo, lo, lo, hi);
+  if (!east) side(hi, lo, hi, hi);
+
   const straightX = (east || west) && !north && !south;
   const straightY = (north || south) && !east && !west;
   if (straightX || straightY) {
-    for (const t of [0.15, 0.55]) {
-      const a = straightX ? tileLocalToScreen(q, t, 0.5) : tileLocalToScreen(q, 0.5, t);
-      const b = straightX
-        ? tileLocalToScreen(q, t + 0.25, 0.5)
-        : tileLocalToScreen(q, 0.5, t + 0.25);
-      g.moveTo(a.x, a.y)
-        .lineTo(b.x, b.y)
-        .stroke({ width: 1, color: bridge ? 0xd8d0c0 : ROAD_MARK, alpha: 0.85 });
+    for (const t of [0.2, 0.58]) {
+      const a = lift(straightX ? tileLocalToScreen(q, t, 0.5) : tileLocalToScreen(q, 0.5, t), deck);
+      const b = lift(
+        straightX ? tileLocalToScreen(q, t + 0.2, 0.5) : tileLocalToScreen(q, 0.5, t + 0.2),
+        deck,
+      );
+      edge(a, b, bridge ? 0xd8d0c0 : ROAD_MARK, 1);
     }
   }
+}
+
+function drawBridgeSupports(
+  g: Graphics,
+  world: World,
+  x: number,
+  y: number,
+  q: [Point, Point, Point, Point],
+  north: boolean,
+  east: boolean,
+  south: boolean,
+  west: boolean,
+): void {
+  const lo = 0.28;
+  const hi = 0.72;
+  const straightX = (east || west) && !north && !south;
+  // Posts sit on the front edge of the deck so a flat top does not hide them.
+  const spots: Array<[number, number]> = straightX
+    ? [
+        [0.32, hi],
+        [0.68, hi],
+      ]
+    : [
+        [hi, 0.32],
+        [hi, 0.68],
+      ];
+  for (const [u, v] of spots) {
+    const top = lift(tileLocalToScreen(q, u, v), BRIDGE_DECK);
+    const foot = tileLocalToScreen(q, u, v);
+    g.moveTo(top.x, top.y)
+      .lineTo(foot.x, foot.y + 4)
+      .stroke({ width: 4, color: BRIDGE_PIER, alpha: 1 });
+    g.ellipse(foot.x, foot.y + 3, 4, 1.8).fill({ color: 0x2a4a68, alpha: 0.5 });
+  }
+
+  const face = (u0: number, v0: number, u1: number, v1: number) => {
+    const a = tileLocalToScreen(q, u0, v0);
+    const b = tileLocalToScreen(q, u1, v1);
+    fillQuad(g, [a, b, lift(b, BRIDGE_DECK), lift(a, BRIDGE_DECK)], BRIDGE_SIDE);
+  };
+  // South and east faces — the visible sides in isometric order.
+  face(lo, hi, hi, hi);
+  face(hi, lo, hi, hi);
+
+  const ramp = (u0: number, v0: number, u1: number, v1: number) => {
+    const innerU0 = u0 === 0 ? lo : u0 === 1 ? hi : u0;
+    const innerV0 = v0 === 0 ? lo : v0 === 1 ? hi : v0;
+    const innerU1 = u1 === 0 ? lo : u1 === 1 ? hi : u1;
+    const innerV1 = v1 === 0 ? lo : v1 === 1 ? hi : v1;
+    fillQuad(
+      g,
+      [
+        tileLocalToScreen(q, u0, v0),
+        tileLocalToScreen(q, u1, v1),
+        lift(tileLocalToScreen(q, innerU1, innerV1), BRIDGE_DECK),
+        lift(tileLocalToScreen(q, innerU0, innerV0), BRIDGE_DECK),
+      ],
+      shade(BRIDGE_COLOR, 0.85),
+    );
+  };
+  if (north && landRoad(world, x, y - 1)) ramp(lo, 0, hi, 0);
+  if (south && landRoad(world, x, y + 1)) ramp(lo, 1, hi, 1);
+  if (west && landRoad(world, x - 1, y)) ramp(0, lo, 0, hi);
+  if (east && landRoad(world, x + 1, y)) ramp(1, lo, 1, hi);
 }
 
 function drawPipe(
@@ -312,7 +495,7 @@ export function buildObjects(
       const b = ctx.buildings.get(id);
       // Draw a building once, from its front (south) tile.
       if (b && b.x + b.w - 1 === x && b.y + b.h - 1 === y) {
-        const tex = factory.building(b);
+        const tex = factory.building(b, b.kind === 'marina' ? waterSide(w, b) : 0);
         const sprite = new Sprite(tex.texture);
         sprite.anchor.set(tex.anchorX, tex.anchorY);
         const front = vertexToScreen(b.x + b.w, b.y + b.h, w.corners(x, y)[2]);

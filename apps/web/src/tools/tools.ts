@@ -23,6 +23,8 @@ export type ToolId =
   | 'dezone'
   | 'demolish'
   | 'level'
+  | 'raise'
+  | 'lower'
   | 'trees'
   | PlaceableKind;
 
@@ -71,6 +73,8 @@ const placeDef = (kind: PlaceableKind, group: ToolGroup, hotkey?: string): ToolD
 export const TOOLS: readonly ToolDef[] = [
   def('select', 'inspect', 'none', () => null, { hotkey: 'q' }),
   def('road', 'transport', 'path', (a) => ({ type: 'road', ...a }), { hotkey: 'r' }),
+  placeDef('marina', 'transport'),
+  placeDef('airport', 'transport'),
   def('zoneResLight', 'zones', 'rect', zone(ZoneType.Residential, ZoneDensity.Light), {
     hotkey: '1',
   }),
@@ -99,6 +103,7 @@ export const TOOLS: readonly ToolDef[] = [
     underground: true,
   }),
   placeDef('waterPump', 'utilities'),
+  placeDef('well', 'utilities'),
   placeDef('policeStation', 'services'),
   placeDef('fireStation', 'services'),
   placeDef('school', 'services'),
@@ -106,6 +111,8 @@ export const TOOLS: readonly ToolDef[] = [
   placeDef('park', 'services'),
   def('demolish', 'terrain', 'rect', (a) => ({ type: 'demolish', ...a }), { hotkey: 'b' }),
   def('level', 'terrain', 'rect', (a) => ({ type: 'level', ...a }), { hotkey: 'n' }),
+  def('raise', 'terrain', 'rect', (a) => ({ type: 'raise', ...a }), { hotkey: 'h' }),
+  def('lower', 'terrain', 'rect', (a) => ({ type: 'lower', ...a })),
   def('trees', 'terrain', 'rect', (a) => ({ type: 'plantTrees', ...a }), { hotkey: 'f' }),
 ];
 

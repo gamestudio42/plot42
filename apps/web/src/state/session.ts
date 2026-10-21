@@ -1,4 +1,6 @@
 import {
+  PLACEABLE_KINDS,
+  PLACEABLE_SPECS,
   type CityStats,
   type Command,
   type CommandResult,
@@ -620,8 +622,15 @@ export class GameSession {
         return this.toast('error', e.bankrupt);
       case 'recovered':
         return this.toast('info', e.recovered);
-      case 'milestone':
-        return this.toast('info', e.milestone(formatNumber(event.population)));
+      case 'milestone': {
+        this.toast('info', e.milestone(formatNumber(event.population)));
+        const unlocked = PLACEABLE_KINDS.filter(
+          (kind) => PLACEABLE_SPECS[kind].minPopulation === event.population,
+        );
+        if (unlocked.length > 0)
+          this.toast('info', e.unlocked(unlocked.map((kind) => t.buildings[kind]).join(', ')));
+        return;
+      }
       case 'newYear':
         return this.toast('info', e.newYear(event.year));
     }
