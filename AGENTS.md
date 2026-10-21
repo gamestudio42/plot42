@@ -19,8 +19,9 @@ simulators, playable in the browser. The player creates conditions; the simulato
    `docs/simulation-spec.md`, and their provenance in `docs/mechanics-matrix.md`.
 6. Do not copy code, sprites, sounds or names from SimCity, Micropolis (GPLv3) or OpenSC2K.
    Study them in `references/` (git-ignored) and write independent code.
-7. Code, comments and technical docs are in English. Player-facing text lives in
-   `apps/web/src/i18n/` (`en`, `pt-BR`, `es`, `fr`, `de`). English is the type source.
+7. Code, comments, technical docs, commit messages and pull requests (title and
+   body) are in English. Player-facing text lives in `apps/web/src/i18n/`
+   (`en`, `pt-BR`, `es`, `fr`, `de`). English is the type source.
    The first visit follows the browser language (or English); the choice is persisted
    in `localStorage.cityBuilder.locale`.
 
@@ -55,7 +56,8 @@ Docker: `docker compose up` serves the dev build on port 5173.
 5. Run a headless report (`pnpm sim`) when the change touches the simulation and compare the
    key metrics with the previous run.
 6. Fix regressions before moving on.
-7. Commit with a descriptive message (conventional commits: `feat:`, `fix:`, `test:`...).
+7. Commit with a descriptive English message (conventional commits: `feat:`, `fix:`, `test:`...).
+   Open pull requests in English (title and body).
 8. Update docs when a rule or constant changes.
 
 Never declare a feature done just because it compiles.
