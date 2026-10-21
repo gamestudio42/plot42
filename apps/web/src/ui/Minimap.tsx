@@ -1,39 +1,35 @@
 import { Infra, Terrain } from '@city/shared';
 import type { World } from '@city/simulation';
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
-import { TILE_H, TILE_W } from '../renderer/iso';
-import { overlayColor } from '../renderer/chunkDraw';
-import { TERRAIN_COLORS, ZONE_COLORS, shade } from '../renderer/palette';
+import { TILE_H, TILE_W, overlayColor, type OverlayMode } from '@view/city';
+import { shade, type Theme } from '@theme/core';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 
 const REDRAW_MS = 400;
 const ROAD = 0x55585e;
 const BUILDING_SHADE = 0.72;
+const FIRE = 0xff5020;
 
 function rgb(color: number): [number, number, number] {
   return [(color >> 16) & 255, (color >> 8) & 255, color & 255];
 }
 
 /** Pixel colour of a tile on the minimap (map view or the active overlay). */
-function tileColor(
-  w: World,
-  i: number,
-  overlay: ReturnType<GameSession['ui']['get']>['overlay'],
-): number {
+function tileColor(w: World, i: number, overlay: OverlayMode, theme: Theme): number {
   if (overlay !== 'none') {
-    const c = overlayColor(w, i, overlay);
+    const c = overlayColor(w, i, overlay, theme);
     if (c !== null) return c;
   }
   const terrain = w.terrain[i] as number;
-  let color: number = TERRAIN_COLORS[terrain] ?? TERRAIN_COLORS[Terrain.Grass];
+  let fill: number = theme.terrain[terrain] ?? (theme.terrain[Terrain.Grass] as number);
   const zone = w.zone[i] as number;
-  if (zone !== 0) color = ZONE_COLORS[zone] ?? color;
-  if ((w.trees[i] as number) > 0 && zone === 0) color = shade(color, 0.75);
-  if (w.hasInfra(i, Infra.Road)) color = ROAD;
-  if ((w.buildingId[i] as number) !== 0) color = shade(color, BUILDING_SHADE);
-  if ((w.fire[i] as number) > 0) color = 0xff5020;
-  return color;
+  if (zone !== 0) fill = theme.zone[zone] ?? fill;
+  if ((w.trees[i] as number) > 0 && zone === 0) fill = shade(fill, 0.75);
+  if (w.hasInfra(i, Infra.Road)) fill = ROAD;
+  if ((w.buildingId[i] as number) !== 0) fill = shade(fill, BUILDING_SHADE);
+  if ((w.fire[i] as number) > 0) fill = FIRE;
+  return fill;
 }
 
 export function Minimap({ session }: { session: GameSession }) {
@@ -41,6 +37,7 @@ export function Minimap({ session }: { session: GameSession }) {
   const viewRef = useRef<HTMLCanvasElement>(null);
   const overlay = useStore(session.ui, (s) => s.overlay);
   const ready = useStore(session.ui, (s) => s.ready);
+  const theme = session.renderer.theme;
 
   // Terrain and city layer, redrawn at most every REDRAW_MS while the city changes.
   useEffect(() => {
@@ -62,7 +59,7 @@ export function Minimap({ session }: { session: GameSession }) {
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
           const i = y * size + x;
-          const [r, g, b] = rgb(tileColor(w, i, overlay));
+          const [r, g, b] = rgb(tileColor(w, i, overlay, theme));
           // Isometric diamond: each tile covers two horizontal pixels.
           const px = x - y + size - 1;
           const py = (x + y) >> 1;
@@ -88,7 +85,7 @@ export function Minimap({ session }: { session: GameSession }) {
       unsubscribe();
       if (timer) window.clearTimeout(timer);
     };
-  }, [session, overlay, ready]);
+  }, [session, overlay, ready, theme]);
 
   // Camera rectangle, redrawn whenever the camera moves.
   useEffect(() => {

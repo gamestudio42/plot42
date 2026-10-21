@@ -1,4 +1,6 @@
 import {
+  NEON_SAVE_FORMAT,
+  SAVE_FORMAT,
   decodeSave,
   encodeSave,
   INFLUENCE_LAYERS,
@@ -24,7 +26,14 @@ const scope = self as unknown as WorkerScope;
 const DEMO_PROGRESS_MONTHS = 6;
 
 let engine: SimulationEngine | null = null;
+/** Envelope format used by `exportSave` / `importSave`; Neo Urbe switches it on `newCity`. */
+let saveFormat: string = SAVE_FORMAT;
 const clock = new WorkerClock(SPEED_TICKS_PER_SECOND);
+
+/** The envelope format a ruleset writes: the two games never share a file format. */
+function formatFor(ruleset: 'classic' | 'neon' | undefined): string {
+  return ruleset === 'neon' ? NEON_SAVE_FORMAT : SAVE_FORMAT;
+}
 
 function post(message: FromWorkerMessage): void {
   scope.postMessage(message);
@@ -125,11 +134,13 @@ scope.onmessage = (event) => {
     switch (message.type) {
       case 'newCity':
         engine = createEngine(message.options);
+        saveFormat = message.options.saveFormat ?? formatFor(message.options.ruleset);
         clock.reset();
         post({ type: 'init', state: fullState(engine) });
         break;
       case 'loadCity':
         engine = SimulationEngine.fromSnapshot(message.snapshot);
+        if (message.saveFormat) saveFormat = message.saveFormat;
         clock.setSpeed(0);
         clock.reset();
         post({ type: 'init', state: fullState(engine) });
@@ -161,16 +172,20 @@ scope.onmessage = (event) => {
       case 'exportSave': {
         if (!engine) throw new Error('No city loaded');
         const stats = engine.stats();
-        const file = encodeSave(engine.serialize(), {
-          population: stats.population,
-          funds: stats.funds,
-          savedAt: message.savedAt,
-        });
+        const file = encodeSave(
+          engine.serialize(),
+          {
+            population: stats.population,
+            funds: stats.funds,
+            savedAt: message.savedAt,
+          },
+          { format: saveFormat },
+        );
         post({ type: 'saveData', id: message.id, text: stringifySave(file), meta: file.meta });
         break;
       }
       case 'importSave': {
-        const decoded = decodeSave(message.text);
+        const decoded = decodeSave(message.text, { format: saveFormat });
         if (!decoded.ok) {
           post({ type: 'loadResult', id: message.id, result: decoded });
           break;

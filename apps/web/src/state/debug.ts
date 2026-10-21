@@ -14,8 +14,8 @@ import type {
   AnimationStats,
   HubSample,
   VehicleSample,
-} from '../renderer/animation/AnimationLayer';
-import type { Point } from '../renderer/iso';
+} from '@view/city';
+import type { Point } from '@view/city';
 import type { BootState, GameSession } from './session';
 
 /** Read-mostly hooks used by Playwright tests and for debugging in the console. */

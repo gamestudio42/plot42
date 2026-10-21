@@ -1,3 +1,5 @@
+import type { Theme } from '@theme/core';
+import type { MusicFactory } from './audio/sound';
 import { useEffect, useRef, useState } from 'react';
 import { useStrings } from './i18n';
 import { GameSession } from './state/session';
@@ -18,18 +20,29 @@ import { Toolbar } from './ui/Toolbar';
 import { ToolTooltip } from './ui/ToolTooltip';
 import { Tutorial } from './ui/Tutorial';
 
-export function App() {
+export interface AppProps {
+  /** Art direction injected by the host app; defaults to Urbe. */
+  theme?: Theme;
+  /** Seed of the scripted city behind the main menu. */
+  menuSeed?: string;
+  /** Rules for cities created from this app's menu. */
+  ruleset?: 'classic' | 'neon';
+  /** Music engine factory; reskins inject their own composer. */
+  music?: MusicFactory;
+}
+
+export function App({ theme, menuSeed, ruleset, music }: AppProps = {}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<GameSession | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const s = new GameSession();
+    const s = new GameSession({ theme, menuSeed, ruleset, music });
     setSession(s);
     void s.boot(host);
     return () => s.dispose();
-  }, []);
+  }, [theme, menuSeed, ruleset, music]);
 
   return (
     <div className="app">

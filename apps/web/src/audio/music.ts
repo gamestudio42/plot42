@@ -1,4 +1,4 @@
-import { createRandom, type Random } from '../renderer/animation/random';
+import { createRandom, type Random } from '@view/city';
 import {
   BEATS_PER_BAR,
   composeBar,

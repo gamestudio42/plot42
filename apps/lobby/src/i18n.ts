@@ -14,7 +14,7 @@ export const LOCALE_KEY = 'plot42.locale';
 const en = {
   pageTitle: 'Plot 42',
   title: 'Plot 42',
-  tagline: 'Three games. One studio lot.',
+  tagline: 'Five games. One studio lot.',
   language: 'Language',
   play: 'Play',
   footer: 'Game Studio 42',
@@ -24,12 +24,16 @@ const en = {
   hortaBlurb: 'Plant a plot, wait for it to ripen, then harvest.',
   postoTitle: 'Posto',
   postoBlurb: 'Three units, a 10×10 grid. Move, strike, and hold the outpost.',
+  mataTitle: 'Mata',
+  mataBlurb: 'Restore a scar. Plants shade, drink and feed each other — the grove decides.',
+  neonTitle: 'Neo Urbe',
+  neonBlurb: 'Megacorps buy the blocks, hackers sell the dark, drones own the sky. Keep the grid up.',
 };
 
 const ptBR: typeof en = {
   pageTitle: 'Plot 42',
   title: 'Plot 42',
-  tagline: 'Três jogos. Um lote do estúdio.',
+  tagline: 'Cinco jogos. Um lote do estúdio.',
   language: 'Idioma',
   play: 'Jogar',
   footer: 'Game Studio 42',
@@ -39,12 +43,16 @@ const ptBR: typeof en = {
   hortaBlurb: 'Plante num lote, espere amadurecer e colha.',
   postoTitle: 'Posto',
   postoBlurb: 'Três unidades, um grid 10×10. Mova, ataque e segure o posto.',
+  mataTitle: 'Mata',
+  mataBlurb: 'Restaure uma cicatriz. As plantas se sombreiam, bebem e se alimentam — a mata decide.',
+  neonTitle: 'Neo Urbe',
+  neonBlurb: 'Megacorps compram os quarteirões, hackers vendem o escuro, drones dominam o céu. Mantenha a rede de pé.',
 };
 
 const es: typeof en = {
   pageTitle: 'Plot 42',
   title: 'Plot 42',
-  tagline: 'Tres juegos. Un lote del estudio.',
+  tagline: 'Cinco juegos. Un lote del estudio.',
   language: 'Idioma',
   play: 'Jugar',
   footer: 'Game Studio 42',
@@ -54,12 +62,16 @@ const es: typeof en = {
   hortaBlurb: 'Siembra un lote, espera a que madure y cosecha.',
   postoTitle: 'Posto',
   postoBlurb: 'Tres unidades, una cuadrícula 10×10. Muévete, ataca y sostén el puesto.',
+  mataTitle: 'Mata',
+  mataBlurb: 'Restaura una cicatriz. Las plantas se sombrean, beben y se alimentan — el bosque decide.',
+  neonTitle: 'Neo Urbe',
+  neonBlurb: 'Las megacorporaciones compran las manzanas, los hackers venden la oscuridad, los drones dominan el cielo. Mantén la red en pie.',
 };
 
 const fr: typeof en = {
   pageTitle: 'Plot 42',
   title: 'Plot 42',
-  tagline: 'Trois jeux. Un lot d’atelier.',
+  tagline: 'Cinq jeux. Un lot d’atelier.',
   language: 'Langue',
   play: 'Jouer',
   footer: 'Game Studio 42',
@@ -69,12 +81,16 @@ const fr: typeof en = {
   hortaBlurb: 'Semez une parcelle, attendez qu’elle mûrisse, récoltez.',
   postoTitle: 'Posto',
   postoBlurb: 'Trois unités, une grille 10×10. Déplacez, frappez, tenez le poste.',
+  mataTitle: 'Mata',
+  mataBlurb: 'Réparez une cicatrice. Les plantes s’ombragent, boivent et se nourrissent — le bosquet décide.',
+  neonTitle: 'Neo Urbe',
+  neonBlurb: 'Les megacorps achètent les pâtés de maisons, les hackers vendent le noir, les drones règnent sur le ciel. Gardez le réseau debout.',
 };
 
 const de: typeof en = {
   pageTitle: 'Plot 42',
   title: 'Plot 42',
-  tagline: 'Drei Spiele. Ein Studio-Grundstück.',
+  tagline: 'Fünf Spiele. Ein Studio-Grundstück.',
   language: 'Sprache',
   play: 'Spielen',
   footer: 'Game Studio 42',
@@ -84,6 +100,10 @@ const de: typeof en = {
   hortaBlurb: 'Pflanze ein Feld, warte, bis es reif ist, ernte.',
   postoTitle: 'Posto',
   postoBlurb: 'Drei Einheiten, ein 10×10-Feld. Bewegen, angreifen, den Posten halten.',
+  mataTitle: 'Mata',
+  mataBlurb: 'Heile eine Narbe. Pflanzen spenden Schatten, trinken und nähren einander — der Hain entscheidet.',
+  neonTitle: 'Neo Urbe',
+  neonBlurb: 'Megakonzerne kaufen die Häuserblöcke, Hacker verkaufen das Dunkel, Drohnen beherrschen den Himmel. Halte das Netz am Leben.',
 };
 
 const CATALOGS = { en, 'pt-BR': ptBR, es, fr, de } as const;

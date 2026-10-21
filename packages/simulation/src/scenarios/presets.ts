@@ -44,6 +44,22 @@ export const SIM_PRESETS: Record<string, SimPreset> = {
       };
     },
   },
+  'neon-balanced': {
+    description: 'Neon town: the balanced city plus substations, batteries, firewalls and drone ports',
+    defaultSize: 64,
+    create(seed, size) {
+      const engine = createEngine({
+        seed,
+        size,
+        name: 'Neon',
+        ruleset: 'neon',
+        terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 },
+      });
+      engine.disastersEnabled = false;
+      addServices(engine, buildTown(engine, { pumps: 8 }));
+      return { engine, onMonth: (e) => void maintainTown(e) };
+    },
+  },
   'no-power': {
     description: 'The town without power plants',
     defaultSize: 64,

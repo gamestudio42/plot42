@@ -1,5 +1,6 @@
 import {
   BALANCE,
+  defaultNeonState,
   Infra,
   isToolCommand,
   isZoneKind,
@@ -15,9 +16,12 @@ import {
   type Difficulty,
   type NewCityOptions,
   type RciValues,
+  type Ruleset,
+  type NeonState,
   type SimEvent,
   type TerrainOptions,
   type ToolCommand,
+  rulesetOf,
 } from '@city/shared';
 import { CommandQueue, runSystems, runTicks, type System as KernelSystem } from '@shell/kernel';
 import { applyToolPlan } from './commands/apply';
@@ -45,6 +49,12 @@ import {
   type TrafficResult,
 } from './systems/traffic';
 import { updateUtilities, type UtilityResult } from './systems/utilities';
+import { cascade, tickGrid, updateGrid, type GridResult } from './systems/neon/grid';
+import { updateCorporations, type CorpResult } from './systems/neon/corporations';
+import { batterySummary } from './systems/neon/grid';
+import { cityFirewallCoverage } from './systems/neon/intrusion';
+import { portCount } from './systems/neon/airTraffic';
+import { tickIntrusions, updateIntrusions, type IntrusionResult } from './systems/neon/intrusion';
 import { DEFAULT_TERRAIN, generateTerrain } from './terrain/generate';
 import { dateOf, isDayStart, monthIndex, monthStage } from './time';
 import { BuildingStore } from './world/buildings';
@@ -61,6 +71,8 @@ export interface EngineOptions {
   difficulty?: Difficulty;
   /** Explicit starting funds (overrides the difficulty). */
   funds?: number;
+  /** Rules of the simulation; defaults to `classic` (Urbe). */
+  ruleset?: Ruleset;
 }
 
 export function createEngine(options: NewCityOptions | EngineOptions): SimulationEngine {
@@ -89,6 +101,8 @@ export class SimulationEngine {
   readonly buildings: BuildingStore;
   readonly rng: Rng;
   readonly seed: string;
+  /** Rules this city runs; new systems read it, the classic pipeline ignores it. */
+  readonly ruleset: Ruleset;
   readonly roads: RoadNetwork;
   name: string;
   tick = 0;
@@ -99,6 +113,8 @@ export class SimulationEngine {
   disastersEnabled = true;
   networksDirty = true;
   lastMilestone = 0;
+  /** Neon systems state; empty for a classic city, which never reads it. */
+  neon: NeonState = defaultNeonState();
   historyDirty = false;
 
   /** Burning tiles, derived from the `fire` layer. */
@@ -109,6 +125,10 @@ export class SimulationEngine {
   /** Last results of the derived systems (not serialized; recomputed when needed). */
   lastTraffic: TrafficResult | null = null;
   lastGrowth: GrowthResult | null = null;
+  /** Last neon results, for the HUD and reports; null in a classic city. */
+  lastGrid: GridResult | null = null;
+  lastCorps: CorpResult | null = null;
+  lastIntrusion: IntrusionResult | null = null;
   private utilities: { power: UtilityResult; water: UtilityResult } | null = null;
   private layerStats: LayerStats | null = null;
   private lastShortageMonth = -1;
@@ -118,11 +138,12 @@ export class SimulationEngine {
   private pendingEvents: SimEvent[] = [];
   private readonly systems: System[] = [];
 
-  private constructor(world: World, rng: Rng, seed: string, name: string) {
+  private constructor(world: World, rng: Rng, seed: string, name: string, ruleset: Ruleset) {
     this.world = world;
     this.rng = rng;
     this.seed = seed;
     this.name = name;
+    this.ruleset = ruleset;
     this.buildings = new BuildingStore(world);
     this.roads = new RoadNetwork(world);
   }
@@ -133,7 +154,13 @@ export class SimulationEngine {
     const world = new World(size);
     const rng = Rng.fromSeed(seed);
     generateTerrain(world, rng.fork(), { ...DEFAULT_TERRAIN, ...options.terrain });
-    const engine = new SimulationEngine(world, rng, seed, options.name ?? 'Nova Cidade');
+    const engine = new SimulationEngine(
+      world,
+      rng,
+      seed,
+      options.name ?? 'Nova Cidade',
+      options.ruleset ?? 'classic',
+    );
     engine.economy.funds =
       options.funds ??
       (options.difficulty
@@ -152,7 +179,13 @@ export class SimulationEngine {
       if (!target) throw new Error(`Unknown layer ${name}`);
       target.set(data);
     }
-    const engine = new SimulationEngine(world, new Rng(snapshot.rng), snapshot.seed, snapshot.name);
+    const engine = new SimulationEngine(
+      world,
+      new Rng(snapshot.rng),
+      snapshot.seed,
+      snapshot.name,
+      rulesetOf(snapshot.ruleset),
+    );
     for (const record of snapshot.buildings) engine.buildings.restore(record);
     engine.buildings.nextId = snapshot.nextBuildingId;
     engine.tick = snapshot.tick;
@@ -163,6 +196,8 @@ export class SimulationEngine {
     engine.disastersEnabled = snapshot.disastersEnabled;
     engine.networksDirty = snapshot.networksDirty;
     engine.lastMilestone = snapshot.lastMilestone;
+    if (snapshot.neon) engine.neon = structuredCopy(snapshot.neon);
+    else if (engine.ruleset === 'neon') engine.neon = defaultNeonState();
     engine.fireCount = countFires(engine);
     world.markAllDirty();
     engine.buildings.takeChanges();
@@ -179,6 +214,7 @@ export class SimulationEngine {
     }
     return {
       name: this.name,
+      ruleset: this.ruleset,
       seed: this.seed,
       size: this.world.size,
       tick: this.tick,
@@ -194,6 +230,7 @@ export class SimulationEngine {
       disastersEnabled: this.disastersEnabled,
       networksDirty: this.networksDirty,
       lastMilestone: this.lastMilestone,
+      ...(this.ruleset === 'neon' ? { neon: structuredCopy(this.neon) } : {}),
     };
   }
 
@@ -230,6 +267,10 @@ export class SimulationEngine {
     if (isDayStart(this.tick) && this.networksDirty) this.refreshUtilities();
     updateFires(this);
     updateDisasters(this);
+    if (this.ruleset === 'neon') {
+      tickGrid(this);
+      tickIntrusions(this);
+    }
     runSystems(this.systems, this);
     this.tick++;
     // Stage outputs live in serialized layers, so a save between stages resumes identically.
@@ -330,6 +371,7 @@ export class SimulationEngine {
     );
     return {
       name: this.name,
+      ruleset: this.ruleset,
       tick: this.tick,
       day: date.day,
       month: date.month,
@@ -368,6 +410,21 @@ export class SimulationEngine {
       disasters: this.disasters.map((d) => ({ ...d })),
       disastersEnabled: this.disastersEnabled,
       edgeConnected: edgeConnected || this.hasGateway(),
+      ...(this.ruleset === 'neon' ? { neon: this.neonStats() } : {}),
+    };
+  }
+
+  /** Neon telemetry for the HUD and the report. */
+  private neonStats(): NonNullable<CityStats['neon']> {
+    let holdings = 0;
+    for (const c of this.neon.corporations) holdings += c.holdings;
+    return {
+      overloaded: this.neon.overloaded.length,
+      batteries: batterySummary(this),
+      firewall: cityFirewallCoverage(this),
+      dronePorts: portCount(this),
+      corporations: { count: this.neon.corporations.length, holdings },
+      skimmed: Math.round(this.neon.skimmed),
     };
   }
 
@@ -382,6 +439,12 @@ export class SimulationEngine {
     const result = updateUtilities(this);
     this.utilities = result;
     this.networksDirty = false;
+    if (this.ruleset === 'neon') {
+      const cascaded = cascade(this, result.power);
+      const grid = updateGrid(this);
+      grid.cascaded = cascaded.cascaded;
+      this.lastGrid = grid;
+    }
     const month = monthIndex(this.tick);
     if ((result.power.shortage || result.water.shortage) && month !== this.lastShortageMonth) {
       this.lastShortageMonth = month;
@@ -414,6 +477,11 @@ export class SimulationEngine {
     });
     // New, upgraded or emptied buildings change utility demand.
     this.networksDirty = true;
+    if (this.ruleset === 'neon') {
+      this.lastCorps = updateCorporations(this);
+      this.lastIntrusion = updateIntrusions(this);
+      this.lastGrid = updateGrid(this);
+    }
     const report = computeMonthlyReport(this, {
       crisisRevenue: crisis ? d.crisisRevenueFactor : 1,
       epidemicCommercial: epidemic ? d.epidemicCommercialRevenue : 1,

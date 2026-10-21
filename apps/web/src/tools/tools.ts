@@ -1,5 +1,6 @@
 import {
   PLACEABLE_SPECS,
+  isNeonPlaceable,
   ZoneDensity,
   ZoneType,
   type Area,
@@ -40,6 +41,8 @@ export interface ToolDef {
   size: number;
   /** Shows the underground (pipes) view while active. */
   underground?: boolean;
+  /** Only offered when the city runs this ruleset; absent means both. */
+  only?: 'neon';
   command(area: Area): ToolCommand | null;
 }
 
@@ -68,6 +71,7 @@ const placeDef = (kind: PlaceableKind, group: ToolGroup, hotkey?: string): ToolD
   def(kind, group, 'footprint', place(kind), {
     size: PLACEABLE_SPECS[kind].size,
     ...(hotkey ? { hotkey } : {}),
+    ...(isNeonPlaceable(kind) ? { only: 'neon' as const } : {}),
   });
 
 export const TOOLS: readonly ToolDef[] = [
@@ -109,6 +113,12 @@ export const TOOLS: readonly ToolDef[] = [
   placeDef('school', 'services'),
   placeDef('hospital', 'services'),
   placeDef('park', 'services'),
+  // Neon-only infrastructure; hidden from the classic Urbe toolbar.
+  placeDef('substation', 'utilities'),
+  placeDef('battery', 'utilities'),
+  placeDef('firewall', 'services'),
+  placeDef('dronePort', 'transport'),
+  placeDef('corpHQ', 'services'),
   def('demolish', 'terrain', 'rect', (a) => ({ type: 'demolish', ...a }), { hotkey: 'b' }),
   def('level', 'terrain', 'rect', (a) => ({ type: 'level', ...a }), { hotkey: 'n' }),
   def('raise', 'terrain', 'rect', (a) => ({ type: 'raise', ...a }), { hotkey: 'h' }),
@@ -135,4 +145,9 @@ export function toolById(id: ToolId): ToolDef {
 
 export function toolByHotkey(key: string): ToolDef | undefined {
   return TOOLS.find((tool) => tool.hotkey === key);
+}
+
+/** Tools offered by a ruleset: `neon` sees every tool, `classic` hides the neon-only ones. */
+export function toolsFor(ruleset: 'classic' | 'neon'): readonly ToolDef[] {
+  return ruleset === 'neon' ? TOOLS : TOOLS.filter((tool) => tool.only !== 'neon');
 }

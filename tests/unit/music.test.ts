@@ -12,7 +12,7 @@ import {
   type NoteEvent,
   type TrackSpec,
 } from '../../apps/web/src/audio/composer';
-import { createRandom } from '../../apps/web/src/renderer/animation/random';
+import { createRandom } from '../../packages/view-city/src/animation/random';
 
 const BARS = 64;
 

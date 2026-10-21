@@ -13,7 +13,9 @@ import {
   type ToolCommand,
 } from '@city/shared';
 import { RoadNetwork, type World } from '@city/simulation';
-import { SoundBoard, type SoundName } from '../audio/sound';
+import type { Theme } from '@theme/core';
+import { urbe } from '@theme/urbe';
+import { SoundBoard, type MusicFactory, type SoundName } from '../audio/sound';
 import {
   applyDocumentLocale,
   bootLocale,
@@ -34,9 +36,9 @@ import {
   writeSave,
   type SaveSlot,
 } from '../persistence/saves';
-import { GameRenderer } from '../renderer/GameRenderer';
-import type { OverlayMode } from '../renderer/chunkDraw';
-import type { Point } from '../renderer/iso';
+import { GameRenderer } from '@view/city';
+import type { OverlayMode } from '@view/city';
+import type { Point } from '@view/city';
 import { ToolController, type ToolPreview } from '../tools/controller';
 import { toolByHotkey, type ToolId } from '../tools/tools';
 import { CityClient } from './client';
@@ -153,18 +155,24 @@ const MENU_CITY = { seed: 'urbe-menu', size: 64, months: 60 } as const;
 /** Share of the boot progress bar taken by the graphics step. */
 const GRAPHICS_SHARE = 0.25;
 
+/** Options that let a different art direction reuse the whole session. */
+export interface SessionOptions {
+  /** Art direction for the renderer; defaults to Urbe. */
+  theme?: Theme;
+  /** Seed of the scripted menu city; each game uses its own so the backgrounds differ. */
+  menuSeed?: string;
+  /** Rules for cities created from this app; defaults to `classic`. */
+  ruleset?: 'classic' | 'neon';
+  /** Music engine factory, so a reskin can supply its own composer. */
+  music?: MusicFactory;
+}
+
 /** Wires the worker client, the renderer, the tools and the UI store together. */
 export class GameSession {
   readonly client = new CityClient();
-  readonly renderer = new GameRenderer();
-  readonly sound = new SoundBoard();
-  readonly ui = new Store<UiState>({
-    ...initialUi,
-    locale: bootLocale(),
-    muted: this.sound.muted,
-    music: this.sound.musicEnabled,
-    animations: readAnimations(),
-  });
+  readonly renderer: GameRenderer;
+  readonly sound: SoundBoard;
+  readonly ui: Store<UiState>;
   readonly tools = new ToolController(this);
   private readonly eventListeners = new Set<(events: SimEvent[]) => void>();
   private readonly cameraListeners = new Set<() => void>();
@@ -176,6 +184,25 @@ export class GameSession {
   private speedBeforePause: Speed = 1;
   private lastAutosave = { time: 0, tick: -1 };
   private autosaveTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(options: SessionOptions = {}) {
+    this.renderer = new GameRenderer(options.theme ?? urbe);
+    this.sound = new SoundBoard(options.music ? { music: options.music } : {});
+    this.ui = new Store<UiState>({
+      ...initialUi,
+      locale: bootLocale(),
+      muted: this.sound.muted,
+      music: this.sound.musicEnabled,
+      animations: readAnimations(),
+    });
+    this.menuSeed = options.menuSeed ?? MENU_CITY.seed;
+    this.ruleset = options.ruleset ?? 'classic';
+  }
+
+  /** Seed of the scripted city behind the main menu. */
+  readonly menuSeed: string;
+  /** Rules every city created by this app runs; the save file still decides when loading. */
+  readonly ruleset: 'classic' | 'neon';
 
   /**
    * Starts the renderer, wires input and builds the live city behind the main menu. The boot
@@ -199,8 +226,10 @@ export class GameSession {
     if (graphics) {
       this.setBoot('city', GRAPHICS_SHARE);
       try {
-        await this.client.demoCity(MENU_CITY, (done, total) =>
-          this.setBoot('city', GRAPHICS_SHARE + ((1 - GRAPHICS_SHARE) * done) / total),
+        await this.client.demoCity(
+          { seed: this.menuSeed, size: MENU_CITY.size, months: MENU_CITY.months },
+          (done, total) =>
+            this.setBoot('city', GRAPHICS_SHARE + ((1 - GRAPHICS_SHARE) * done) / total),
         );
         if (this.disposed) return;
         this.renderer.setAttract(true);
@@ -285,7 +314,7 @@ export class GameSession {
   }
 
   newCity(options: NewCityOptions): Promise<void> {
-    return this.client.newCity(options);
+    return this.client.newCity({ ...options, ruleset: options.ruleset ?? this.ruleset });
   }
 
   /** Road graph of the mirror world, recomputed lazily when tiles change. */
@@ -301,7 +330,7 @@ export class GameSession {
 
   /** Creates a city from the main menu and switches to the game screen. */
   async startCity(options: NewCityOptions): Promise<void> {
-    await this.client.newCity(options);
+    await this.client.newCity({ ...options, ruleset: options.ruleset ?? this.ruleset });
     this.enterGame({ tutorial: true });
   }
 
@@ -436,7 +465,7 @@ export class GameSession {
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = saveFileName(meta.name);
+    link.download = saveFileName(meta.name, this.ruleset);
     document.body.appendChild(link);
     link.click();
     link.remove();

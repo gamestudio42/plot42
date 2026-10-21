@@ -2,7 +2,7 @@ import { BALANCE, PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
 import { formatMoney, formatNumber, useStrings, type Locale, type Strings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
-import { TOOL_GROUPS, TOOLS, type ToolDef } from '../tools/tools';
+import { TOOL_GROUPS, toolsFor, type ToolDef } from '../tools/tools';
 import { ToolIcon } from './icons';
 
 function costLabel(tool: ToolDef, t: Strings, locale: Locale): string | null {
@@ -43,11 +43,13 @@ export function Toolbar({ session }: { session: GameSession }) {
   const locale = useStore(session.ui, (s) => s.locale);
   const active = useStore(session.ui, (s) => s.tool);
   const population = useStore(session.ui, (s) => s.stats?.population ?? 0);
+  const ruleset = useStore(session.ui, (s) => s.stats?.ruleset ?? 'classic');
+  const tools = toolsFor(ruleset);
   return (
     <nav className="toolbar" aria-label={t.ui.tools} data-testid="toolbar">
       {TOOL_GROUPS.map((group) => (
         <div key={group} className="tool-group" role="group" aria-label={t.toolGroups[group]}>
-          {TOOLS.filter((tool) => tool.group === group).map((tool) => {
+          {tools.filter((tool) => tool.group === group).map((tool) => {
             const spec =
               tool.id in PLACEABLE_SPECS ? PLACEABLE_SPECS[tool.id as PlaceableKind] : undefined;
             const locked = Boolean(spec && spec.minPopulation > population);

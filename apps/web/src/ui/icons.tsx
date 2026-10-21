@@ -176,6 +176,41 @@ const ICONS: Record<ToolId, ReactElement> = {
       <path d="M6 11 H19 L14 14 H9 Z" fill="#e8eef4" />
     </>
   ),
+  substation: (
+    <>
+      <rect x="4" y="10" width="16" height="11" rx="1.5" fill="#5a6270" />
+      <path d="M13 3 L8 12 H12 L10 20 L17 10 H13 Z" fill="#f0c030" />
+    </>
+  ),
+  battery: (
+    <>
+      <rect x="4" y="6" width="16" height="14" rx="2" fill="#3a4a5a" stroke="#7fd0e8" />
+      <path d="M13 8 L8 15 H11.5 L10.5 19 L16 12 H12.5 Z" fill="#7fd0e8" />
+      <rect x="9" y="3" width="6" height="3" rx="1" fill="#7fd0e8" />
+    </>
+  ),
+  firewall: (
+    <>
+      <path d="M12 2 L21 6 V12 C21 17 17 20.5 12 22 C7 20.5 3 17 3 12 V6 Z" fill="#1a2a3a" stroke="#ff5ac8" strokeWidth="1.6" />
+      <path d="M8 12 H16 M12 8 V16" stroke="#ff5ac8" strokeWidth="1.8" />
+    </>
+  ),
+  dronePort: (
+    <>
+      <rect x="3" y="14" width="18" height="7" rx="2" fill="#2a3440" />
+      <circle cx="7" cy="17.5" r="1.2" fill="#7fd0e8" />
+      <circle cx="17" cy="17.5" r="1.2" fill="#7fd0e8" />
+      <path d="M6 8 H10 M14 8 H18 M8 8 V10 M16 8 V10" stroke="#c8ccd2" strokeWidth="1.6" />
+      <rect x="9" y="6" width="6" height="4" rx="1" fill="#8fd8f0" />
+    </>
+  ),
+  corpHQ: (
+    <>
+      <rect x="5" y="4" width="14" height="17" fill="#2a2036" stroke="#ff5ac8" strokeWidth="1.2" />
+      <path d="M8 8 H16 M8 12 H16 M8 16 H16" stroke="#7fd0e8" strokeWidth="1.4" />
+      <path d="M12 2 V4" stroke="#ffb020" strokeWidth="2" />
+    </>
+  ),
 };
 
 export function ToolIcon({ id }: { id: ToolId }) {

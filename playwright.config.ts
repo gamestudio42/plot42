@@ -26,10 +26,26 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: `pnpm build && pnpm --filter @city/web preview --port ${PORT} --strictPort`,
-    port: PORT,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  webServer: [
+    {
+      command: `pnpm build && pnpm --filter @city/web preview --port ${PORT} --strictPort`,
+      port: PORT,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+    {
+      // The lobby spec runs against the assembled static site, not the Urbe dev build.
+      command: `pnpm build:site && pnpm exec vite preview --outDir site --port 4180 --strictPort`,
+      port: 4180,
+      reuseExistingServer: !process.env.CI,
+      timeout: 300_000,
+    },
+    {
+      // Neo Urbe runs on its own port so the shared Urbe server stays untouched.
+      command: `pnpm --filter @neon/web build && pnpm --filter @neon/web preview --port 5179 --strictPort`,
+      port: 5179,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  ],
 });

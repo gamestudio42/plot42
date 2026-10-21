@@ -53,6 +53,8 @@ export interface UtilityStats {
 
 export interface CityStats {
   name: string;
+  /** Rules this city runs; the UI hides neon-only tools for `classic`. */
+  ruleset: 'classic' | 'neon';
   tick: number;
   day: number;
   month: number;
@@ -88,6 +90,21 @@ export interface CityStats {
   disasters: ActiveDisaster[];
   disastersEnabled: boolean;
   edgeConnected: boolean;
+  /** Neon-only telemetry; absent in a classic city. */
+  neon?: {
+    /** Districts above the grid overload threshold. */
+    overloaded: number;
+    /** Battery banks and their mean charge 0..1. */
+    batteries: { banks: number; charge: number };
+    /** Share of services under firewall cover 0..1. */
+    firewall: number;
+    /** Online drone ports. */
+    dronePorts: number;
+    /** Corporations and their total holdings. */
+    corporations: { count: number; holdings: number };
+    /** Cash corporations moved out of the treasury. */
+    skimmed: number;
+  };
 }
 
 export interface HistoryEntry {
@@ -116,7 +133,13 @@ export type SimEvent =
   | { type: 'bankrupt' }
   | { type: 'recovered' }
   | { type: 'milestone'; population: number }
-  | { type: 'newYear'; year: number };
+  | { type: 'newYear'; year: number }
+  // Neo ruleset only.
+  | { type: 'gridOverload'; x: number; y: number }
+  | { type: 'cascadeBlackout'; x: number; y: number; tiles: number }
+  | { type: 'corpPurchase'; corp: number; x: number; y: number }
+  | { type: 'intrusion'; x: number; y: number; kind: string; blocked: boolean }
+  | { type: 'droneLane'; x: number; y: number };
 
 export type ProblemCode =
   | 'NO_ZONE'
@@ -139,7 +162,13 @@ export type ProblemCode =
   | 'RUBBLE'
   | 'FLOODED'
   | 'MAX_LEVEL'
-  | 'GROWING';
+  | 'GROWING'
+  // Neo ruleset only.
+  | 'GRID_OVERLOAD'
+  | 'CORP_OWNED'
+  | 'HACKED'
+  | 'NO_FIREWALL'
+  | 'DRONE_PORT';
 
 export interface Problem {
   code: ProblemCode;

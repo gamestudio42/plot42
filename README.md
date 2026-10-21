@@ -4,10 +4,10 @@
 
 <h1 align="center">Plot 42</h1>
 
-<p align="center"><strong>Three browser games on one studio lot.</strong></p>
+<p align="center"><strong>Four browser games on one studio lot.</strong></p>
 
 <p align="center">
-  A static platform: a lobby and three titles that share a deterministic TypeScript
+  A static platform: a lobby and four titles that share a deterministic TypeScript
   shell. No install, no server. Saves stay in the browser or in exported files.
 </p>
 
@@ -18,12 +18,13 @@
 | **Urbe** | Isometric city builder. Zone the land, keep power and water flowing, watch demand and disasters. | `pnpm dev` → [localhost:5173](http://localhost:5173) |
 | **Horta** | Plant, wait, harvest on a small isometric grid. | `pnpm horta` → [localhost:5174](http://localhost:5174) |
 | **Posto** | Three units, a 10×10 board. Move, attack, then the enemy answers. | `pnpm posto` → [localhost:5175](http://localhost:5175) |
+| **Mata** | Restore a scar before the drought. Seeds and cistern are limited; mix species or lose. | `pnpm mata` → [localhost:5177](http://localhost:5177) |
+| **Neo Urbe** | Urbe under the `neon` ruleset: unstable grid, megacorps buying lots, hackers, drone lanes and seven-storey spires. | `pnpm neon` → [localhost:5178](http://localhost:5178) |
 
-The lobby (`pnpm lobby`, [localhost:5176](http://localhost:5176)) links the three.
+The lobby (`pnpm lobby`, [localhost:5176](http://localhost:5176)) links the five.
 
-Urbe keeps the five interface languages (English, Portuguese, Spanish, French, German)
-and the `.city.json` save format. Horta and Posto ship in English and Portuguese
-(`.horta.json`, `.posto.json`).
+All titles ship the five interface languages (English, Portuguese, Spanish, French,
+German). Saves: `.city.json`, `.neon.json`, `.horta.json`, `.posto.json`, `.mata.json`.
 
 ## Urbe
 
@@ -52,6 +53,8 @@ pnpm lobby      # http://localhost:5176
 pnpm dev        # Urbe, http://localhost:5173
 pnpm horta      # http://localhost:5174
 pnpm posto      # http://localhost:5175
+pnpm mata       # http://localhost:5177
+pnpm neon       # Neo Urbe, http://localhost:5178
 ```
 
 Or with Docker: `docker compose up` serves Urbe on port 5173.
@@ -59,17 +62,17 @@ Or with Docker: `docker compose up` serves Urbe on port 5173.
 | Command            | Description                                                 |
 | ------------------ | ----------------------------------------------------------- |
 | `pnpm check`       | Lint, type check, unit/integration/scenario tests and Urbe build |
-| `pnpm test:e2e`    | Playwright end-to-end tests (Urbe)                          |
+| `pnpm test:e2e`    | Playwright end-to-end tests (Urbe and Neo Urbe)             |
 | `pnpm sim`         | Headless city simulation over presets and seeds             |
 | `pnpm bench`       | Tick timing benchmark (`--strict` for CI)                   |
-| `pnpm build:site`  | Lobby + three games into `site/`                            |
+| `pnpm build:site`  | Lobby + five games into `site/`                             |
 | `pnpm preview:site`| Serve `site/` on http://localhost:4173                      |
 
 `pnpm build:site` reads `BASE_PATH` (default `/`). GitHub Pages uses
-`/<repository>/`. The assembled tree is `site/index.html` plus `urbe/`, `horta/`
-and `posto/`.
+`/<repository>/`. The assembled tree is `site/index.html` plus `urbe/`, `horta/`,
+`posto/` and `mata/`.
 
-Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
+Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [neon spec](docs/neon-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
 
 ## Licence
 

@@ -9,6 +9,7 @@ import {
   type UtilityStats,
 } from '@city/shared';
 import type { SimulationEngine } from '../engine';
+import { neonPower, neonWater } from './neon/vertical';
 import type { World } from '../world/world';
 import { hubJobs } from './demand';
 
@@ -27,13 +28,17 @@ interface NetworkSpec {
 }
 
 export function powerDemand(b: BuildingRecord): number {
-  if (isZoneKind(b.kind)) return b.abandoned ? 0 : (ZONE_SPECS[b.kind].power[b.level] ?? 0);
-  return PLACEABLE_SPECS[b.kind].powerUse;
+  if (!isZoneKind(b.kind)) return PLACEABLE_SPECS[b.kind].powerUse;
+  if (b.abandoned) return 0;
+  // Neon spires grow past the classic table; `neonPower` extrapolates identically for both rules.
+  const table = ZONE_SPECS[b.kind].power;
+  return (table[b.level] ?? neonPower(b.kind, b.level)) as number;
 }
 
 export function waterDemand(b: BuildingRecord): number {
-  if (isZoneKind(b.kind)) return b.abandoned ? 0 : (ZONE_SPECS[b.kind].water[b.level] ?? 0);
-  return 0;
+  if (!isZoneKind(b.kind) || b.abandoned) return 0;
+  const table = ZONE_SPECS[b.kind].water;
+  return (table[b.level] ?? neonWater(b.kind, b.level)) as number;
 }
 
 export function powerSupply(b: BuildingRecord): number {
@@ -101,6 +106,76 @@ export function updateUtilities(
   );
   if (write) updateHubJobs(engine);
   return { power, water };
+}
+
+/** One connected component of the power network, as the classic solver sees it. */
+export interface PowerComponent {
+  buildings: BuildingRecord[];
+  supply: number;
+  demand: number;
+}
+
+/**
+ * Groups buildings into power components using exactly the conductor rules of the classic
+ * solver (built tiles, power lines and zoned tiles, jumping over a plain road). The neon grid
+ * layer reuses this so overload, cascade and batteries describe the same components the
+ * `powered` layer was solved from.
+ */
+export function powerComponents(engine: SimulationEngine): PowerComponent[] {
+  const w = engine.world;
+  const size = w.size;
+  const count = w.tileCount;
+  const infra = w.structure.infra;
+  const buildingId = w.buildingId;
+  const conductors = new Uint8Array(count);
+  for (let i = 0; i < count; i++) {
+    const flags = infra[i] as number;
+    if ((buildingId[i] as number) !== 0 || (flags & Infra.PowerLine) !== 0 || (w.zone[i] as number) !== ZoneType.None)
+      conductors[i] = 1;
+  }
+  const visited = new Uint8Array(count);
+  const queue = new Int32Array(count);
+  const claimed = new Set<number>();
+  const components: PowerComponent[] = [];
+
+  for (const source of engine.buildings.values()) {
+    if (powerSupply(source) <= 0) continue;
+    const start = w.index(source.x, source.y);
+    if (visited[start] === 1) continue;
+    const component: PowerComponent = { buildings: [], supply: 0, demand: 0 };
+    let tail = 0;
+    for (let y = source.y; y < source.y + source.h; y++) {
+      for (let x = source.x; x < source.x + source.w; x++) {
+        const t = y * size + x;
+        visited[t] = 1;
+        queue[tail++] = t;
+      }
+    }
+    for (let head = 0; head < tail; head++) {
+      const t = queue[head] as number;
+      const id = buildingId[t] as number;
+      if (id !== 0 && !claimed.has(id)) {
+        const b = engine.buildings.get(id);
+        if (b) {
+          claimed.add(id);
+          component.buildings.push(b);
+          component.supply += powerSupply(b);
+          component.demand += powerDemand(b);
+        }
+      }
+      const tx = t % size;
+      if (t >= size)
+        tail = enqueue(conductors, infra, visited, queue, tail, t - size, t >= 2 * size ? t - 2 * size : -1);
+      if (tx < size - 1)
+        tail = enqueue(conductors, infra, visited, queue, tail, t + 1, tx < size - 2 ? t + 2 : -1);
+      if (t < count - size)
+        tail = enqueue(conductors, infra, visited, queue, tail, t + size, t < count - 2 * size ? t + 2 * size : -1);
+      if (tx > 0)
+        tail = enqueue(conductors, infra, visited, queue, tail, t - 1, tx > 1 ? t - 2 : -1);
+    }
+    components.push(component);
+  }
+  return components;
 }
 
 /** Sets hub capacity to its current job count and occupancy to it while the hub operates. */
@@ -262,6 +337,87 @@ function solve(
 const UNREACHED = 0;
 const UNSERVED = 1;
 const SERVED = 2;
+
+/**
+ * Groups every powered building into connected components, using the exact traversal of the
+ * classic solver (including the hop over a road tile). Neon systems need the same components the
+ * solver saw, so stress and cascades describe the real network instead of a second opinion.
+ */
+export function powerNetworkComponents(engine: SimulationEngine): BuildingRecord[][] {
+  const w = engine.world;
+  const size = w.size;
+  const count = w.tileCount;
+  const infra = w.structure.infra;
+  const zone = w.zone;
+  const buildingId = w.buildingId;
+  const conductors = new Uint8Array(w.tileCount);
+  for (let i = 0; i < count; i++) {
+    if (
+      (buildingId[i] as number) !== 0 ||
+      ((infra[i] as number) & Infra.PowerLine) !== 0 ||
+      (zone[i] as number) !== ZoneType.None
+    )
+      conductors[i] = 1;
+  }
+
+  const visited = new Uint8Array(count);
+  const owned = new Uint8Array(engine.buildings.nextId);
+  const queue = new Int32Array(count);
+  const components: BuildingRecord[][] = [];
+
+  for (const source of engine.buildings.values()) {
+    if (powerSupply(source) <= 0) continue;
+    const start = w.index(source.x, source.y);
+    if (visited[start] === 1) continue;
+    const component: BuildingRecord[] = [];
+    let tail = 0;
+    for (let y = source.y; y < source.y + source.h; y++) {
+      for (let x = source.x; x < source.x + source.w; x++) {
+        const t = y * size + x;
+        visited[t] = 1;
+        queue[tail++] = t;
+      }
+    }
+    for (let head = 0; head < tail; head++) {
+      const t = queue[head] as number;
+      const id = buildingId[t] as number;
+      if (id !== 0 && owned[id] !== 1) {
+        const b = engine.buildings.get(id);
+        if (b) {
+          owned[id] = 1;
+          component.push(b);
+        }
+      }
+      const tx = t % size;
+      if (t >= size)
+        tail = enqueue(
+          conductors,
+          infra,
+          visited,
+          queue,
+          tail,
+          t - size,
+          t >= 2 * size ? t - 2 * size : -1,
+        );
+      if (tx < size - 1)
+        tail = enqueue(conductors, infra, visited, queue, tail, t + 1, tx < size - 2 ? t + 2 : -1);
+      if (t < count - size)
+        tail = enqueue(
+          conductors,
+          infra,
+          visited,
+          queue,
+          tail,
+          t + size,
+          t < count - 2 * size ? t + 2 * size : -1,
+        );
+      if (tx > 0)
+        tail = enqueue(conductors, infra, visited, queue, tail, t - 1, tx > 1 ? t - 2 : -1);
+    }
+    components.push(component);
+  }
+  return components;
+}
 
 /**
  * Enqueues neighbour `n`; when `n` is a plain road tile, conduction jumps over it to `beyond`

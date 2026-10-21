@@ -1,4 +1,4 @@
-import type { Random } from '../renderer/animation/random';
+import type { Random } from '@view/city';
 
 /**
  * Procedural ambient music, one bar at a time. Pure: no WebAudio, so the rules can be unit

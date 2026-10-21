@@ -12,6 +12,7 @@ import { tileVariant } from '../world/variant';
 import type { CityTotals } from './demand';
 import type { RoadNetwork } from './roads';
 import { hasDestination, type ComponentStats } from './traffic';
+import { neonCapacity, neonMaxLevel } from './neon/vertical';
 
 export const ZONE_KIND: Record<number, ZoneBuildingKind> = {
   [ZoneType.Residential]: 'residential',
@@ -94,10 +95,11 @@ export function attractiveness(
   );
 }
 
-export function maxLevel(density: number, watered: boolean): number {
+export function maxLevel(density: number, watered: boolean, neon = false): number {
   const z = BALANCE.zones;
   const cap = density === ZoneDensity.Dense ? z.maxLevelDense : z.maxLevelLight;
-  return watered ? cap : Math.min(cap, z.maxLevelWithoutWater);
+  const classic = watered ? cap : Math.min(cap, z.maxLevelWithoutWater);
+  return neon ? neonMaxLevel(density, watered, true, classic) : classic;
 }
 
 export interface GrowthContext {
@@ -152,6 +154,7 @@ export function updateGrowth(engine: SimulationEngine, ctx: GrowthContext): Grow
     const x = w.xOf(i);
     const y = w.yOf(i);
     w.setLayer('trees', i, 0);
+    const neon = engine.ruleset === 'neon';
     engine.buildings.add({
       kind,
       x,
@@ -159,7 +162,7 @@ export function updateGrowth(engine: SimulationEngine, ctx: GrowthContext): Grow
       w: 1,
       h: 1,
       level: 1,
-      capacity: ZONE_SPECS[kind].capacity[1],
+      capacity: neon ? neonCapacity(kind, 1) : (ZONE_SPECS[kind].capacity[1] as number),
       occupancy: 0,
       condition: 100,
       age: 0,
@@ -234,16 +237,18 @@ function updateBuilding(
     Math.min(b.capacity, b.occupancy + (delta >= 0 ? Math.ceil(delta) : Math.floor(delta))),
   );
 
-  const cap = maxLevel(w.zoneDensity[i] as number, w.watered[i] === 1);
+  const neon = engine.ruleset === 'neon';
+  const cap = maxLevel(w.zoneDensity[i] as number, w.watered[i] === 1, neon);
+  const threshold = g.upgradeThresholds[b.level] ?? g.upgradeThresholds[g.upgradeThresholds.length - 1];
   if (
     b.level < cap &&
     b.occupancy >= g.upgradeOccupancy * b.capacity &&
     demand > g.upgradeDemand &&
-    a >= (g.upgradeThresholds[b.level] as number) &&
+    a >= (threshold as number) &&
     engine.rng.chance(g.upgradeRate * clamp01(g.upgradeBias + g.upgradeDemandGain * demand))
   ) {
     b.level++;
-    b.capacity = spec.capacity[b.level] as number;
+    b.capacity = neon ? neonCapacity(kind, b.level) : (spec.capacity[b.level] as number);
     engine.buildings.touch(b);
     w.markDirty(i);
     result.upgraded++;
@@ -254,7 +259,7 @@ function updateBuilding(
     engine.rng.chance(g.downgradeRate)
   ) {
     b.level--;
-    b.capacity = spec.capacity[b.level] as number;
+    b.capacity = neon ? neonCapacity(kind, b.level) : (spec.capacity[b.level] as number);
     b.occupancy = Math.min(b.occupancy, b.capacity);
     engine.buildings.touch(b);
     w.markDirty(i);

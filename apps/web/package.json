@@ -15,6 +15,9 @@
     "@shell/bridge": "workspace:*",
     "@shell/chrome": "workspace:*",
     "@shell/view-iso": "workspace:*",
+    "@theme/core": "workspace:*",
+    "@theme/urbe": "workspace:*",
+    "@view/city": "workspace:*",
     "pixi.js": "^8.22.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

@@ -1,4 +1,4 @@
-import { SAVE_FILE_EXTENSION } from '@city/shared';
+import { NEON_SAVE_FILE_EXTENSION, SAVE_FILE_EXTENSION } from '@city/shared';
 import { dateOf } from '@city/simulation';
 import { useRef } from 'react';
 import { formatMoney, formatNumber, intlLocale, months, useStrings, type Locale } from '../i18n';
@@ -18,6 +18,8 @@ export function ImportFileButton({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const busy = useStore(session.ui, (s) => s.busy);
+  const extension =
+    session.ruleset === 'neon' ? NEON_SAVE_FILE_EXTENSION : SAVE_FILE_EXTENSION;
   return (
     <>
       <button
@@ -32,7 +34,7 @@ export function ImportFileButton({
       <input
         ref={input}
         type="file"
-        accept={`${SAVE_FILE_EXTENSION},.json,application/json`}
+        accept={`${extension},.json,application/json`}
         hidden
         onChange={(e) => {
           const file = e.target.files?.[0];

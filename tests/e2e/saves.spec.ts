@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { SAVE_VERSION } from '@city/shared';
 import { expect, test, type Page } from '@playwright/test';
 import { startCity, waitForCity } from './helpers';
 
@@ -50,7 +51,7 @@ test('exports a file, rejects corrupted files and imports it back', async ({ pag
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.city\.json$/);
   const text = readFileSync(await download.path(), 'utf8');
-  expect(JSON.parse(text)).toMatchObject({ format: 'city-builder-save', version: 1 });
+  expect(JSON.parse(text)).toMatchObject({ format: 'city-builder-save', version: SAVE_VERSION });
 
   const input = page.getByTestId('import-file-game-input');
   const file = (name: string, content: string) => ({

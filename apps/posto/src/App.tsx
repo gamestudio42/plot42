@@ -4,6 +4,7 @@ import { BootScreen } from './BootScreen';
 import { LOCALES, LOCALE_LABELS, useStrings } from './i18n';
 import { lobbyHref } from './platform';
 import { PostoSession } from './session';
+import { unitRole } from './sprites';
 
 const MARK = `${import.meta.env.BASE_URL}favicon.svg`;
 
@@ -179,7 +180,9 @@ function GameHud({ session }: { session: PostoSession }) {
         </div>
         <div className="hud-stat">
           <span className="hud-label">{t.selected}</span>
-          <span>{selectedId === null ? t.none : `#${selectedId}`}</span>
+          <span>
+            {selectedId === null ? t.none : t.roles[unitRole(selectedId)]}
+          </span>
         </div>
         <SoundToggle
           muted={muted}

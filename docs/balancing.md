@@ -26,6 +26,7 @@ Presets (`packages/simulation/src/scenarios/presets.ts`) drive the city with a s
 | ------------ | --------------------------------------------------------------------- |
 | `balanced`   | Flat map, the scenario town with four services; adds plants and pumps |
 | `disasters`  | Same town with fires and disasters on; clears rubble and rebuilds     |
+| `neon-balanced` | The balanced town under the neon ruleset: substations, batteries, firewalls and drone ports |
 | `no-power`   | Same town without any power plant                                     |
 | `high-taxes` | Same town with every tax at 15%                                       |
 | `grid`       | Flat 128×128 map filled with a street grid of dense zones (benchmark) |
@@ -41,6 +42,20 @@ Final month:
 | `disasters`  | 4 294 – 5 663 | 66 554 – 117 621  | 11 – 16%     | 78 – 85%  | 98 – 100% | 14 – 96% | 0 of 5          |
 | `high-taxes` | 234 – 292     | −99 476 – −88 428 | 2 – 12%      | 83 – 88%  | 100%      | 50 – 67% | 5 of 5          |
 | `no-power`   | 0             | −24 835           | –            | –         | 0%        | –        | 5 of 5          |
+
+### Neo Urbe (`neon-balanced`, 64×64, 120 months, seeds 1–3)
+
+| Seed | Population | Funds  | Unemployment | Occupancy | Power | Water    | Congestion | Bankrupt |
+| ---- | ---------- | ------ | ------------ | --------- | ----- | -------- | ---------- | -------- |
+| 1    | 2 886      | 12 002 | 11.1%        | 82.9%     | 100%  | 95.1%    | 0.518      | no       |
+| 2    | 3 118      | 15 221 | 11.1%        | 83.6%     | 100%  | 99.3%    | 0.510      | no       |
+| 3    | 3 140      | 14 398 | 10.3%        | 82.6%     | 100%  | 91.5%    | 0.475      | no       |
+
+The neon layer costs about 1–2 ms per month on a 64×64 city and keeps the town solvent: the
+substations and batteries absorb the extra demand of seven-storey spires, and the drone relief
+keeps congestion below the classic town's. The `grid` 128×128 benchmark still passes `--strict`
+(7.69 ms per month, every stage under its p95 budget), so the new systems do not threaten the tick
+budget.
 
 - **Balanced:** every seed grows for twenty years and ends with RCI demand near zero (the
   town is full). Seeds 1, 2 and 4 are in debt for 4 to 8 months between months 18 and 25 and

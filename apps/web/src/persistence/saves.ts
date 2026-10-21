@@ -1,4 +1,4 @@
-import { SAVE_FILE_EXTENSION, type SaveMeta } from '@city/shared';
+import { NEON_SAVE_FILE_EXTENSION, SAVE_FILE_EXTENSION, type SaveMeta } from '@city/shared';
 import {
   AUTOSAVE_ID,
   SaveStorageError,
@@ -23,8 +23,9 @@ export function manualSlotId(name: string, seed: string): string {
 }
 
 /** Download file name for a city: ASCII letters, digits and hyphens, accents dropped. */
-export function saveFileName(name: string): string {
-  return slugFileName(name, SAVE_FILE_EXTENSION, 'cidade');
+export function saveFileName(name: string, ruleset: 'classic' | 'neon' = 'classic'): string {
+  const extension = ruleset === 'neon' ? NEON_SAVE_FILE_EXTENSION : SAVE_FILE_EXTENSION;
+  return slugFileName(name, extension, ruleset === 'neon' ? 'neo-urbe' : 'cidade');
 }
 
 export const listSaves = (): Promise<SaveSlot[]> => store.list();

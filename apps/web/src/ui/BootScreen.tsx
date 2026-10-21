@@ -2,7 +2,7 @@ import { BootView as ChromeBootView, prefersReducedMotion, useStore } from '@she
 import { useEffect, useState } from 'react';
 import { catalog, type Locale } from '../i18n';
 import type { BootState, GameSession } from '../state/session';
-import { Logo } from './Logo';
+import { BrandLogo } from './Logo';
 
 const FADE_MS = 300;
 
@@ -40,7 +40,7 @@ export function BootView({
       leaving={leaving}
       step={boot.step}
     >
-      <Logo size={96} />
+      <BrandLogo locale={locale ?? 'en'} size={96} />
     </ChromeBootView>
   );
 }

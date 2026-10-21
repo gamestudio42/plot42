@@ -72,3 +72,45 @@ describe('diagnoseTile', () => {
     expect(codes(e, 20, 20)).toEqual(['NO_POWER']);
   });
 });
+
+describe('diagnoseTile neon hints', () => {
+  it('reports the neon-only problems when the context supplies them', () => {
+    const e = flatCity('diag-neon', 48);
+    e.execute({ type: 'road', x0: 2, y0: 10, x1: 20, y1: 10 });
+    const s = e.stats();
+    const problems = diagnoseTile(
+      {
+        world: e.world,
+        building: (id) => e.buildings.get(id),
+        demand: s.demand,
+        taxes: s.taxes,
+        power: s.power,
+        neon: { overloaded: true, owner: '#2', hacked: true, unguarded: true, drones: true },
+      },
+      5,
+      9,
+    ).map((p) => p.code);
+    expect(problems).toContain('GRID_OVERLOAD');
+    expect(problems).toContain('CORP_OWNED');
+    expect(problems).toContain('HACKED');
+    expect(problems).toContain('NO_FIREWALL');
+  });
+
+  it('keeps the classic diagnosis free of neon codes', () => {
+    const e = flatCity('diag-classic', 48);
+    const s = e.stats();
+    const problems = diagnoseTile(
+      {
+        world: e.world,
+        building: (id) => e.buildings.get(id),
+        demand: s.demand,
+        taxes: s.taxes,
+        power: s.power,
+      },
+      5,
+      9,
+    ).map((p) => p.code);
+    for (const code of ['GRID_OVERLOAD', 'CORP_OWNED', 'HACKED', 'NO_FIREWALL', 'DRONE_PORT'])
+      expect(problems).not.toContain(code);
+  });
+});

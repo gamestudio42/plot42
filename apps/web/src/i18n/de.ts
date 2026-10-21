@@ -9,13 +9,14 @@ import type {
   SaveErrorCode,
   ZoneBuildingKind,
 } from '@city/shared';
-import type { OverlayMode } from '../renderer/chunkDraw';
+import type { OverlayMode } from '@view/city';
 import type { ToolGroup, ToolId } from '../tools/tools';
 import type { Strings } from './en';
 
 export const de = {
   appTitle: 'Urbe',
   pageTitle: 'Urbe — baue deine Stadt',
+  brand: 'Urbe',
   tools: {
     select: 'Untersuchen',
     road: 'Straße',
@@ -45,6 +46,11 @@ export const de = {
     park: 'Park',
     marina: 'Marina',
     airport: 'Flughafen',
+    substation: 'Umspannwerk',
+    battery: 'Batteriespeicher',
+    firewall: 'Firewall-Knoten',
+    dronePort: 'Drohnenhafen',
+    corpHQ: 'Konzernzentrale',
   } satisfies Record<ToolId, string>,
   toolHints: {
     select: 'Klicke ein Grundstück an, um Details zu sehen.',
@@ -77,6 +83,11 @@ export const de = {
       'An der Küste, mit Straße. Industriearbeitsplätze, wertet das Ufer auf und verbindet die Stadt mit der Region.',
     airport:
       'Ebenes 4×4-Areal, mit Straße. Gewerbearbeitsplätze und regionale Anbindung, aber der Lärm senkt den Bodenwert.',
+    substation: 'Neben Stromleitungen platzieren. Versorgt seine Netzinsel; ein uberlastetes Viertel kann kaskadieren.',
+    battery: 'Puffert das Viertel bei einem Brownout und ladt sich bei stabilem Netz wieder auf.',
+    firewall: 'Deckt einen Radius von 6 Grundstucken ab. Senkt die Chance, dass eine Intrusion einen Dienst abschaltet.',
+    dronePort: 'Braucht eine Strasse. Drohnenrouten entlasten den Verkehr in den umliegenden Strassen.',
+    corpHQ: 'Braucht eine Strasse. Megakonzerne kaufen leerstehende Grundstucke ringsum und verzerren den Bodenwert.',
   } satisfies Record<ToolId, string>,
   toolGroups: {
     inspect: 'Untersuchen',
@@ -120,6 +131,11 @@ export const de = {
     park: 'Park',
     marina: 'Marina',
     airport: 'Flughafen',
+    substation: 'Umspannwerk',
+    battery: 'Batteriespeicher',
+    firewall: 'Firewall-Knoten',
+    dronePort: 'Drohnenhafen',
+    corpHQ: 'Konzernzentrale',
   } satisfies Record<BuildingKind, string>,
   zones: {
     residential: 'Wohngebiet',
@@ -187,6 +203,11 @@ export const de = {
     FLOODED: 'Überflutetes Grundstück.',
     MAX_LEVEL: 'Maximale Stufe für diese Dichte.',
     GROWING: 'Alles gut: dieses Grundstück kann wachsen.',
+    GRID_OVERLOAD: 'Netz uberlastet: dieses Viertel kann kaskadieren.',
+    CORP_OWNED: 'Eigentum eines Megakonzerns.',
+    HACKED: 'Gehackt: Dienst offline.',
+    NO_FIREWALL: 'Keine Firewall-Abdeckung in der Nahe.',
+    DRONE_PORT: 'Drohnenrouten kreuzen hier.',
   } satisfies Record<ProblemCode, string>,
   ui: {
     cost: 'Kosten',

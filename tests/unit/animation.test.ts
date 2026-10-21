@@ -1,5 +1,6 @@
 import { Infra, Terrain, type BuildingKind } from '@city/shared';
 import { describe, expect, it } from 'vitest';
+import { urbe } from '../../packages/theme-urbe/src';
 import {
   FireDispatch,
   MIN_WORK_TIME,
@@ -7,16 +8,16 @@ import {
   stationAccess,
   type FireView,
   type StationFootprint,
-} from '../../apps/web/src/renderer/animation/fireDispatch';
+} from '../../packages/view-city/src/animation/fireDispatch';
 import {
   HubTraffic,
   MAX_BOATS_PER_MARINA,
   boatPose,
   flightState,
   waterReach,
-} from '../../apps/web/src/renderer/animation/hubs';
-import { createRandom } from '../../apps/web/src/renderer/animation/random';
-import { RUNWAY } from '../../apps/web/src/renderer/hubSprites';
+} from '../../packages/view-city/src/animation/hubs';
+import { createRandom } from '../../packages/view-city/src/animation/random';
+import { RUNWAY } from '../../packages/view-city/src/hubSprites';
 import {
   DX,
   DY,
@@ -26,7 +27,7 @@ import {
   reverse,
   routeBfs,
   type Dir,
-} from '../../apps/web/src/renderer/animation/roads';
+} from '../../packages/view-city/src/animation/roads';
 import {
   MAX_PUFFS,
   SmokeSim,
@@ -35,9 +36,9 @@ import {
   puffLook,
   puffZoomBoost,
   smokeVents,
-} from '../../apps/web/src/renderer/animation/smoke';
-import { VehicleSim, carDensity } from '../../apps/web/src/renderer/animation/vehicles';
-import { sparkleAlpha, sparkleSpots } from '../../apps/web/src/renderer/animation/water';
+} from '../../packages/view-city/src/animation/smoke';
+import { VehicleSim, carDensity } from '../../packages/view-city/src/animation/vehicles';
+import { sparkleAlpha, sparkleSpots } from '../../packages/view-city/src/animation/water';
 import { addWater, flatEngine } from '../helpers/engine';
 
 interface TestView extends FireView {
@@ -229,11 +230,14 @@ describe('chimney smoke', () => {
   });
 
   it('places one vent per smoking chimney with stable keys', () => {
-    const vents = smokeVents([
-      building('coalPlant'),
-      building('industrial', { id: 9, abandoned: true }),
-      building('industrial', { id: 11, level: 5 }),
-    ]);
+    const vents = smokeVents(
+      [
+        building('coalPlant'),
+        building('industrial', { id: 9, abandoned: true }),
+        building('industrial', { id: 11, level: 5 }),
+      ],
+      urbe,
+    );
     expect(vents.map((v) => v.key)).toEqual([28, 29, 44, 45]);
     const plant = vents.filter((v) => v.buildingId === 7);
     expect(plant[0]?.offsetX).not.toBeCloseTo(plant[1]?.offsetX ?? 0, 0);
@@ -448,7 +452,7 @@ describe('hub traffic', () => {
 
   it('sends boats out from an operating marina and brings them back', () => {
     const lit = harbour(true);
-    const traffic = new HubTraffic(createRandom(5));
+    const traffic = new HubTraffic(createRandom(5), urbe);
     traffic.setSites(lit.e.world, lit.e.buildings.values());
     let seen = 0;
     for (let k = 0; k < 400; k++) {
@@ -466,7 +470,7 @@ describe('hub traffic', () => {
     if (first) expect(first.path.length).toBeGreaterThan(1);
 
     const dark = harbour(false);
-    const idle = new HubTraffic(createRandom(5));
+    const idle = new HubTraffic(createRandom(5), urbe);
     idle.setSites(dark.e.world, dark.e.buildings.values());
     for (let k = 0; k < 200; k++) idle.step(0.1);
     expect(idle.boats).toHaveLength(0);
@@ -518,7 +522,7 @@ describe('hub traffic', () => {
       offline: 0,
       attractiveness: 0,
     });
-    const traffic = new HubTraffic(createRandom(9));
+    const traffic = new HubTraffic(createRandom(9), urbe);
     traffic.setSites(e.world, e.buildings.values());
     const modes: string[] = [];
     let lastId = 0;

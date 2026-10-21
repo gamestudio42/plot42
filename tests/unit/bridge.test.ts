@@ -6,7 +6,7 @@ import {
   isBridgeTile,
   isLandRoad,
   roadSurfaceLift,
-} from '../../apps/web/src/renderer/bridge';
+} from '../../packages/view-city/src/bridge';
 import { addWater, flatEngine } from '../helpers/engine';
 
 function road(world: ReturnType<typeof flatEngine>['world'], x: number, y: number): void {

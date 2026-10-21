@@ -110,8 +110,10 @@ describe('save codec', () => {
   });
 
   it('upgrades old files through the registered migrations', () => {
-    const text = saveText(town());
-    // Pretend the current format is version 3 and the file is version 1.
+    // Rewind the envelope to version 1; the checksum covers only `state`, so it stays valid.
+    const text = tamper(saveText(town()), (f) => {
+      f.version = 1;
+    });
     const migrations = {
       1: (f: Record<string, unknown>) => ({ ...f, upgradedTo2: true }),
       2: (f: Record<string, unknown>) => {

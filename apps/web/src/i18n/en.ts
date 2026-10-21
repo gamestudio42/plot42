@@ -9,13 +9,15 @@ import type {
   SaveErrorCode,
   ZoneBuildingKind,
 } from '@city/shared';
-import type { OverlayMode } from '../renderer/chunkDraw';
+import type { OverlayMode } from '@view/city';
 import type { ToolGroup, ToolId } from '../tools/tools';
 
 /** Canonical player-facing catalog. Other locales must match this shape. */
 export const en = {
   appTitle: 'Urbe',
   pageTitle: 'Urbe — build your city',
+  /** Wordmark shown on the logo; a reskin overrides it. */
+  brand: 'Urbe',
   tools: {
     select: 'Inspect',
     road: 'Road',
@@ -45,6 +47,11 @@ export const en = {
     park: 'Park',
     marina: 'Marina',
     airport: 'Airport',
+    substation: 'Substation',
+    battery: 'Battery bank',
+    firewall: 'Firewall node',
+    dronePort: 'Drone port',
+    corpHQ: 'Corporate HQ',
   } satisfies Record<ToolId, string>,
   toolHints: {
     select: 'Click a lot to see details.',
@@ -76,6 +83,11 @@ export const en = {
     marina: 'On the coast, with a road. Industrial jobs, raises the waterfront and links the city to the region.',
     airport:
       'Flat 4×4 area, with a road. Commercial jobs and a regional link, but the noise lowers nearby land value.',
+    substation: 'Place beside power lines. Feeds its grid component; an overloaded district can cascade.',
+    battery: 'Buffers the district during a brownout and recharges while the grid is stable.',
+    firewall: 'Covers a 6-lot radius. Lowers the chance an intrusion takes a service offline.',
+    dronePort: 'Needs a road. Drone lanes relieve congestion on nearby streets.',
+    corpHQ: 'Needs a road. Megacorps buy idle lots around it and distort land value.',
   } satisfies Record<ToolId, string>,
   toolGroups: {
     inspect: 'Inspect',
@@ -119,6 +131,11 @@ export const en = {
     park: 'Park',
     marina: 'Marina',
     airport: 'Airport',
+    substation: 'Substation',
+    battery: 'Battery bank',
+    firewall: 'Firewall node',
+    dronePort: 'Drone port',
+    corpHQ: 'Corporate HQ',
   } satisfies Record<BuildingKind, string>,
   zones: {
     residential: 'Residential',
@@ -186,6 +203,11 @@ export const en = {
     FLOODED: 'Flooded lot.',
     MAX_LEVEL: 'Maximum level for this density.',
     GROWING: 'All good: this lot can grow.',
+    GRID_OVERLOAD: 'Grid overloaded: this district may cascade.',
+    CORP_OWNED: 'Owned by a megacorporation.',
+    HACKED: 'Hacked: service offline.',
+    NO_FIREWALL: 'No firewall coverage nearby.',
+    DRONE_PORT: 'Drone lanes cross here.',
   } satisfies Record<ProblemCode, string>,
   ui: {
     cost: 'Cost',

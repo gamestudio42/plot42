@@ -9,13 +9,14 @@ import type {
   SaveErrorCode,
   ZoneBuildingKind,
 } from '@city/shared';
-import type { OverlayMode } from '../renderer/chunkDraw';
+import type { OverlayMode } from '@view/city';
 import type { ToolGroup, ToolId } from '../tools/tools';
 import type { Strings } from './en';
 
 export const fr = {
   appTitle: 'Urbe',
   pageTitle: 'Urbe — construisez votre ville',
+  brand: 'Urbe',
   tools: {
     select: 'Inspecter',
     road: 'Route',
@@ -45,6 +46,11 @@ export const fr = {
     park: 'Parc',
     marina: 'Marina',
     airport: 'Aéroport',
+    substation: 'Sous-station',
+    battery: 'Batterie',
+    firewall: 'Nœud pare-feu',
+    dronePort: 'Port de drones',
+    corpHQ: 'Siège corporatif',
   } satisfies Record<ToolId, string>,
   toolHints: {
     select: 'Cliquez sur une parcelle pour voir les détails.',
@@ -77,6 +83,11 @@ export const fr = {
       'Sur la côte, avec une route. Emplois industriels, valorise le front de mer et relie la ville à la région.',
     airport:
       'Terrain plat 4×4, avec une route. Emplois commerciaux et liaison régionale, mais le bruit dévalue les alentours.',
+    substation: 'A placer pres des lignes electriques. Alimente son composant de reseau ; un quartier surcharge peut cascader.',
+    battery: 'Amortit le quartier pendant une panne et se recharge quand le reseau est stable.',
+    firewall: "Couvre un rayon de 6 lots. Reduit le risque qu'une intrusion coupe un service.",
+    dronePort: 'Necessite une route. Les couloirs de drones soulagent la congestion des rues voisines.',
+    corpHQ: "Necessite une route. Les megacorporations achettent les lots vacants alentour et faussent la valeur du sol.",
   } satisfies Record<ToolId, string>,
   toolGroups: {
     inspect: 'Inspecter',
@@ -120,6 +131,11 @@ export const fr = {
     park: 'Parc',
     marina: 'Marina',
     airport: 'Aéroport',
+    substation: 'Sous-station',
+    battery: 'Batterie',
+    firewall: 'Nœud pare-feu',
+    dronePort: 'Port de drones',
+    corpHQ: 'Siège corporatif',
   } satisfies Record<BuildingKind, string>,
   zones: {
     residential: 'Résidentiel',
@@ -187,6 +203,11 @@ export const fr = {
     FLOODED: 'Parcelle inondée.',
     MAX_LEVEL: 'Niveau maximal pour cette densité.',
     GROWING: 'Tout va bien : cette parcelle peut grandir.',
+    GRID_OVERLOAD: 'Reseau surcharge : ce quartier peut cascader.',
+    CORP_OWNED: "Propriete d'une megacorporation.",
+    HACKED: 'Pirate : service hors ligne.',
+    NO_FIREWALL: 'Aucune couverture pare-feu a proximite.',
+    DRONE_PORT: 'Des couloirs de drones passent ici.',
   } satisfies Record<ProblemCode, string>,
   ui: {
     cost: 'Coût',

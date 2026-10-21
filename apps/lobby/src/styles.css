@@ -15,6 +15,8 @@
   --urbe: #5b8def;
   --horta: #4ade80;
   --posto: #f0a14a;
+  --mata: #c4a24a;
+  --neon: #22d3ee;
 }
 
 * {
@@ -241,6 +243,12 @@ body,
 .card-posto {
   border-top: 3px solid var(--posto);
 }
+.card-mata {
+  border-top: 3px solid var(--mata);
+}
+.card-neon {
+  border-top: 3px solid var(--neon);
+}
 
 .card-mark {
   display: grid;
@@ -281,6 +289,12 @@ body,
 }
 .card-posto .play {
   color: var(--posto);
+}
+.card-mata .play {
+  color: var(--mata);
+}
+.card-neon .play {
+  color: var(--neon);
 }
 
 footer {

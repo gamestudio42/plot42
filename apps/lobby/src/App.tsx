@@ -17,6 +17,8 @@ const GAMES = [
   { slug: 'urbe', port: 5173, kind: 'urbe', title: 'urbeTitle', blurb: 'urbeBlurb' },
   { slug: 'horta', port: 5174, kind: 'horta', title: 'hortaTitle', blurb: 'hortaBlurb' },
   { slug: 'posto', port: 5175, kind: 'posto', title: 'postoTitle', blurb: 'postoBlurb' },
+  { slug: 'mata', port: 5177, kind: 'mata', title: 'mataTitle', blurb: 'mataBlurb' },
+  { slug: 'neon', port: 5178, kind: 'neon', title: 'neonTitle', blurb: 'neonBlurb' },
 ] as const;
 
 function gameHref(slug: string, port: number): string {

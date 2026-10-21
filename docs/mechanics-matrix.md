@@ -78,3 +78,28 @@ References studied (cloned into the git-ignored `references/` folder):
 | Disasters   | Fire, flood, earthquake menu and random disasters           | Observed   | SC2000 disaster menu (OpenSC2K `disasters.md`).                       |
 | Disasters   | Economic crisis, blackout, epidemic                         | New        |                                                                       |
 | Diagnostics | "Why is this not growing" panel                             | New        |                                                                       |
+
+## Neo Urbe (neon ruleset)
+
+Everything below only runs with `ruleset: 'neon'`. Formulas live in
+[docs/neon-spec.md](neon-spec.md), constants in `packages/shared/src/balance/neon.ts`.
+
+| System        | Mechanic                                                      | Provenance | Notes                                                              |
+| ------------- | ------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| Ruleset       | `classic`/`neon` stored in the snapshot and the save          | New        | Save v2; v1 migrates to `classic`.                                 |
+| Ruleset       | Separate save envelope and extension for Neo Urbe             | New        | `neon-city-save` / `.neon.json`, so the games never mix files.     |
+| Power         | Overload when demand reaches 90% of supply                     | New        | Reuses the classic component solver, including the road hop.       |
+| Power         | Cascading blackout off a stressed component                    | New        | Takes a share of buildings offline for two days.                   |
+| Power         | Substations add supply; batteries buffer charge                | New        | Charge is persisted per building.                                  |
+| Power         | Demand ≥ 90% of supply stresses a component                    | New        | Same components the classic solver found, road hop included.       |
+| Power         | A stressed, short component can blow into a cascading blackout | New        | 8% per day, 35% of its buildings offline for 2 days, via `rng`.     |
+| Corporations  | Four agents with cash and a preferred quadrant                 | New        | Buy vacant zoned lots once a month.                                |
+| Corporations  | Corporate lots stamp extra land value around them              | New        | Reuses the influence layer; averaged by the normal pass.           |
+| Corporations  | Tax skim moves cash from the treasury to the corporation       | New        | Reported in `CityStats.neon.skimmed`.                              |
+| Security      | Monthly intrusion chance grows with population                 | New        | Capped at 0.8.                                                     |
+| Security      | Firewalls cut the chance and need power                        | New        | Coverage scaled by distance inside the radius.                     |
+| Security      | A successful intrusion takes a service offline and steals cash | New        | Reuses the `offline` counter the utilities pass already respects.  |
+| Traffic       | Drone ports relieve congestion on a separate aerial layer      | New        | Additive: the ground `traffic` layer is never written.             |
+| Traffic       | Aerial lanes derived from the road network beside each port    | New        | Read model rebuilt for the renderer; not serialized.               |
+| Zoning        | Dense lots reach level 7, light lots level 3                   | Observed   | SC2000 has light/dense; the neon caps are ours.                    |
+| Zoning        | Capacity, power and water extrapolate past the classic table   | New        | Exact at or below level 5, so the classic table stays the source.  |

@@ -63,9 +63,33 @@ export interface MusicStatus extends MusicState {
   enabled: boolean;
 }
 
+/** Minimal shape of a music engine so a reskin can inject its own composer. */
+export interface MusicEngine {
+  readonly state: MusicState;
+  start(): void;
+  stop(): void;
+  setTrack(track: TrackId): void;
+  setDucked(ducked: boolean): void;
+  dispose(): void;
+}
+
+/** Builds a music engine on the shared audio graph (the Urbe lo-fi player by default). */
+export type MusicFactory = (
+  ctx: AudioContext,
+  bus: GainNode,
+  noise: AudioBuffer,
+) => MusicEngine;
+
 export class SoundBoard {
   private readonly graph = new AudioGraph({ mutedKey: STORAGE_KEY });
-  private music: MusicPlayer | null = null;
+  private music: MusicEngine | null = null;
+  private readonly musicFactory: MusicFactory;
+
+  constructor(options: { music?: MusicFactory } = {}) {
+    this.musicFactory =
+      options.music ??
+      ((ctx, bus, noise) => new MusicPlayer(ctx, bus, noise));
+  }
   private musicOn = readFlag(MUSIC_KEY, true);
   private musicTrack: TrackId = 'menu';
   private musicDucked = false;
@@ -142,7 +166,7 @@ export class SoundBoard {
     const musicBus = this.graph.ctx.createGain();
     musicBus.gain.value = MUSIC_VOLUME;
     musicBus.connect(this.graph.master);
-    this.music = new MusicPlayer(this.graph.ctx, musicBus, this.graph.noiseBuffer);
+    this.music = this.musicFactory(this.graph.ctx, musicBus, this.graph.noiseBuffer);
   }
 
   private syncMusic(): void {

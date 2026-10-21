@@ -6,7 +6,7 @@ import { lobbyHref } from '../platform';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { LocaleSelect } from './LocaleSelect';
-import { Logo } from './Logo';
+import { BrandLogo } from './Logo';
 
 const SIZES = [64, 96, 128] as const;
 
@@ -18,6 +18,7 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
   const t = useStrings(session.ui);
   const m = t.menu;
   const muted = useStore(session.ui, (s) => s.muted);
+  const locale = useStore(session.ui, (s) => s.locale);
   const [name, setName] = useState<string>(m.defaultCityName);
   const defaultName = useRef(m.defaultCityName);
   useEffect(() => {
@@ -78,7 +79,7 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
       </div>
       <div className="menu-card">
         <h1 className="menu-title">
-          <Logo />
+          <BrandLogo locale={locale} />
         </h1>
         <p className="muted">{m.subtitle}</p>
         <form

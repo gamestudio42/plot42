@@ -8,6 +8,7 @@ import {
   type PlaceableKind,
 } from '@city/shared';
 import type { SimulationEngine } from '../engine';
+import { droneRelief } from './neon/airTraffic';
 import type { World } from '../world/world';
 import { MinHeap } from './heap';
 import type { RoadNetwork } from './roads';
@@ -301,7 +302,9 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
     addTrips(flow, shops, road, t.shoppingRate * b.occupancy);
   }
   const funding = engine.economy.funding.transport / 100;
-  const capacity = t.roadCapacity * (0.5 + 0.5 * funding);
+  // Drone lanes relieve the road network before the capacity limit is applied.
+  const relief = engine.ruleset === 'neon' ? droneRelief(engine, roadsCountGuess(w)) : 0;
+  const capacity = t.roadCapacity * (0.5 + 0.5 * funding) * (1 + relief);
   const k = t.congestionSmoothing;
   let sum = 0;
   let roadsCount = 0;
@@ -324,6 +327,13 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
     shops,
     components: comps,
   };
+}
+
+/** Road tiles on the map, used to scale drone relief. */
+function roadsCountGuess(w: SimulationEngine['world']): number {
+  let n = 0;
+  for (let i = 0; i < w.tileCount; i++) if (w.hasInfra(i, Infra.Road)) n++;
+  return n;
 }
 
 /** Adds `amount` trips on every road tile from `start` back to the tree's nearest source. */

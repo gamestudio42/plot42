@@ -11,6 +11,8 @@ import {
 import { BALANCE, DEPARTMENTS } from '../balance/balance';
 import type { DisasterKind } from '../commands/commands';
 import { PLACEABLE_KINDS, ZONE_BUILDING_KINDS, type BuildingRecord } from '../types/buildings';
+import type { NeonState } from '../types/neon';
+import { isRuleset } from '../types/ruleset';
 import { EXPENSE_CATEGORIES } from '../types/stats';
 import { INFLUENCE_LAYERS, STRUCTURE_LAYERS } from '../types/tiles';
 import type { EngineSnapshot, SnapshotLayer } from './snapshot';
@@ -25,9 +27,15 @@ export {
 } from '@shell/kernel';
 
 export const SAVE_FORMAT = 'city-builder-save';
-/** Bump when the layout of `SaveState` changes, and register a migration from the old version. */
-export const SAVE_VERSION = 1;
+/**
+ * Bump when the layout of `SaveState` changes, and register a migration from the old version.
+ * v2 adds `ruleset` (absent in v1 saves, which were all classic).
+ */
+export const SAVE_VERSION = 2;
 export const SAVE_FILE_EXTENSION = '.city.json';
+/** Neo Urbe envelope: same schema, its own format and extension so the two never mix. */
+export const NEON_SAVE_FORMAT = 'neon-city-save';
+export const NEON_SAVE_FILE_EXTENSION = '.neon.json';
 
 /** Summary stored next to the state so save lists do not need to decode the whole file. */
 export interface SaveMeta {
@@ -53,12 +61,23 @@ export type DecodeResult =
   | { ok: true; snapshot: EngineSnapshot; meta: SaveMeta; migratedFrom: number | null }
   | { ok: false; errors: SaveError[] };
 
-export const SAVE_MIGRATIONS: Readonly<Record<number, SaveMigration>> = {};
+/**
+ * v1 → v2: every pre-ruleset city is classic. The checksum is recomputed by the envelope decoder
+ * before this runs, so the migration only fills the new field.
+ */
+export const SAVE_MIGRATIONS: Readonly<Record<number, SaveMigration>> = {
+  1: (file) => {
+    const state = isRecord(file.state) ? file.state : {};
+    return { ...file, state: { ...state, ruleset: 'classic' } };
+  },
+};
 
 export interface DecodeOptions {
   /** Defaults to `SAVE_MIGRATIONS` and `SAVE_VERSION`; tests inject their own. */
   migrations?: Readonly<Record<number, SaveMigration>>;
   currentVersion?: number;
+  /** Envelope format. Neo Urbe passes `NEON_SAVE_FORMAT` so the two games never mix files. */
+  format?: string;
 }
 
 export const SNAPSHOT_LAYERS: readonly SnapshotLayer[] = [...STRUCTURE_LAYERS, ...INFLUENCE_LAYERS];
@@ -66,11 +85,13 @@ export const SNAPSHOT_LAYERS: readonly SnapshotLayer[] = [...STRUCTURE_LAYERS, .
 export function encodeSave(
   snapshot: EngineSnapshot,
   extra: Pick<SaveMeta, 'population' | 'funds' | 'savedAt'>,
-): SaveFile {
+  options: { format?: string } = {},
+): SaveEnvelope<string, SaveMeta, SaveState> {
   const layers = {} as Record<SnapshotLayer, string>;
   for (const name of SNAPSHOT_LAYERS) layers[name] = bytesToBase64(snapshot.layers[name]);
   const state: SaveState = {
     name: snapshot.name,
+    ruleset: snapshot.ruleset ?? 'classic',
     seed: snapshot.seed,
     size: snapshot.size,
     tick: snapshot.tick,
@@ -86,8 +107,9 @@ export function encodeSave(
     disastersEnabled: snapshot.disastersEnabled,
     networksDirty: snapshot.networksDirty,
     lastMilestone: snapshot.lastMilestone,
+    ...(snapshot.neon ? { neon: JSON.parse(JSON.stringify(snapshot.neon)) as NeonState } : {}),
   };
-  return encodeEnvelope(SAVE_FORMAT, SAVE_VERSION, {
+  return encodeEnvelope(options.format ?? SAVE_FORMAT, SAVE_VERSION, {
     name: snapshot.name,
     seed: snapshot.seed,
     size: snapshot.size,
@@ -99,7 +121,7 @@ export function encodeSave(
 /** Parses, verifies, migrates and validates a save. A failed decode never throws. */
 export function decodeSave(text: string, options: DecodeOptions = {}): DecodeResult {
   const decoded = decodeEnvelope(text, {
-    format: SAVE_FORMAT,
+    format: options.format ?? SAVE_FORMAT,
     currentVersion: options.currentVersion ?? SAVE_VERSION,
     migrations: options.migrations ?? SAVE_MIGRATIONS,
   });
@@ -293,8 +315,13 @@ class Validator {
       };
     });
 
+    const ruleset = isRuleset(s.ruleset) ? s.ruleset : 'classic';
+    if (s.ruleset !== undefined && !isRuleset(s.ruleset)) {
+      this.error('state.ruleset', 'expected "classic" or "neon"');
+    }
     const snapshot: EngineSnapshot = {
       name: this.str(s.name, 'state.name'),
+      ruleset,
       seed: this.str(s.seed, 'state.seed'),
       size,
       tick: this.int(s.tick, 'state.tick', 0),
@@ -310,8 +337,52 @@ class Validator {
       disastersEnabled: this.bool(s.disastersEnabled, 'state.disastersEnabled'),
       networksDirty: this.bool(s.networksDirty, 'state.networksDirty'),
       lastMilestone: this.int(s.lastMilestone, 'state.lastMilestone', 0),
+      ...(s.neon === undefined ? {} : { neon: this.neonState(s.neon, size) }),
     };
     return this.errors.length > 0 ? null : snapshot;
+  }
+
+  /** Structural validation of the neon systems state. */
+  neonState(value: unknown, size: number): NeonState {
+    const n = this.record(value, 'state.neon');
+    const corporations = this.array(n.corporations, 'state.neon.corporations').map((entry, k) => {
+      const c = this.record(entry, `state.neon.corporations[${k}]`);
+      return {
+        id: this.int(c.id, `state.neon.corporations[${k}].id`, 1),
+        name: this.str(c.name, `state.neon.corporations[${k}].name`),
+        capital: this.num(c.capital, `state.neon.corporations[${k}].capital`, 0),
+        quadrant: this.int(c.quadrant, `state.neon.corporations[${k}].quadrant`, 0, 3),
+        holdings: this.int(c.holdings, `state.neon.corporations[${k}].holdings`, 0),
+      };
+    });
+    const batteries = this.array(n.batteries, 'state.neon.batteries').map((entry, k) => {
+      const b = this.record(entry, `state.neon.batteries[${k}]`);
+      return {
+        buildingId: this.int(b.buildingId, `state.neon.batteries[${k}].buildingId`, 1),
+        charge: this.num(b.charge, `state.neon.batteries[${k}].charge`, 0, 1),
+      };
+    });
+    const intrusions = this.array(n.intrusions, 'state.neon.intrusions').map((entry, k) => {
+      const i = this.record(entry, `state.neon.intrusions[${k}]`);
+      return {
+        buildingId: this.int(i.buildingId, `state.neon.intrusions[${k}].buildingId`, 1),
+        ticks: this.int(i.ticks, `state.neon.intrusions[${k}].ticks`, 0),
+        firewall: this.num(i.firewall, `state.neon.intrusions[${k}].firewall`, 0, 1),
+        kind: this.str(i.kind, `state.neon.intrusions[${k}].kind`),
+      };
+    });
+    return {
+      corporations,
+      batteries,
+      intrusions,
+      overloaded: this.array(n.overloaded, 'state.neon.overloaded').map((tile, k) =>
+        this.int(tile, `state.neon.overloaded[${k}]`, 0, size * size - 1),
+      ),
+      lastCorpMonth: this.int(n.lastCorpMonth, 'state.neon.lastCorpMonth', -1),
+      lastIntrusionMonth: this.int(n.lastIntrusionMonth, 'state.neon.lastIntrusionMonth', -1),
+      skimmed: this.num(n.skimmed, 'state.neon.skimmed', 0),
+      blocked: this.int(n.blocked, 'state.neon.blocked', 0),
+    };
   }
 
   buildings(value: unknown, size: number, nextId: number): BuildingRecord[] {
@@ -355,6 +426,9 @@ class Validator {
         watered: this.bool(b.watered, `${path}.watered`),
         offline: this.int(b.offline, `${path}.offline`, 0),
         attractiveness: this.num(b.attractiveness, `${path}.attractiveness`, 0, 1),
+        ...(b.owner === undefined
+          ? {}
+          : { owner: this.int(b.owner, `${path}.owner`, 1) }),
       };
     });
   }

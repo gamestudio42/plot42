@@ -91,8 +91,33 @@ export function bootLocale(): Locale {
   return bootStoredLocale(LOCALE_KEY, (stored) => resolveLocale({ stored }));
 }
 
+/** Partial catalog applied on top of the base one; a reskin overrides copy without forking it. */
+let override: Partial<Record<Locale, DeepPartial<Strings>>> = {};
+
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
+
+/** Registers a copy override for one locale (used by reskins such as Neo Urbe). */
+export function setCatalogOverride(locale: Locale, strings: DeepPartial<Strings>): void {
+  override = { ...override, [locale]: strings };
+}
+
+function merge<T>(base: T, extra: DeepPartial<T> | undefined): T {
+  if (!extra) return base;
+  const out = { ...base } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(extra as Record<string, unknown>)) {
+    const current = out[key];
+    out[key] =
+      current && typeof current === 'object' && value && typeof value === 'object'
+        ? merge(current, value as never)
+        : value;
+  }
+  return out as T;
+}
+
 export function catalog(locale: Locale): Strings {
-  return CATALOGS[locale] ?? en;
+  return merge(CATALOGS[locale] ?? en, override[locale]);
 }
 
 export function useStrings(ui: Store<{ locale: Locale }>): Strings {

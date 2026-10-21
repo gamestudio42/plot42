@@ -14,8 +14,28 @@ export const PLACEABLE_KINDS = [
   'park',
   'marina',
   'airport',
+  // Neon-only placeables. A classic city never contains them; both rulesets can load them.
+  'substation',
+  'battery',
+  'firewall',
+  'dronePort',
+  'corpHQ',
 ] as const;
 export type PlaceableKind = (typeof PLACEABLE_KINDS)[number];
+
+/** Placeables that only the `neon` ruleset offers. */
+export const NEON_PLACEABLE_KINDS = [
+  'substation',
+  'battery',
+  'firewall',
+  'dronePort',
+  'corpHQ',
+] as const;
+export type NeonPlaceableKind = (typeof NEON_PLACEABLE_KINDS)[number];
+
+export function isNeonPlaceable(kind: BuildingKind): kind is NeonPlaceableKind {
+  return (NEON_PLACEABLE_KINDS as readonly string[]).includes(kind);
+}
 
 export type BuildingKind = ZoneBuildingKind | PlaceableKind;
 
@@ -44,6 +64,8 @@ export interface BuildingRecord {
   offline: number;
   /** Last computed attractiveness 0..1, for diagnostics. */
   attractiveness: number;
+  /** Megacorporation that owns a neon lot, or absent for city-owned buildings. */
+  owner?: number;
 }
 
 export function isZoneKind(kind: BuildingKind): kind is ZoneBuildingKind {

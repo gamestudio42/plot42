@@ -5,6 +5,7 @@ import {
   type BuildingRecord,
   type PlaceableKind,
   type PlaceableSpec,
+  type CityStats,
   type Problem,
 } from '@city/shared';
 import {
@@ -83,11 +84,35 @@ function inspect(session: GameSession, x: number, y: number): Snapshot | null {
         taxes: stats.taxes,
         power: stats.power,
         ...(roads ? { roads } : {}),
+        ...(stats.neon && session.ruleset === 'neon' ? { neon: neonHints(session, stats, x, y) } : {}),
       },
       x,
       y,
     ),
     regional: building !== null && isGateway(w, roads, building),
+  };
+}
+
+/**
+ * Neon-only inspector hints. The stats carry the city-wide counters; ownership and an active
+ * intrusion are read from the mirror building, so the inspector never asks the worker again.
+ */
+function neonHints(
+  session: GameSession,
+  stats: CityStats,
+  x: number,
+  y: number,
+): NonNullable<Parameters<typeof diagnoseTile>[0]['neon']> {
+  const world = session.client.world;
+  const id = world ? (world.buildingId[y * world.size + x] as number) : 0;
+  const building = id === 0 ? undefined : session.client.buildings.get(id);
+  const neon = stats.neon;
+  return {
+    overloaded: (neon?.overloaded ?? 0) > 0,
+    owner: building?.owner === undefined ? null : `#${building.owner}`,
+    hacked: (building?.offline ?? 0) > 0,
+    unguarded: (neon?.firewall ?? 0) < 0.5,
+    drones: (neon?.dronePorts ?? 0) > 0,
   };
 }
 

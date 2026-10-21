@@ -70,6 +70,7 @@ export class PostoSession {
       onInit: () => {
         this.renderer.setWorld(this.client.size, this.client.units);
         this.lastOutcome = this.client.stats?.outcome ?? 'playing';
+        this.renderer.setOutcome(this.lastOutcome);
       },
       onUnits: () => this.renderer.setUnits(this.client.units),
       onStats: (stats) => {
@@ -129,6 +130,7 @@ export class PostoSession {
     this.lastOutcome = 'playing';
     this.renderer.setAttract(false);
     this.renderer.setInputEnabled(true);
+    this.renderer.setOutcome('playing');
     await this.client.newGame({ name: name || 'Posto', seed: seed || 'posto' });
     this.ui.set({ screen: 'game' });
     this.applyDrone();
@@ -173,6 +175,7 @@ export class PostoSession {
     this.lastOutcome = result.meta.outcome;
     this.renderer.setAttract(false);
     this.renderer.setInputEnabled(true);
+    this.renderer.setOutcome(result.meta.outcome);
     this.ui.set({ screen: 'game', name: result.meta.name, seed: result.meta.seed });
     this.applyDrone();
     this.toast('info', catalog(this.ui.get().locale).loaded);
@@ -247,6 +250,8 @@ export class PostoSession {
     if (outcome === this.lastOutcome) return;
     this.lastOutcome = outcome;
     const t = catalog(this.ui.get().locale);
+    this.renderer.setOutcome(outcome);
+    if (outcome !== 'playing') this.renderer.setInputEnabled(false);
     if (outcome === 'victory') {
       this.sfx.play('victory');
       this.toast('info', t.victory);

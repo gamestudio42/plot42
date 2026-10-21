@@ -39,6 +39,39 @@ export {
 } from './systems/demand';
 export { attractiveness, maxLevel, transportScore, ZONE_KIND } from './systems/growth';
 export { boxBlur, populationCentre } from './systems/influence';
+export {
+  batterySummary,
+  cascade,
+  isOverloaded,
+  tickGrid,
+  updateGrid,
+  type GridResult,
+} from './systems/neon/grid';
+export { initCorporations, ownerOf, updateCorporations, type CorpResult } from './systems/neon/corporations';
+export {
+  cityFirewallCoverage,
+  firewallCoverage,
+  activeIntrusion,
+  tickIntrusions,
+  updateIntrusions,
+  INTRUSION_KINDS,
+  type IntrusionKind,
+  type IntrusionResult,
+} from './systems/neon/intrusion';
+export {
+  droneCapacity,
+  droneLanes,
+  droneRelief,
+  portCount,
+  type DroneLane,
+} from './systems/neon/airTraffic';
+export {
+  neonCapacity,
+  neonMaxLevel,
+  neonPower,
+  neonWater,
+  verticalScale,
+} from './systems/neon/vertical';
 export { RoadNetwork } from './systems/roads';
 export { SERVICE_LAYERS, stationAccessRoads } from './systems/services';
 export {

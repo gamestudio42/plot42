@@ -4,6 +4,8 @@
  *   /urbe/      city builder
  *   /horta/     harvest grid
  *   /posto/     tactics
+ *   /mata/      living grove
+ *   /neon/      cyberpunk city builder
  *
  * BASE_PATH is the site root (e.g. /plot42/). Each game is built under that prefix.
  */
@@ -37,5 +39,11 @@ cpSync(join(root, 'apps/horta/dist'), join(site, 'horta'), { recursive: true });
 
 run('@posto/web', `${baseRoot}posto/`);
 cpSync(join(root, 'apps/posto/dist'), join(site, 'posto'), { recursive: true });
+
+run('@mata/web', `${baseRoot}mata/`);
+cpSync(join(root, 'apps/mata/dist'), join(site, 'mata'), { recursive: true });
+
+run('@neon/web', `${baseRoot}neon/`);
+cpSync(join(root, 'apps/neon/dist'), join(site, 'neon'), { recursive: true });
 
 console.log(`Assembled site/ with BASE_PATH=${baseRoot}`);

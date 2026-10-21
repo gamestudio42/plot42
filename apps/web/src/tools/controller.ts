@@ -1,7 +1,7 @@
 import { RejectReason, type Area, type ToolCommand } from '@city/shared';
 import { planToolCommand, type ToolPlan } from '@city/simulation';
-import type { HighlightTile } from '../renderer/GameRenderer';
-import type { Point } from '../renderer/iso';
+import type { HighlightTile } from '@view/city';
+import type { Point } from '@view/city';
 import type { GameSession } from '../state/session';
 import { toolById, type ToolDef, type ToolId } from './tools';
 

@@ -26,6 +26,19 @@ export interface DiagnoseContext {
   power: UtilityStats;
   /** Reused between calls when available; built from `world` otherwise. */
   roads?: RoadNetwork;
+  /** Neon-only hints; omitted by the classic UI. */
+  neon?: {
+    /** District is above the grid overload threshold. */
+    overloaded: boolean;
+    /** Corporation that owns the lot, if any. */
+    owner: string | null;
+    /** Service is offline because of an intrusion. */
+    hacked: boolean;
+    /** No firewall node covers this tile. */
+    unguarded: boolean;
+    /** Drone lanes cross this district. */
+    drones: boolean;
+  };
 }
 
 const THRESHOLDS = {
@@ -60,6 +73,13 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
   if ((w.fire[i] as number) > 0) add('ON_FIRE', 3);
   if (w.hasInfra(i, Infra.Rubble)) add('RUBBLE', 3);
   if ((w.flood[i] as number) > 0) add('FLOODED', 3);
+
+  const neon = ctx.neon;
+  if (neon?.hacked) add('HACKED', 3);
+  if (neon?.overloaded) add('GRID_OVERLOAD', 2);
+  if (neon?.owner) add('CORP_OWNED', 1);
+  if (neon?.unguarded) add('NO_FIREWALL', 1);
+  if (neon?.drones) add('DRONE_PORT', 0);
 
   if (building && !isZoneKind(building.kind)) {
     const spec = PLACEABLE_SPECS[building.kind];

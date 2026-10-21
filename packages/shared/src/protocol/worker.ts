@@ -5,6 +5,7 @@ import type { EngineSnapshot } from '../schemas/snapshot';
 import type { BuildingRecord } from '../types/buildings';
 import type { CityStats, HistoryEntry, SimEvent } from '../types/stats';
 import type { InfluenceLayer, StructureLayer } from '../types/tiles';
+import type { Ruleset } from '../types/ruleset';
 
 export interface TerrainOptions {
   /** Fraction of the map covered by water, 0..0.5. */
@@ -24,11 +25,18 @@ export interface NewCityOptions {
   size: number;
   terrain: TerrainOptions;
   difficulty?: Difficulty;
+  /** Rules the new city runs; defaults to `classic`. */
+  ruleset?: Ruleset;
+  /**
+   * Envelope format for saves and exports; defaults to `SAVE_FORMAT`. Neo Urbe passes its own so
+   * the two games never overwrite or import each other's files.
+   */
+  saveFormat?: string;
 }
 
 export type ToWorkerMessage =
   | { type: 'newCity'; options: NewCityOptions }
-  | { type: 'loadCity'; snapshot: EngineSnapshot }
+  | { type: 'loadCity'; snapshot: EngineSnapshot; saveFormat?: string }
   | { type: 'command'; id: number; command: Command }
   | { type: 'setSpeed'; speed: Speed }
   | { type: 'runTicks'; id: number; ticks: number }

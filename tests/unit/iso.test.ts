@@ -5,7 +5,7 @@ import {
   screenToGrid,
   tileCenter,
   vertexToScreen,
-} from '../../apps/web/src/renderer/iso';
+} from '../../packages/view-city/src/iso';
 
 describe('isometric projection', () => {
   it('maps grid axes to screen diagonals', () => {

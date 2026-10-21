@@ -18,10 +18,17 @@ this document still describes that engine in detail after the platform map.
 | `packages/simulation` | City engine: world, systems, commands, persistence, scenarios          | `@city/shared`, `@shell/kernel`       |
 | `packages/horta`      | Horta: plant / grow / harvest grid and `horta-save` envelope           | `@shell/kernel`                       |
 | `packages/posto`      | Posto: 10×10 tactics, deterministic enemy turn, `posto-save`           | `@shell/kernel`                       |
+| `packages/mata`       | Mata: living grove, plant interactions, `mata-save`                    | `@shell/kernel`                       |
+| `packages/theme`      | Colourless `Theme` interface injected into the renderer                | nothing                               |
+| `packages/theme-urbe` | Today's Urbe palette, byte for byte                                    | `@theme/core`                         |
+| `packages/theme-neon` | Cyberpunk palette, CSS tokens and audio parameters                     | `@theme/core`                         |
+| `packages/view-city`  | Pixi renderer, sprites and animation layer, theme injected             | pixi.js + city packages               |
 | `apps/lobby`          | Plot 42 landing page (marks, LocaleSelect, five locales)               | react + chrome                        |
 | `apps/web`            | Urbe: Vite + React UI, Pixi renderer, worker host                      | city packages + shell                 |
 | `apps/horta`          | Horta web app                                                          | horta + shell                         |
 | `apps/posto`          | Posto web app                                                          | posto + shell                         |
+| `apps/mata`           | Mata web app                                                           | mata + shell                          |
+| `apps/neon`           | Neo Urbe web app: Urbe UI under `@theme/neon` and the neon ruleset      | view-city + themes + city packages    |
 | `tools/`              | Headless city reports, benchmarks, `build-site`                        | shared, simulation                    |
 | `tests/`              | Unit, integration, scenario (Vitest) and end-to-end (Playwright) tests | everything                            |
 
@@ -30,7 +37,7 @@ and `tsx` compile them on the fly, so there is no package build step.
 
 ## Static site
 
-`pnpm build:site` (`tools/build-site.ts`) builds the lobby plus the three games with
+`pnpm build:site` (`tools/build-site.ts`) builds the lobby plus the five games with
 `BASE_PATH` prefixes and copies them into `site/`:
 
 | Path        | App            |
@@ -39,12 +46,25 @@ and `tsx` compile them on the fly, so there is no package build step.
 | `/urbe/`    | `apps/web`     |
 | `/horta/`   | `apps/horta`   |
 | `/posto/`   | `apps/posto`   |
+| `/mata/`    | `apps/mata`    |
+| `/neon/`    | `apps/neon`    |
 
 Development uses one Vite port per app (`5173` Urbe, `5174` Horta, `5175` Posto, `5176`
-lobby) with `base: '/'`. `pnpm preview:site` serves the assembled folder. GitHub Pages
-publishes `site/` (`BASE_PATH` from the repository name).
+lobby, `5177` Mata, `5178` Neo Urbe) with `base: '/'`. `pnpm preview:site` serves the assembled folder.
+GitHub Pages publishes `site/` (`BASE_PATH` from the repository name).
 
-IndexedDB names stay per title: Urbe `city-builder`, Horta `horta`, Posto `posto`.
+IndexedDB names stay per title: Urbe `city-builder`, Horta `horta`, Posto `posto`,
+Mata `mata`; Neo Urbe reuses `SaveStore` under the neon prefix and writes the
+`neon-city-save` envelope (`.neon.json`).
+
+**Mata** is a 16×16 grove. The player spends seeds to plant five species and
+cistern water to irrigate; the engine ticks moisture, nutrients, soil, shade,
+fauna and health. Light is `255 - shade` with a min/max window per species:
+grass needs sun, ferns need shade, Ingá feeds neighbors, cactus holds the dry.
+Adults return a seed on a fixed interval. A drought is announced on tick 24,
+runs from 32 to 44, and then the grove is judged won or lost. `diagnoseTile()`
+is shared by the engine and the HUD inspector. Saves use `mata-save` v2
+(`.mata.json`); v1 files migrate in health, bag and cistern.
 
 The simulation package compiles with `lib: ["ES2023"]` and no ambient types, so any accidental
 use of DOM or Node APIs fails the type check. ESLint additionally bans `Math.random`, `Date`,
@@ -83,7 +103,8 @@ flowchart LR
   thread. It applies the deltas sent by the worker. Because the mirror is a real `World`,
   the UI can run the same pure validation (`previewCommand`) and diagnostic
   (`diagnoseTile`) functions as the engine, without a round trip.
-- **Renderer** (`apps/web/src/renderer`) draws the mirror. It never mutates simulation state.
+- **Renderer** (`packages/view-city`) draws the mirror with an injected `Theme`. It never mutates
+  simulation state.
 - **GameSession** (`apps/web/src/state/session.ts`) wires the client, the renderer and the tools
   to a small `Store<UiState>`: current screen (menu or game), open panel, tutorial step, tool,
   overlay, speed and toasts. React components subscribe to slices of that store.
@@ -182,6 +203,30 @@ total, and the p95 of every tick stays under 10 ms even on a CPU throttled to 40
 Systems implement `System { id; update(ctx: SimContext): void }` and are registered in a fixed
 order. The engine only orchestrates; game rules live in the systems.
 
+## Rulesets
+
+`EngineOptions.ruleset` selects `'classic'` (Urbe, default) or `'neon'` (Neo Urbe). The flag is
+stored in the snapshot and in the save, so a loaded city keeps its own rules regardless of the app
+that opened it. The classic path is untouched: every neon branch is guarded by
+`ruleset === 'neon'`, and the classic unit, scenario and E2E suites keep the same hashes.
+
+| Area | Classic | Neon |
+| --- | --- | --- |
+| Power | Component balance | Same components, plus overload, cascading blackouts and batteries |
+| Land | Vacant lots stay vacant | Four megacorps buy idle zoned lots and stamp land value |
+| Security | No intrusions | Hackers take services offline; firewalls block them |
+| Traffic | Ground network only | Drone ports add an aerial relief layer above it |
+| Zoning | Classic level caps | Dense level 7, light level 3, extrapolated capacity and demand |
+
+The five mechanics live in `packages/simulation/src/systems/neon/`; their constants are in
+`packages/shared/src/balance/neon.ts` and their formulas in [neon-spec.md](neon-spec.md).
+`CityStats.neon` carries the extra telemetry (stressed components, battery charge, firewall
+coverage, drone ports, corporations, skimmed cash) and is absent in a classic city.
+
+Themes are orthogonal to the ruleset: `@view/city` receives a `Theme` and never hardcodes a colour,
+so `apps/web` injects `@theme/urbe` and `apps/neon` injects `@theme/neon`. A third skin is a new
+`packages/theme-*` package, not a fork of the renderer.
+
 ## Determinism
 
 - A single seeded RNG (`xoshiro128**`) with serializable state. No `Math.random`.
@@ -229,7 +274,7 @@ classified (`quota`, `unavailable`, `missing`) and shown to the player; export t
 
 ## Animations
 
-`apps/web/src/renderer/animation/` adds motion on top of the chunks. It is purely cosmetic:
+`packages/view-city/src/animation/` adds motion on top of the chunks. It is purely cosmetic:
 it reads the mirror world and never sends commands, so turning it off changes nothing in the
 simulation. The rules live in pure modules (unit tested); `AnimationLayer` only maps them to
 Pixi sprites.

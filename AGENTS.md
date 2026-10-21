@@ -6,14 +6,18 @@ Guidance for AI agents and humans working on this repository.
 
 Build Plot 42, a static browser game platform. Urbe is the isometric city builder:
 the player creates conditions and the simulator decides the outcome. Horta is a
-small harvest grid. Posto is a turn-based outpost on a 10×10 board. All three
-share the shell (`kernel`, `bridge`, `view-iso`, `chrome`).
+small harvest grid. Posto is a turn-based outpost on a 10×10 board. Mata is a
+living grove: plants shade, drink and feed each other. Neo Urbe is the same
+city builder as Urbe under the `neon` ruleset — a cyberpunk reskin with its own
+theme, music and five extra mechanics. All five share the shell
+(`kernel`, `bridge`, `view-iso`, `chrome`).
 
 ## Golden rules
 
 1. The simulation (`packages/simulation`) is pure TypeScript: no DOM, no Node APIs, no
    wall-clock time, no `Math.random`, no transcendental `Math` functions. Lint and type check
-   enforce this. The same bans apply to `packages/horta` and `packages/posto`.
+   enforce this. The same bans apply to `packages/horta`, `packages/posto`,
+   `packages/mata` and the neon systems in `packages/simulation/src/systems/neon/`.
 2. React components never contain economic or growth rules. They send commands and read state.
 3. The renderer never mutates simulation state.
 4. Every random decision uses the engine RNG, in a deterministic order.
@@ -23,7 +27,12 @@ share the shell (`kernel`, `bridge`, `view-iso`, `chrome`).
    Study them in `references/` (git-ignored) and write independent code.
 7. Code, comments, technical docs, commit messages and pull requests (title and
    body) are in English. Player-facing text for Urbe lives in `apps/web/src/i18n/`
-   (`en`, `pt-BR`, `es`, `fr`, `de`). Horta, Posto and the lobby use the same five locales.
+   (`en`, `pt-BR`, `es`, `fr`, `de`). Horta, Posto, Mata and the lobby use the same five locales.
+8. A game never contains colours. The renderer reads a `Theme` from `@theme/core`;
+   Urbe injects `@theme/urbe` and Neo Urbe injects `@theme/neon`. Adding a third
+   skin means a new `packages/theme-*` package, not a fork of `@view/city`.
+9. The classic ruleset must not change. New city mechanics go behind
+   `ruleset === 'neon'` and are covered by `tests/unit/neon-*.test.ts`.
    English is the type source. The first visit follows the browser language (or English).
 
 ## Commands
@@ -34,13 +43,15 @@ pnpm lobby            # Plot 42 lobby on http://localhost:5176
 pnpm dev              # Urbe on http://localhost:5173
 pnpm horta            # Horta on http://localhost:5174
 pnpm posto            # Posto on http://localhost:5175
+pnpm mata             # Mata on http://localhost:5177
+pnpm neon             # Neo Urbe on http://localhost:5178
 pnpm lint             # ESLint
 pnpm typecheck        # tsc for every package
 pnpm test             # unit + integration tests (Vitest)
 pnpm test:simulation  # long scenario tests (Vitest)
 pnpm test:e2e         # Playwright (builds and serves Urbe)
 pnpm build            # production build of apps/web (Urbe)
-pnpm build:site       # lobby + three games into site/
+pnpm build:site       # lobby + four games into site/
 pnpm preview:site     # serve site/ on http://localhost:4173
 pnpm sim --preset balanced --months 120 --seeds 1,2,3   # headless JSON reports
 pnpm sim --list       # simulation presets
@@ -77,9 +88,18 @@ packages/view-iso/ isometric camera, picking, chunk grid
 packages/chrome/   Store, boot/pause/toasts, i18n helpers, audio graph, IndexedDB
 packages/horta/    Horta sim (plant / grow / harvest)
 packages/posto/    Posto sim (move / attack, enemy turn)
+packages/mata/     Mata sim (shade / water / nutrients / fauna / health, `mata-save`)
+packages/simulation/src/systems/neon/
+                   Neon ruleset: grid, corporations, intrusion, air traffic, vertical
+packages/theme/    Colourless Theme interface shared by every skin
+packages/theme-urbe/  Today's Urbe palette, byte for byte
+packages/theme-neon/  Cyberpunk palette, CSS tokens and audio parameters
+packages/view-city/  Renderer, sprites and animation layer (theme injected)
 apps/lobby/        Plot 42 landing page (marks, LocaleSelect, five locales)
 apps/horta/        Horta web app (port 5174)
 apps/posto/        Posto web app (port 5175)
+apps/mata/         Mata web app (port 5177)
+apps/neon/         Neo Urbe web app (port 5178), wraps apps/web with the neon theme
 apps/web/src/
   renderer/   Pixi isometric renderer, camera, picking, procedural sprites, overlays,
               animation/ (cosmetic cars, smoke, water glints, fire engines)
