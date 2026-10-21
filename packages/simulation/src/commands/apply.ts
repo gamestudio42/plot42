@@ -80,7 +80,7 @@ export function applyToolPlan(
         w: spec.size,
         h: spec.size,
         level: 1,
-        capacity: spec.powerSupply || spec.waterSupply,
+        capacity: spec.powerSupply || spec.waterSupply || spec.jobs,
         occupancy: 0,
         condition: 100,
         age: 0,
@@ -95,6 +95,8 @@ export function applyToolPlan(
       break;
     }
     case 'level':
+    case 'raise':
+    case 'lower':
       applyHeights(engine, plan.heights);
       break;
   }

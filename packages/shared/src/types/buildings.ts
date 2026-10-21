@@ -6,11 +6,14 @@ export const PLACEABLE_KINDS = [
   'gasPlant',
   'windTurbine',
   'waterPump',
+  'well',
   'policeStation',
   'fireStation',
   'school',
   'hospital',
   'park',
+  'marina',
+  'airport',
 ] as const;
 export type PlaceableKind = (typeof PLACEABLE_KINDS)[number];
 

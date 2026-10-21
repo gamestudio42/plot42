@@ -38,6 +38,29 @@ export function addHill(engine: SimulationEngine, vx: number, vy: number, height
   relaxSlopes(w.heights, vs);
 }
 
+/** Adds a dummy residential building so unlock rules see `count` inhabitants. */
+export function seedResidents(engine: SimulationEngine, count: number, x = 30, y = 30): void {
+  engine.buildings.add({
+    kind: 'residential',
+    x,
+    y,
+    w: 1,
+    h: 1,
+    level: 1,
+    capacity: count,
+    occupancy: count,
+    condition: 100,
+    age: 0,
+    abandoned: false,
+    emptyMonths: 0,
+    variant: 0,
+    powered: true,
+    watered: true,
+    offline: 0,
+    attractiveness: 1,
+  });
+}
+
 export function slopeConstraintHolds(engine: SimulationEngine): boolean {
   const w = engine.world;
   const vs = w.vertexSize;

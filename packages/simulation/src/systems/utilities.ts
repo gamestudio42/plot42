@@ -5,10 +5,12 @@ import {
   ZoneType,
   isZoneKind,
   type BuildingRecord,
+  type PlaceableKind,
   type UtilityStats,
 } from '@city/shared';
 import type { SimulationEngine } from '../engine';
 import type { World } from '../world/world';
+import { hubJobs } from './demand';
 
 export interface UtilityResult extends UtilityStats {
   /** True when some consumer in a supplied component went unserved. */
@@ -49,8 +51,9 @@ export function pumpNearWater(world: World, b: BuildingRecord): boolean {
 }
 
 export function waterSupply(world: World, b: BuildingRecord): number {
-  if (b.kind !== 'waterPump' || !b.powered || b.offline > 0) return 0;
-  const spec = PLACEABLE_SPECS.waterPump;
+  if (isZoneKind(b.kind) || !b.powered || b.offline > 0) return 0;
+  const spec = PLACEABLE_SPECS[b.kind];
+  if (spec.waterSupply <= 0 && spec.waterSupplyNearWater <= 0) return 0;
   return pumpNearWater(world, b) ? spec.waterSupplyNearWater : spec.waterSupply;
 }
 
@@ -96,7 +99,29 @@ export function updateUtilities(
       postProcess: (next) => spreadWaterToEmptyZones(w, next),
     },
   );
+  if (write) updateHubJobs(engine);
   return { power, water };
+}
+
+/** Sets hub capacity to its current job count and occupancy to it while the hub operates. */
+function updateHubJobs(engine: SimulationEngine): void {
+  let residents = 0;
+  const operating = new Map<string, number>();
+  const hubs: BuildingRecord[] = [];
+  for (const b of engine.buildings.values()) {
+    if (isZoneKind(b.kind)) {
+      if (b.kind === 'residential' && !b.abandoned) residents += b.occupancy;
+      continue;
+    }
+    if (PLACEABLE_SPECS[b.kind].jobs <= 0) continue;
+    hubs.push(b);
+    if (b.powered && b.offline === 0) operating.set(b.kind, (operating.get(b.kind) ?? 0) + 1);
+  }
+  for (const b of hubs) {
+    const spec = PLACEABLE_SPECS[b.kind as PlaceableKind];
+    b.capacity = hubJobs(spec, residents, operating.get(b.kind) ?? 0);
+    b.occupancy = b.powered && b.offline === 0 ? b.capacity : 0;
+  }
 }
 
 function solve(

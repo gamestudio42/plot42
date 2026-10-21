@@ -44,6 +44,19 @@ describe('road network', () => {
     expect(Number.isFinite(tree.dist[w.index(40, 10)] as number)).toBe(true);
   });
 
+  it('joins two shores with a single road component over water', () => {
+    const e = flatEngine(32);
+    addWater(e, 10, 0, 12, 31);
+    e.execute({ type: 'road', x0: 0, y0: 8, x1: 20, y1: 8 });
+    const r = e.roads;
+    r.update();
+    const w = e.world;
+    expect(r.componentCount).toBe(1);
+    expect(r.bridgeTiles).toBe(3);
+    expect(r.component[w.index(0, 8)]).toBe(r.component[w.index(20, 8)]);
+    expect(r.component[w.index(0, 8)]).not.toBe(0);
+  });
+
   it('recomputes only when roads change', () => {
     const e = flatEngine(16);
     e.roads.update();
@@ -147,5 +160,17 @@ describe('water network', () => {
     e.execute({ type: 'pipe', x0: 5, y0: 3, x1: 5, y1: 10 });
     expect(w.watered[w.index(5, 10)]).toBe(1);
     expect(w.hasInfra(w.index(5, 10), Infra.Pipe)).toBe(true);
+  });
+
+  it('serves a powered 1×1 well next to water', () => {
+    const e = flatEngine(32);
+    addWater(e, 0, 0, 31, 0);
+    const w = e.world;
+    e.execute({ type: 'place', kind: 'well', x: 4, y: 1 });
+    expect(e.stats().water.supply).toBe(0);
+    e.execute({ type: 'place', kind: 'windTurbine', x: 5, y: 1 });
+    expect(e.stats().water.supply).toBe(80);
+    e.execute({ type: 'pipe', x0: 4, y0: 2, x1: 4, y1: 8 });
+    expect(w.watered[w.index(4, 8)]).toBe(1);
   });
 });

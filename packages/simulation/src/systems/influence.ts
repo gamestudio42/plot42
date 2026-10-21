@@ -1,7 +1,8 @@
-import { BALANCE, PLACEABLE_SPECS, ZONE_SPECS, isZoneKind } from '@city/shared';
+import { BALANCE, PLACEABLE_SPECS, ZONE_SPECS, isZoneKind, type PlaceableKind } from '@city/shared';
 import type { SimulationEngine } from '../engine';
 import type { World } from '../world/world';
 import type { RoadNetwork } from './roads';
+import { isOperatingHub } from './traffic';
 
 /** Separable box blur with clamped edges (averages only in-bounds samples). */
 export function boxBlur(src: Float32Array, size: number, radius: number): Float32Array {
@@ -57,6 +58,34 @@ function parkDistance(engine: SimulationEngine, radius: number): Uint8Array {
     }
   }
   return dist;
+}
+
+/**
+ * Land value from operating hubs: `spec.landValue` beside the footprint, fading linearly to 0
+ * one tile past `spec.landValueRadius` (the marina's waterfront, the airport's noise).
+ */
+function hubLandValue(engine: SimulationEngine): Float32Array | null {
+  const w = engine.world;
+  let field: Float32Array | null = null;
+  for (const b of engine.buildings.values()) {
+    if (!isOperatingHub(b)) continue;
+    const spec = PLACEABLE_SPECS[b.kind as PlaceableKind];
+    const radius = spec.landValueRadius;
+    if (spec.landValue === 0 || radius <= 0) continue;
+    field ??= new Float32Array(w.tileCount);
+    for (let y = b.y - radius; y < b.y + b.h + radius; y++) {
+      for (let x = b.x - radius; x < b.x + b.w + radius; x++) {
+        if (!w.inBounds(x, y)) continue;
+        const d = Math.max(
+          Math.max(b.x - x, x - (b.x + b.w - 1), 0),
+          Math.max(b.y - y, y - (b.y + b.h - 1), 0),
+        );
+        const i = w.index(x, y);
+        field[i] = (field[i] as number) + spec.landValue * (1 - d / (radius + 1));
+      }
+    }
+  }
+  return field;
 }
 
 const waterCache = new WeakMap<World, { version: number; cap: number; dist: Uint8Array }>();
@@ -147,6 +176,7 @@ export function updateInfluence(engine: SimulationEngine, roads: RoadNetwork): v
   const parkValue = BALANCE.services.parkValue;
   const parkSpan = BALANCE.services.parkRadius + 1;
   const water = waterDistance(w, lv.waterRadius);
+  const hubs = hubLandValue(engine);
   const centre = populationCentre(engine);
   const heights = w.heights;
   const vs = w.vertexSize;
@@ -172,6 +202,7 @@ export function updateInfluence(engine: SimulationEngine, roads: RoadNetwork): v
     v += lv.education * (education[i] as number) + lv.health * (health[i] as number);
     v += lv.police * (police[i] as number);
     if ((accessRoad[i] as number) !== -1) v += lv.roadAccess;
+    if (hubs) v += hubs[i] as number;
     if (centre)
       v += Math.max(0, lv.centerBonus - (Math.abs(x - centre.x) + Math.abs(y - centre.y)) / 2);
     v -=

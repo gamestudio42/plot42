@@ -1,5 +1,7 @@
 import type { PlaceableKind, ZoneBuildingKind } from '../types/buildings';
 
+export type HubJobKind = 'commercial' | 'industrial';
+
 export interface PlaceableSpec {
   size: number;
   cost: number;
@@ -12,6 +14,20 @@ export interface PlaceableSpec {
   waterSupplyNearWater: number;
   pollution: number;
   serviceRadius: number;
+  /** Base jobs added to C or I while the building operates (powered and intact). */
+  jobs: number;
+  jobKind: HubJobKind | null;
+  /** Extra jobs per 1000 residents, split between operating hubs of the same kind. */
+  jobsPer1000: number;
+  maxJobs: number;
+  minPopulation: number;
+  requiresWater: boolean;
+  requiresRoad: boolean;
+  /** Links its road component to the region, like a road leaving the map. */
+  gateway: boolean;
+  /** Land value added (or removed) around the footprint while operating. */
+  landValue: number;
+  landValueRadius: number;
 }
 
 export const DEPARTMENTS = ['transport', 'police', 'fire', 'health', 'education'] as const;
@@ -27,6 +43,16 @@ const placeable = (
   waterSupplyNearWater: 0,
   pollution: 0,
   serviceRadius: 0,
+  jobs: 0,
+  jobKind: null,
+  jobsPer1000: 0,
+  maxJobs: 0,
+  minPopulation: 0,
+  requiresWater: false,
+  requiresRoad: false,
+  gateway: false,
+  landValue: 0,
+  landValueRadius: 0,
   ...spec,
 });
 
@@ -41,6 +67,14 @@ export const PLACEABLE_SPECS: Record<PlaceableKind, PlaceableSpec> = {
     powerUse: 10,
     waterSupply: 150,
     waterSupplyNearWater: 400,
+  }),
+  well: placeable({
+    size: 1,
+    cost: 100,
+    upkeep: 4,
+    powerUse: 2,
+    waterSupply: 40,
+    waterSupplyNearWater: 80,
   }),
   policeStation: placeable({
     size: 2,
@@ -75,6 +109,39 @@ export const PLACEABLE_SPECS: Record<PlaceableKind, PlaceableSpec> = {
     serviceRadius: 26,
   }),
   park: placeable({ size: 1, cost: 50, upkeep: 2 }),
+  marina: placeable({
+    size: 3,
+    cost: 2500,
+    upkeep: 35,
+    powerUse: 8,
+    pollution: 15,
+    jobs: 40,
+    jobKind: 'industrial',
+    jobsPer1000: 25,
+    maxJobs: 200,
+    minPopulation: 1000,
+    requiresWater: true,
+    requiresRoad: true,
+    gateway: true,
+    landValue: 30,
+    landValueRadius: 6,
+  }),
+  airport: placeable({
+    size: 4,
+    cost: 6000,
+    upkeep: 70,
+    powerUse: 16,
+    pollution: 35,
+    jobs: 60,
+    jobKind: 'commercial',
+    jobsPer1000: 50,
+    maxJobs: 600,
+    minPopulation: 2000,
+    requiresRoad: true,
+    gateway: true,
+    landValue: -35,
+    landValueRadius: 5,
+  }),
 };
 
 type LevelTable = readonly [number, number, number, number, number, number];
@@ -152,6 +219,8 @@ export const BALANCE = {
       tax: 0.5,
     },
     industrial: { base: 30, perCapita: 0.25, market: 0.8, labor: 0.4, tax: 0.5, edgeBonus: 0.1 },
+    /** C/I market numerator added per operating hub job (visitors and freight). */
+    hubMarketPerJob: 2,
   },
   attractiveness: {
     residential: {
