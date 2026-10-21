@@ -1,13 +1,15 @@
 import type { DisasterKind } from '@city/shared';
 import type { ReactNode } from 'react';
-import { t } from '../i18n/pt-BR';
+import { useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
+import { LocaleSelect } from './LocaleSelect';
 import { Panel } from './Panel';
 
 const DISASTERS: DisasterKind[] = ['fire', 'flood', 'earthquake', 'crisis', 'blackout', 'epidemic'];
 
 export function SystemPanel({ session, children }: { session: GameSession; children?: ReactNode }) {
+  const t = useStrings(session.ui);
   const grid = useStore(session.ui, (s) => s.grid);
   const underground = useStore(session.ui, (s) => s.underground);
   const muted = useStore(session.ui, (s) => s.muted);
@@ -24,6 +26,7 @@ export function SystemPanel({ session, children }: { session: GameSession; child
       title={s.title}
       testId="system-panel"
       onClose={() => session.closePanel()}
+      closeLabel={t.ui.close}
       className="system-panel"
     >
       {children}
@@ -54,6 +57,7 @@ export function SystemPanel({ session, children }: { session: GameSession; child
         ))}
       </div>
       <h3>{s.settings}</h3>
+      <LocaleSelect session={session} label={s.language} />
       <label className="check-row">
         <input type="checkbox" checked={grid} onChange={(e) => session.setGrid(e.target.checked)} />
         {s.grid}

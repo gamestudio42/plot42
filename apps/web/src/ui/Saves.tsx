@@ -1,7 +1,7 @@
 import { SAVE_FILE_EXTENSION } from '@city/shared';
 import { dateOf } from '@city/simulation';
 import { useRef } from 'react';
-import { formatMoney, formatNumber, MONTHS, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, intlLocale, months, useStrings, type Locale } from '../i18n';
 import type { SaveSlot } from '../persistence/saves';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
@@ -45,18 +45,20 @@ export function ImportFileButton({
   );
 }
 
-function slotDate(slot: SaveSlot): string {
+function slotDate(slot: SaveSlot, locale: Locale): string {
   const game = dateOf(slot.tick);
   const real = slot.savedAt ? new Date(slot.savedAt) : null;
   const saved =
     real && !Number.isNaN(real.getTime())
-      ? real.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      ? real.toLocaleString(intlLocale(locale), { dateStyle: 'short', timeStyle: 'short' })
       : '';
-  return `${MONTHS[game.month]} ${game.year}${saved ? ` · ${saved}` : ''}`;
+  return `${months(locale)[game.month]} ${game.year}${saved ? ` · ${saved}` : ''}`;
 }
 
 /** Main-menu block: continue the latest city, open a file, or pick a saved city. */
 export function SavedCities({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const saves = useStore(session.ui, (s) => s.saves);
   const busy = useStore(session.ui, (s) => s.busy);
   const m = t.menu;
@@ -88,8 +90,11 @@ export function SavedCities({ session }: { session: GameSession }) {
                 <strong>{slot.name}</strong>
                 {slot.autosave && <span className="badge auto">{t.save.autosave}</span>}
                 <div className="muted small">
-                  {slotDate(slot)} ·{' '}
-                  {t.save.slotInfo(formatNumber(slot.population), formatMoney(slot.funds))}
+                  {slotDate(slot, locale)} ·{' '}
+                  {t.save.slotInfo(
+                    formatNumber(slot.population, locale),
+                    formatMoney(slot.funds, locale),
+                  )}
                 </div>
               </div>
               <button
@@ -125,6 +130,7 @@ export function SavedCities({ session }: { session: GameSession }) {
 
 /** In-game save controls for the system panel. */
 export function SaveControls({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const busy = useStore(session.ui, (s) => s.busy);
   const s = t.save;
   return (

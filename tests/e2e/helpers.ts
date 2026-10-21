@@ -17,12 +17,21 @@ export interface StartOptions {
   hills?: number;
 }
 
+/**
+ * Existing E2E assertions are written against the Portuguese catalog. Pin the locale
+ * before any page script runs so `bootLocale` does not follow the browser language.
+ */
+export async function pinE2ELocale(page: Page): Promise<void> {
+  await page.addInitScript(() => localStorage.setItem('cityBuilder.locale', 'pt-BR'));
+}
+
 /** Starts a new city from the main menu with a fixed seed. */
 export async function startCity(
   page: Page,
   seed = 'e2e',
   options: StartOptions = {},
 ): Promise<void> {
+  await pinE2ELocale(page);
   if (!options.tutorial) {
     await page.addInitScript(() => localStorage.setItem('cityBuilder.tutorialDone', '1'));
   }

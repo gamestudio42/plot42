@@ -1,59 +1,62 @@
 import { BALANCE, PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
-import { formatMoney, formatNumber, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, useStrings, type Locale, type Strings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { TOOL_GROUPS, TOOLS, type ToolDef } from '../tools/tools';
 import { ToolIcon } from './icons';
 
-function costLabel(tool: ToolDef): string | null {
+function costLabel(tool: ToolDef, t: Strings, locale: Locale): string | null {
   const c = BALANCE.costs;
+  const money = (value: number) => formatMoney(value, locale);
   switch (tool.id) {
     case 'road':
-      return `${formatMoney(c.road)}/lote · ponte ${formatMoney(c.bridge)}`;
+      return `${money(c.road)}${t.ui.perTile} · ${t.ui.bridge} ${money(c.bridge)}`;
     case 'powerLine':
-      return `${formatMoney(c.powerLine)}/lote`;
+      return `${money(c.powerLine)}${t.ui.perTile}`;
     case 'pipe':
-      return `${formatMoney(c.pipe)}/lote`;
+      return `${money(c.pipe)}${t.ui.perTile}`;
     case 'zoneResLight':
     case 'zoneComLight':
     case 'zoneIndLight':
-      return `${formatMoney(c.zoneLight)}/lote`;
+      return `${money(c.zoneLight)}${t.ui.perTile}`;
     case 'zoneResDense':
     case 'zoneComDense':
     case 'zoneIndDense':
-      return `${formatMoney(c.zoneDense)}/lote`;
+      return `${money(c.zoneDense)}${t.ui.perTile}`;
     case 'level':
     case 'raise':
     case 'lower':
-      return `${formatMoney(c.levelPerUnit)}/unidade de altura`;
+      return `${money(c.levelPerUnit)}${t.ui.perHeight}`;
     case 'trees':
-      return `${formatMoney(c.plantTree)}/lote`;
+      return `${money(c.plantTree)}${t.ui.perTile}`;
     case 'select':
     case 'dezone':
     case 'demolish':
       return null;
     default:
-      return formatMoney(PLACEABLE_SPECS[tool.id as PlaceableKind].cost);
+      return money(PLACEABLE_SPECS[tool.id as PlaceableKind].cost);
   }
 }
 
 export function Toolbar({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const active = useStore(session.ui, (s) => s.tool);
   const population = useStore(session.ui, (s) => s.stats?.population ?? 0);
   return (
-    <nav className="toolbar" aria-label="Ferramentas" data-testid="toolbar">
+    <nav className="toolbar" aria-label={t.ui.tools} data-testid="toolbar">
       {TOOL_GROUPS.map((group) => (
         <div key={group} className="tool-group" role="group" aria-label={t.toolGroups[group]}>
           {TOOLS.filter((tool) => tool.group === group).map((tool) => {
             const spec =
               tool.id in PLACEABLE_SPECS ? PLACEABLE_SPECS[tool.id as PlaceableKind] : undefined;
             const locked = Boolean(spec && spec.minPopulation > population);
-            const cost = costLabel(tool);
+            const cost = costLabel(tool, t, locale);
             const title = [
               t.tools[tool.id],
               cost,
-              locked && spec ? t.hud.unlockAt(formatNumber(spec.minPopulation)) : null,
-              tool.hotkey ? `Atalho: ${tool.hotkey.toUpperCase()}` : null,
+              locked && spec ? t.hud.unlockAt(formatNumber(spec.minPopulation, locale)) : null,
+              tool.hotkey ? `${t.ui.shortcut}: ${tool.hotkey.toUpperCase()}` : null,
             ]
               .filter(Boolean)
               .join(' — ');

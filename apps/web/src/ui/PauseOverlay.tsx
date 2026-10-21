@@ -1,9 +1,10 @@
-import { t } from '../i18n/pt-BR';
+import { useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 
 /** Paused state: a soft vignette and a badge. Purely visual, the map stays interactive. */
 export function PauseOverlay({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const paused = useStore(session.ui, (s) => s.speed === 0);
   if (!paused) return null;
   return (

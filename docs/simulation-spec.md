@@ -354,4 +354,4 @@ it off).
 `NO_ROAD`, `NO_POWER`, `BROWNOUT`, `NO_WATER_FOR_LEVEL`, `LOW_DEMAND`, `NO_JOB_ACCESS`,
 `NO_CUSTOMERS`, `NO_WORKERS`, `POLLUTION`, `CRIME`, `LOW_LAND_VALUE`, `CONGESTION`,
 `HIGH_TAXES`, `SLOPE`, `ABANDONED`, `ON_FIRE`, `RUBBLE`, `FLOODED`, `MAX_LEVEL`. The UI
-translates each code into Portuguese.
+translates each code into the player's language.

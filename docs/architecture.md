@@ -267,6 +267,6 @@ starts with the first gesture, defaults to on and is stored in
 
 ## Error handling
 
-- Rejected commands return a `RejectReason` code; the UI translates it to Portuguese.
+- Rejected commands return a `RejectReason` code; the UI translates it to the player's language.
 - Save validation reports every problem found; a corrupted file never reaches the engine.
 - IndexedDB quota errors and WebGL context loss are surfaced to the player.

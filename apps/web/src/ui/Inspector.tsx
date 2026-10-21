@@ -16,7 +16,7 @@ import {
   type World,
 } from '@city/simulation';
 import { useEffect, useMemo, useState } from 'react';
-import { formatNumber, t } from '../i18n/pt-BR';
+import { formatNumber, useStrings, type Locale, type Strings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { Panel } from './Panel';
@@ -104,24 +104,26 @@ function HubFacts({
   building: b,
   spec,
   regional,
+  t,
+  locale,
 }: {
   building: BuildingRecord;
   spec: PlaceableSpec;
   regional: boolean;
+  t: Strings;
+  locale: Locale;
 }) {
   const h = t.inspector.hub;
   const operating = b.occupancy > 0;
+  const num = (value: number) => formatNumber(value, locale);
   return (
     <>
       <dt>{h.status}</dt>
       <dd data-testid="hub-status">{operating ? h.operating : h.idle}</dd>
       <dt>{h.jobs}</dt>
       <dd data-testid="hub-jobs">
-        {formatNumber(b.occupancy)} / {formatNumber(b.capacity)}{' '}
-        {spec.jobKind ? h.jobKind[spec.jobKind] : ''}
-        <small className="fact-note">
-          {h.growth(spec.jobsPer1000, formatNumber(spec.maxJobs))}
-        </small>
+        {num(b.occupancy)} / {num(b.capacity)} {spec.jobKind ? h.jobKind[spec.jobKind] : ''}
+        <small className="fact-note">{h.growth(spec.jobsPer1000, num(spec.maxJobs))}</small>
       </dd>
       {spec.gateway && (
         <>
@@ -140,6 +142,8 @@ function HubFacts({
 }
 
 export function Inspector({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const selected = useStore(session.ui, (s) => s.selected);
   // Refresh once per game day at most; tile changes trigger their own refresh.
   const day = useStore(session.ui, (s) =>
@@ -172,6 +176,7 @@ export function Inspector({ session }: { session: GameSession }) {
       title={title}
       testId="inspector"
       onClose={() => session.select(null)}
+      closeLabel={t.ui.close}
       className="inspector"
     >
       <dl className="facts">
@@ -199,7 +204,7 @@ export function Inspector({ session }: { session: GameSession }) {
                 <dd data-testid="inspector-level">{b.abandoned ? n.abandoned : b.level}</dd>
                 <dt>{n.occupancy}</dt>
                 <dd>
-                  {formatNumber(b.occupancy)} / {formatNumber(b.capacity)}{' '}
+                  {formatNumber(b.occupancy, locale)} / {formatNumber(b.capacity, locale)}{' '}
                   {b.kind === 'residential' ? n.residents : n.jobs}
                 </dd>
                 <dt>{n.condition}</dt>
@@ -208,7 +213,7 @@ export function Inspector({ session }: { session: GameSession }) {
                 <dd>{Math.round(b.attractiveness * 100)}%</dd>
               </>
             )}
-            {hub && <HubFacts building={b} spec={hub} regional={s.regional} />}
+            {hub && <HubFacts building={b} spec={hub} regional={s.regional} t={t} locale={locale} />}
             <dt>{n.age}</dt>
             <dd>
               {b.age} {n.months}

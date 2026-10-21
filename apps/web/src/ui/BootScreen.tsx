@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { t } from '../i18n/pt-BR';
+import { catalog, type Locale } from '../i18n';
 import { prefersReducedMotion } from '../motion';
 import type { BootState, GameSession } from '../state/session';
 import { useStore } from '../state/store';
@@ -9,6 +9,7 @@ const FADE_MS = 300;
 
 /** Loading screen shown until the renderer and the menu city are ready, then faded out. */
 export function BootScreen({ session }: { session: GameSession }) {
+  const locale = useStore(session.ui, (s) => s.locale);
   const boot = useStore(session.ui, (s) => s.boot);
   const [gone, setGone] = useState(false);
   const done = boot.step === 'done';
@@ -20,10 +21,19 @@ export function BootScreen({ session }: { session: GameSession }) {
   }, [done]);
 
   if (gone) return null;
-  return <BootView boot={boot} leaving={done} />;
+  return <BootView boot={boot} leaving={done} locale={locale} />;
 }
 
-export function BootView({ boot, leaving = false }: { boot: BootState; leaving?: boolean }) {
+export function BootView({
+  boot,
+  leaving = false,
+  locale = 'en',
+}: {
+  boot: BootState;
+  leaving?: boolean;
+  locale?: Locale;
+}) {
+  const t = catalog(locale);
   const percent = Math.round(boot.progress * 100);
   return (
     <div

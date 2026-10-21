@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { clientPointOf, waitForCity } from './helpers';
+import { clientPointOf, pinE2ELocale, waitForCity } from './helpers';
 
 const musicState = (page: Page) => page.evaluate(() => window.__cityDebug?.musicState());
 
 async function openMenu(page: Page): Promise<void> {
+  await pinE2ELocale(page);
   await page.addInitScript(() => localStorage.setItem('cityBuilder.tutorialDone', '1'));
   await page.goto('/');
   await page.getByTestId('main-menu').waitFor();

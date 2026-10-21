@@ -1,11 +1,13 @@
 import { PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
-import { formatMoney, formatNumber, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { toolById } from '../tools/tools';
 
 /** Small label next to the cursor with the tool name, cost and validation message. */
 export function ToolTooltip({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const preview = useStore(session.ui, (s) => s.preview);
   const pointer = useStore(session.ui, (s) => s.pointer);
   const toolId = useStore(session.ui, (s) => s.tool);
@@ -21,7 +23,7 @@ export function ToolTooltip({ session }: { session: GameSession }) {
       <div className="tool-tooltip-title">{t.tools[tool.id]}</div>
       {preview.count > 0 && (
         <div>
-          {t.ui.cost}: {preview.cost > 0 ? formatMoney(preview.cost) : t.ui.free}
+          {t.ui.cost}: {preview.cost > 0 ? formatMoney(preview.cost, locale) : t.ui.free}
           {tool.shape !== 'footprint' && ` · ${preview.count} ${t.ui.tiles}`}
         </div>
       )}
@@ -29,7 +31,7 @@ export function ToolTooltip({ session }: { session: GameSession }) {
         <div className="tool-tooltip-reason">
           {t.reasons[preview.reason]}
           {preview.reason === 'LOCKED' && tool.id in PLACEABLE_SPECS
-            ? ` ${t.hud.unlockAt(formatNumber(PLACEABLE_SPECS[tool.id as PlaceableKind].minPopulation))}`
+            ? ` ${t.hud.unlockAt(formatNumber(PLACEABLE_SPECS[tool.id as PlaceableKind].minPopulation, locale))}`
             : null}
         </div>
       )}

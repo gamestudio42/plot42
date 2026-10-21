@@ -17,7 +17,7 @@
   An isometric city builder that runs in the browser.
   Zone the land, connect power and water, keep the budget alive —
   then watch demand, traffic and disasters do the rest.
-  No install. Interface in Brazilian Portuguese.
+  No install. Interface in English, Portuguese, Spanish, French and German.
 </p>
 
 <p align="center">
@@ -63,7 +63,7 @@
 | --- | --- |
 | **Live game** | [gamestudio42.github.io/urbe](https://gamestudio42.github.io/urbe/) |
 | **Hotkeys** | `R` road · `1–6` zones · `E` power · `T` water · `P` pause · `M` sound |
-| **Language** | Interface in Brazilian Portuguese · code and docs in English |
+| **Language** | English, Portuguese, Spanish, French, German · code and docs in English |
 
 ## Develop
 

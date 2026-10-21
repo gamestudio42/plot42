@@ -1,4 +1,4 @@
-import { t } from '../i18n/pt-BR';
+import { useStrings, type Strings } from '../i18n';
 import {
   isGoodOverlay,
   POWER_ON_COLOR,
@@ -35,7 +35,7 @@ function gradient(scale: (v: number) => number): string {
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 }
 
-function Legend({ mode }: { mode: OverlayMode }) {
+function Legend({ mode, t }: { mode: OverlayMode; t: Strings }) {
   const o = t.overlayPanel;
   if (mode === 'none') return null;
   if (mode === 'power' || mode === 'water') {
@@ -60,12 +60,14 @@ function Legend({ mode }: { mode: OverlayMode }) {
 }
 
 export function OverlayPanel({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const overlay = useStore(session.ui, (s) => s.overlay);
   return (
     <Panel
       title={t.overlayPanel.title}
       testId="overlay-panel"
       onClose={() => session.closePanel()}
+      closeLabel={t.ui.close}
       className="overlay-panel"
     >
       <div className="overlay-grid">
@@ -82,7 +84,7 @@ export function OverlayPanel({ session }: { session: GameSession }) {
           </button>
         ))}
       </div>
-      <Legend mode={overlay} />
+      <Legend mode={overlay} t={t} />
     </Panel>
   );
 }

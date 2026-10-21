@@ -1,16 +1,17 @@
 import type { ReactNode } from 'react';
-import { t } from '../i18n/pt-BR';
 
 export function Panel({
   title,
   testId,
   onClose,
+  closeLabel,
   className = '',
   children,
 }: {
   title: string;
   testId: string;
   onClose: () => void;
+  closeLabel: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -22,8 +23,8 @@ export function Panel({
           type="button"
           className="icon-button"
           onClick={onClose}
-          aria-label={t.ui.close}
-          title={t.ui.close}
+          aria-label={closeLabel}
+          title={closeLabel}
         >
           ×
         </button>
