@@ -19,19 +19,30 @@ interface Palette extends BoxColors {
 }
 
 /** Cream / terracotta, beige / slate, stone / brown, peach / green. */
-const RES_PALETTES: Palette[] = [
+const RES_HOUSE_PALETTES: Palette[] = [
   { wall: 0xe8dcc0, roof: 0xb6483a, window: 0x6fa8d8, accent: 0x8a4a3a },
   { wall: 0xd4c4a0, roof: 0x4a6080, window: 0x5a90c0, accent: 0x6a5344 },
   { wall: 0xf2e6d0, roof: 0x6b4a32, window: 0x7ab0d0, accent: 0x7a4a38 },
   { wall: 0xe6c8b4, roof: 0x3d6b48, window: 0x6a9cc0, accent: 0x5a4034 },
 ];
 
-/** Stucco, brick, glass-blue, charcoal — not three tints of the same office. */
-const COM_PALETTES: Palette[] = [
-  { wall: 0xf0e6d4, roof: 0xc45a42, window: 0xd8eefc, accent: 0xd84a4a },
-  { wall: 0xc47858, roof: 0x5a4038, window: 0xffe8c8, accent: 0x2a8f7a },
-  { wall: 0x7a9bb8, roof: 0x4a6078, window: 0xc8e4f8, accent: 0x3a5a8a },
-  { wall: 0x3a424c, roof: 0xb88850, window: 0x8ec8e8, accent: 0xe8c040 },
+/**
+ * Housing vs offices: warm living walls here, cool corporate walls on COM_PALETTES.
+ * Cream / brick / taupe / sage — no salmon (that read as a shop).
+ */
+export const RES_TOWER_PALETTES: Palette[] = [
+  { wall: 0xe8d4a0, roof: 0x8a7a58, window: 0x6fa8d8, accent: 0xa05040 },
+  { wall: 0xb45a48, roof: 0x5c4038, window: 0xf0d8b0, accent: 0x5a3028 },
+  { wall: 0xc8bca8, roof: 0x6a5a48, window: 0x7aa0b8, accent: 0x5a4a3c },
+  { wall: 0x88a86a, roof: 0x4a6a48, window: 0x4a7088, accent: 0x3a5038 },
+];
+
+/** Ice / navy / steel / teal — no cream, brick or terracotta. */
+export const COM_PALETTES: Palette[] = [
+  { wall: 0xe4eef8, roof: 0x6a8498, window: 0xd8eefc, accent: 0xd84a4a },
+  { wall: 0x2c3a4e, roof: 0x1e2838, window: 0x8ec8e8, accent: 0xe8c040 },
+  { wall: 0x4a7aa8, roof: 0x3a5a78, window: 0xc8e4f8, accent: 0x2a6a9a },
+  { wall: 0x2a8a78, roof: 0x1e5a50, window: 0xc8f0e8, accent: 0xe8c040 },
 ];
 
 /** Yellow roof, brown steel, tan brick, rust. */
@@ -259,6 +270,28 @@ function parapet(g: Graphics, top: Point[], rise: number, color: number): void {
   poly(g, [up(t, rise), up(r, rise), up(b, rise), up(l, rise)], shade(color, 1.08));
 }
 
+/** Thin ledges on the camera-facing faces, every other floor. */
+function balconyRows(
+  g: Graphics,
+  u0: number,
+  v0: number,
+  u1: number,
+  v1: number,
+  height: number,
+  floors: number,
+  z0: number,
+  color: number,
+): void {
+  const floorH = height / Math.max(1, floors);
+  const depth = 0.055;
+  const ledge: BoxColors = { wall: color, roof: shade(color, 1.08) };
+  for (let floor = 1; floor < floors; floor += 2) {
+    const z = z0 + floor * floorH + 1;
+    boxUV(g, u0 + 0.1, v1 - depth, u1 - 0.1, Math.min(0.99, v1 + 0.012), 2, ledge, 0, z);
+    boxUV(g, u1 - depth, v0 + 0.1, Math.min(0.99, u1 + 0.012), v1 - 0.1, 2, ledge, 0, z);
+  }
+}
+
 function door(g: Graphics, from: Point, to: Point, t: number, z1: number, color: number): void {
   const a = lerp(from, to, t);
   const e = lerp(from, to, t + 0.14);
@@ -292,7 +325,8 @@ export function drawResidential(
   abandoned: boolean,
 ): void {
   const style = styleOf(variant);
-  const p = muted(RES_PALETTES[style] ?? RES_PALETTES[0]!, abandoned);
+  const row = level <= 2 ? RES_HOUSE_PALETTES : RES_TOWER_PALETTES;
+  const p = muted(row[style] ?? row[0]!, abandoned);
   const colors: BoxColors = { wall: p.wall, roof: p.roof, window: p.window };
 
   if (level <= 2) {
@@ -329,42 +363,60 @@ export function drawResidential(
   const floors = [0, 0, 0, 4, 7, 11];
   const h = heights[level] ?? 40;
   const f = floors[level] ?? 4;
-  const flat = { wall: p.wall, roof: shade(p.wall, 0.8), window: p.window };
+  const tower: BoxColors = { wall: p.wall, roof: p.roof, window: p.window };
 
   if (style === 0) {
-    const top = boxUV(g, 0.1, 0.1, 0.9, 0.9, h, flat, f);
+    const top = boxUV(g, 0.08, 0.08, 0.92, 0.92, h, tower, f);
+    balconyRows(g, 0.08, 0.08, 0.92, 0.92, h, f, 0, shade(p.accent, 0.9));
+    parapet(g, top, 4, p.roof);
     if (abandoned) return;
     waterTank(g, onTop(top, 0.55, 0.4));
-    if (level >= 5) antenna(g, onTop(top, 0.3, 0.7), 16);
+    if (level >= 5) antenna(g, onTop(top, 0.28, 0.68), 16);
     return;
   }
   if (style === 1) {
-    boxUV(g, 0.1, 0.1, 0.9, 0.9, h * 0.76, flat, Math.max(2, f - 2));
-    const top = boxUV(g, 0.22, 0.22, 0.78, 0.78, h * 0.24, flat, 2, h * 0.76);
-    if (abandoned) return;
-    miniBox(g, onTop(top, 0.5, 0.45), 6, 5, shade(p.wall, 0.7));
+    const mid = h * 0.42;
+    const cap = h * 0.28;
+    boxUV(g, 0.06, 0.06, 0.94, 0.94, mid, tower, Math.max(2, Math.round(f * 0.42)));
+    boxUV(
+      g,
+      0.18,
+      0.18,
+      0.82,
+      0.82,
+      h - mid - cap,
+      tower,
+      Math.max(2, Math.round(f * 0.3)),
+      mid,
+    );
+    const top = boxUV(g, 0.3, 0.3, 0.7, 0.7, cap, tower, Math.max(1, Math.round(f * 0.28)), h - cap);
+    parapet(g, top, 3, p.roof);
+    if (!abandoned) miniBox(g, onTop(top, 0.5, 0.45), 6, 5, shade(p.wall, 0.7));
     return;
   }
   if (style === 2) {
+    const podium = 12;
     boxUV(
       g,
-      0.06,
-      0.06,
-      0.94,
-      0.94,
-      11,
-      { wall: shade(p.wall, 0.7), roof: shade(p.wall, 0.75), window: p.window },
+      0.04,
+      0.04,
+      0.96,
+      0.96,
+      podium,
+      { wall: shade(p.wall, 0.72), roof: shade(p.roof, 0.85), window: p.window },
       1,
     );
-    const top = boxUV(g, 0.16, 0.16, 0.84, 0.84, h, flat, f);
-    if (!abandoned) antenna(g, onTop(top, 0.65, 0.28), 14);
+    const top = boxUV(g, 0.24, 0.12, 0.92, 0.76, h - podium, tower, f, podium);
+    parapet(g, top, 3, p.roof);
+    if (!abandoned) antenna(g, onTop(top, 0.7, 0.3), 14);
     return;
   }
-  const main = boxUV(g, 0.1, 0.08, 0.9, 0.58, h, flat, f);
-  const wing = boxUV(g, 0.1, 0.58, 0.52, 0.92, h * 0.7, flat, Math.max(2, f - 3));
+  const bar = boxUV(g, 0.08, 0.08, 0.92, 0.38, h, tower, f);
+  const wing = boxUV(g, 0.08, 0.38, 0.4, 0.92, h * 0.82, tower, Math.max(2, f - 2));
+  parapet(g, bar, 3, p.roof);
   if (abandoned) return;
-  waterTank(g, onTop(main, 0.7, 0.4));
-  if (level >= 5) antenna(g, onTop(wing, 0.4, 0.5), 16);
+  waterTank(g, onTop(bar, 0.72, 0.45));
+  if (level >= 5) antenna(g, onTop(wing, 0.45, 0.55), 16);
 }
 
 export function drawCommercial(
