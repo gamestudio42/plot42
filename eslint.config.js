@@ -12,6 +12,7 @@ export default defineConfig(
   {
     ignores: [
       '**/dist/**',
+      'site/**',
       '**/node_modules/**',
       'references/**',
       'reports/**',
@@ -31,7 +32,13 @@ export default defineConfig(
     },
   },
   {
-    files: ['packages/simulation/src/**/*.ts', 'packages/shared/src/**/*.ts'],
+    files: [
+      'packages/simulation/src/**/*.ts',
+      'packages/shared/src/**/*.ts',
+      'packages/kernel/src/**/*.ts',
+      'packages/horta/src/**/*.ts',
+      'packages/posto/src/**/*.ts',
+    ],
     rules: {
       'no-restricted-globals': [
         'error',
@@ -51,12 +58,26 @@ export default defineConfig(
     },
   },
   {
-    files: ['apps/web/src/**/*.{ts,tsx}'],
+    files: [
+      'apps/web/src/**/*.{ts,tsx}',
+      'apps/horta/src/**/*.{ts,tsx}',
+      'apps/posto/src/**/*.{ts,tsx}',
+      'apps/lobby/src/**/*.{ts,tsx}',
+      'packages/chrome/src/**/*.{ts,tsx}',
+    ],
     extends: [reactHooks.configs.flat['recommended-latest']],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['tools/**/*.ts', 'tests/**/*.ts', '*.config.{js,ts}', 'apps/web/vite.config.ts'],
+    files: [
+      'tools/**/*.ts',
+      'tests/**/*.ts',
+      '*.config.{js,ts}',
+      'apps/web/vite.config.ts',
+      'apps/horta/vite.config.ts',
+      'apps/posto/vite.config.ts',
+      'apps/lobby/vite.config.ts',
+    ],
     languageOptions: { globals: globals.node },
   },
 );

@@ -232,6 +232,7 @@ export const es = {
     load: 'Abrir archivo…',
     savedCities: 'Ciudades guardadas',
     noSaves: 'Aún no hay ciudades guardadas.',
+    plot42: 'Plot 42',
     credits: 'Inspirado en los clásicos de simulación urbana. Código, arte y música originales.',
     soundOn: 'Sonido activado',
     soundOff: 'Sonido desactivado',

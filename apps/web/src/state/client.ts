@@ -18,6 +18,7 @@ import {
   type ToWorkerMessage,
 } from '@city/shared';
 import { World } from '@city/simulation';
+import { emitListeners, RpcInbox } from '@shell/bridge';
 
 export interface ClientListener {
   /** A new city was loaded: everything must be rebuilt. */
@@ -31,8 +32,6 @@ export interface ClientListener {
   onEvents?(events: SimEvent[]): void;
   onError?(message: string): void;
 }
-
-type Pending = (message: FromWorkerMessage) => void;
 
 export interface DemoCityOptions {
   seed: string;
@@ -59,9 +58,7 @@ export class CityClient {
 
   private readonly worker: Worker;
   private readonly listeners = new Set<ClientListener>();
-  private readonly pending = new Map<number, Pending>();
-  private nextId = 1;
-  private initResolvers: Array<() => void> = [];
+  private readonly rpc = new RpcInbox<FromWorkerMessage>();
   private demo: PendingDemo | null = null;
 
   constructor() {
@@ -78,11 +75,11 @@ export class CityClient {
   }
 
   newCity(options: NewCityOptions): Promise<void> {
-    return this.waitInit(() => this.send({ type: 'newCity', options }));
+    return this.rpc.waitInit(() => this.send({ type: 'newCity', options }));
   }
 
   loadCity(snapshot: EngineSnapshot): Promise<void> {
-    return this.waitInit(() => this.send({ type: 'loadCity', snapshot }));
+    return this.rpc.waitInit(() => this.send({ type: 'loadCity', snapshot }));
   }
 
   /**
@@ -102,18 +99,19 @@ export class CityClient {
         ...(onProgress ? { onProgress } : {}),
         fail: (error) => {
           this.demo = null;
-          this.initResolvers = this.initResolvers.filter((r) => r !== settle);
+          this.rpc.dropInit(settle);
           reject(error);
         },
       };
-      this.initResolvers.push(settle);
+      this.rpc.addInit(settle);
       this.send({ type: 'demoCity', ...options });
     });
   }
 
   command(command: Command): Promise<CommandResult> {
-    return this.request({ type: 'command', id: 0, command }, (m) =>
-      m.type === 'commandResult' ? m.result : undefined,
+    return this.rpc.request(
+      (id) => this.send({ type: 'command', id, command }),
+      (m) => (m.type === 'commandResult' ? m.result : undefined),
     );
   }
 
@@ -122,52 +120,40 @@ export class CityClient {
   }
 
   runTicks(ticks: number): Promise<void> {
-    return this.request({ type: 'runTicks', id: 0, ticks }, () => undefined);
+    return this.rpc.request((id) => this.send({ type: 'runTicks', id, ticks }), () => undefined);
   }
 
   snapshot(): Promise<EngineSnapshot> {
-    return this.request({ type: 'snapshot', id: 0 }, (m) =>
-      m.type === 'snapshot' ? m.snapshot : undefined,
+    return this.rpc.request(
+      (id) => this.send({ type: 'snapshot', id }),
+      (m) => (m.type === 'snapshot' ? m.snapshot : undefined),
     );
   }
 
   hash(): Promise<string> {
-    return this.request({ type: 'hash', id: 0 }, (m) => (m.type === 'hash' ? m.hash : undefined));
+    return this.rpc.request(
+      (id) => this.send({ type: 'hash', id }),
+      (m) => (m.type === 'hash' ? m.hash : undefined),
+    );
   }
 
   exportSave(savedAt: string): Promise<{ text: string; meta: SaveMeta }> {
-    return this.request({ type: 'exportSave', id: 0, savedAt }, (m) =>
-      m.type === 'saveData' ? { text: m.text, meta: m.meta } : undefined,
+    return this.rpc.request(
+      (id) => this.send({ type: 'exportSave', id, savedAt }),
+      (m) => (m.type === 'saveData' ? { text: m.text, meta: m.meta } : undefined),
     );
   }
 
   /** Loads a save in the worker; on success the mirror world is rebuilt before this resolves. */
   importSave(text: string): Promise<LoadResult> {
-    return this.request({ type: 'importSave', id: 0, text }, (m) =>
-      m.type === 'loadResult' ? m.result : undefined,
+    return this.rpc.request(
+      (id) => this.send({ type: 'importSave', id, text }),
+      (m) => (m.type === 'loadResult' ? m.result : undefined),
     );
   }
 
   dispose(): void {
     this.worker.terminate();
-  }
-
-  private waitInit(start: () => void): Promise<void> {
-    return new Promise((resolve) => {
-      this.initResolvers.push(resolve);
-      start();
-    });
-  }
-
-  private request<T>(
-    message: ToWorkerMessage & { id: number },
-    pick: (m: FromWorkerMessage) => T | undefined,
-  ): Promise<T> {
-    const id = this.nextId++;
-    return new Promise<T>((resolve) => {
-      this.pending.set(id, (m) => resolve(pick(m) as T));
-      this.send({ ...message, id } as ToWorkerMessage);
-    });
   }
 
   private send(message: ToWorkerMessage): void {
@@ -178,10 +164,7 @@ export class CityClient {
     key: K,
     ...args: Parameters<NonNullable<ClientListener[K]>>
   ): void {
-    for (const listener of this.listeners) {
-      const fn = listener[key] as ((...a: unknown[]) => void) | undefined;
-      fn?.apply(listener, args);
-    }
+    emitListeners(this.listeners, key, ...args);
   }
 
   private handle(message: FromWorkerMessage): void {
@@ -203,13 +186,9 @@ export class CityClient {
         }
         this.emit('onError', message.message);
         break;
-      default: {
-        const resolve = this.pending.get(message.id);
-        if (resolve) {
-          this.pending.delete(message.id);
-          resolve(message);
-        }
-      }
+      default:
+        this.rpc.settle(message.id, message);
+        break;
     }
   }
 
@@ -230,9 +209,7 @@ export class CityClient {
     this.emit('onInit');
     this.emit('onStats', state.stats);
     this.emit('onHistory', state.history);
-    const resolvers = this.initResolvers;
-    this.initResolvers = [];
-    for (const resolve of resolvers) resolve();
+    this.rpc.resolveInit();
   }
 
   private applyDelta(delta: Delta): void {

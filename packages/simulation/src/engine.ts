@@ -19,6 +19,7 @@ import {
   type TerrainOptions,
   type ToolCommand,
 } from '@city/shared';
+import { CommandQueue, runSystems, runTicks, type System as KernelSystem } from '@shell/kernel';
 import { applyToolPlan } from './commands/apply';
 import { planToolCommand, type PlanContext } from './commands/plan';
 import { applyPolicyCommand } from './commands/policy';
@@ -72,10 +73,7 @@ export interface LoggedCommand {
 }
 
 /** A custom system run every tick after the built-in pipeline (used by tests and tools). */
-export interface System {
-  readonly id: string;
-  update(engine: SimulationEngine): void;
-}
+export type System = KernelSystem<SimulationEngine>;
 
 const MILESTONES = [100, 500, 1000, 2000, 5000, 10000, 25000, 50000, 100000] as const;
 const MAX_PENDING_EVENTS = 500;
@@ -116,7 +114,7 @@ export class SimulationEngine {
   private lastShortageMonth = -1;
 
   readonly commandLog: LoggedCommand[] = [];
-  private readonly queue: Command[] = [];
+  private readonly queue = new CommandQueue<Command>();
   private pendingEvents: SimEvent[] = [];
   private readonly systems: System[] = [];
 
@@ -217,7 +215,7 @@ export class SimulationEngine {
 
   /** Queues a command for the start of the next tick. */
   enqueue(command: Command): void {
-    this.queue.push(command);
+    this.queue.enqueue(command);
   }
 
   /** Applies a command immediately (between ticks) and records it for replay. */
@@ -227,12 +225,12 @@ export class SimulationEngine {
   }
 
   step(): void {
-    while (this.queue.length > 0) this.execute(this.queue.shift() as Command);
+    this.queue.drain((command) => this.execute(command));
     // Networks only change through commands, growth and disasters, which all mark them dirty.
     if (isDayStart(this.tick) && this.networksDirty) this.refreshUtilities();
     updateFires(this);
     updateDisasters(this);
-    for (const system of this.systems) system.update(this);
+    runSystems(this.systems, this);
     this.tick++;
     // Stage outputs live in serialized layers, so a save between stages resumes identically.
     switch (monthStage(this.tick)) {
@@ -254,7 +252,7 @@ export class SimulationEngine {
   }
 
   runTicks(count: number): void {
-    for (let i = 0; i < count; i++) this.step();
+    runTicks(count, () => this.step());
   }
 
   /** Runs whole months (useful for tests and headless simulation). */

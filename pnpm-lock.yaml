@@ -17,9 +17,18 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.13.0)
+      '@horta/sim':
+        specifier: workspace:*
+        version: link:packages/horta
       '@playwright/test':
         specifier: ^1.64.1
         version: 1.64.1
+      '@posto/sim':
+        specifier: workspace:*
+        version: link:packages/posto
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:packages/kernel
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5
@@ -48,14 +57,23 @@ importers:
         specifier: ^5.0.5
         version: 5.0.5(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
 
-  apps/web:
+  apps/horta:
     dependencies:
-      '@city/shared':
+      '@horta/sim':
         specifier: workspace:*
-        version: link:../../packages/shared
-      '@city/simulation':
+        version: link:../../packages/horta
+      '@shell/bridge':
         specifier: workspace:*
-        version: link:../../packages/simulation
+        version: link:../../packages/bridge
+      '@shell/chrome':
+        specifier: workspace:*
+        version: link:../../packages/chrome
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      '@shell/view-iso':
+        specifier: workspace:*
+        version: link:../../packages/view-iso
       pixi.js:
         specifier: ^8.22.0
         version: 8.22.0
@@ -79,13 +97,163 @@ importers:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
 
-  packages/shared: {}
+  apps/lobby:
+    dependencies:
+      '@shell/chrome':
+        specifier: workspace:*
+        version: link:../../packages/chrome
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.1.2
+        version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
+      vite:
+        specifier: ^8.3.4
+        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
+
+  apps/posto:
+    dependencies:
+      '@posto/sim':
+        specifier: workspace:*
+        version: link:../../packages/posto
+      '@shell/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
+      '@shell/chrome':
+        specifier: workspace:*
+        version: link:../../packages/chrome
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      '@shell/view-iso':
+        specifier: workspace:*
+        version: link:../../packages/view-iso
+      pixi.js:
+        specifier: ^8.22.0
+        version: 8.22.0
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.1.2
+        version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
+      vite:
+        specifier: ^8.3.4
+        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
+
+  apps/web:
+    dependencies:
+      '@city/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@city/simulation':
+        specifier: workspace:*
+        version: link:../../packages/simulation
+      '@shell/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
+      '@shell/chrome':
+        specifier: workspace:*
+        version: link:../../packages/chrome
+      '@shell/view-iso':
+        specifier: workspace:*
+        version: link:../../packages/view-iso
+      pixi.js:
+        specifier: ^8.22.0
+        version: 8.22.0
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.1.2
+        version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
+      vite:
+        specifier: ^8.3.4
+        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
+
+  packages/bridge: {}
+
+  packages/chrome:
+    dependencies:
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+
+  packages/horta:
+    dependencies:
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
+  packages/kernel: {}
+
+  packages/posto:
+    dependencies:
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
+  packages/shared:
+    dependencies:
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/simulation:
     dependencies:
       '@city/shared':
         specifier: workspace:*
         version: link:../shared
+      '@shell/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
+  packages/view-iso:
+    dependencies:
+      pixi.js:
+        specifier: ^8.22.0
+        version: 8.22.0
 
 packages:
 

@@ -1,11 +1,28 @@
+import {
+  base64ToBytes,
+  bytesToBase64,
+  decodeEnvelope,
+  encodeEnvelope,
+  isRecord,
+  type SaveEnvelope,
+  type SaveError,
+  type SaveMigration,
+} from '@shell/kernel';
 import { BALANCE, DEPARTMENTS } from '../balance/balance';
 import type { DisasterKind } from '../commands/commands';
 import { PLACEABLE_KINDS, ZONE_BUILDING_KINDS, type BuildingRecord } from '../types/buildings';
 import { EXPENSE_CATEGORIES } from '../types/stats';
 import { INFLUENCE_LAYERS, STRUCTURE_LAYERS } from '../types/tiles';
-import { base64ToBytes, bytesToBase64 } from '../util/base64';
-import { Fnv1a } from '../util/hash';
 import type { EngineSnapshot, SnapshotLayer } from './snapshot';
+
+export {
+  canonicalJson,
+  saveChecksum,
+  stringifySave,
+  type SaveError,
+  type SaveErrorCode,
+  type SaveMigration,
+} from '@shell/kernel';
 
 export const SAVE_FORMAT = 'city-builder-save';
 /** Bump when the layout of `SaveState` changes, and register a migration from the old version. */
@@ -30,36 +47,11 @@ export type SaveState = Omit<EngineSnapshot, 'heights' | 'layers'> & {
   layers: Record<SnapshotLayer, string>;
 };
 
-export interface SaveFile {
-  format: typeof SAVE_FORMAT;
-  version: number;
-  meta: SaveMeta;
-  state: SaveState;
-  /** FNV-1a of the canonical JSON of `state`, as written by `version`. */
-  checksum: string;
-}
-
-export type SaveErrorCode =
-  | 'NOT_JSON'
-  | 'NOT_A_SAVE'
-  | 'NEWER_VERSION'
-  | 'UNSUPPORTED_VERSION'
-  | 'CHECKSUM'
-  | 'MIGRATION_FAILED'
-  | 'INVALID';
-
-export interface SaveError {
-  code: SaveErrorCode;
-  /** Field path or extra information, in English (for logs and bug reports). */
-  detail?: string;
-}
+export type SaveFile = SaveEnvelope<typeof SAVE_FORMAT, SaveMeta, SaveState>;
 
 export type DecodeResult =
   | { ok: true; snapshot: EngineSnapshot; meta: SaveMeta; migratedFrom: number | null }
   | { ok: false; errors: SaveError[] };
-
-/** Upgrades a raw file object from version `n` to `n + 1`; registered under key `n`. */
-export type SaveMigration = (file: Record<string, unknown>) => Record<string, unknown>;
 
 export const SAVE_MIGRATIONS: Readonly<Record<number, SaveMigration>> = {};
 
@@ -70,21 +62,6 @@ export interface DecodeOptions {
 }
 
 export const SNAPSHOT_LAYERS: readonly SnapshotLayer[] = [...STRUCTURE_LAYERS, ...INFLUENCE_LAYERS];
-
-/** JSON with object keys sorted, so the checksum ignores formatting and key order. */
-export function canonicalJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record)
-    .filter((k) => record[k] !== undefined)
-    .sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(record[k])}`).join(',')}}`;
-}
-
-export function saveChecksum(state: unknown): string {
-  return new Fnv1a().string(canonicalJson(state)).hex();
-}
 
 export function encodeSave(
   snapshot: EngineSnapshot,
@@ -110,75 +87,32 @@ export function encodeSave(
     networksDirty: snapshot.networksDirty,
     lastMilestone: snapshot.lastMilestone,
   };
-  return {
-    format: SAVE_FORMAT,
-    version: SAVE_VERSION,
-    meta: {
-      name: snapshot.name,
-      seed: snapshot.seed,
-      size: snapshot.size,
-      tick: snapshot.tick,
-      ...extra,
-    },
-    state,
-    checksum: saveChecksum(state),
-  };
-}
-
-export function stringifySave(file: SaveFile): string {
-  return JSON.stringify(file);
+  return encodeEnvelope(SAVE_FORMAT, SAVE_VERSION, {
+    name: snapshot.name,
+    seed: snapshot.seed,
+    size: snapshot.size,
+    tick: snapshot.tick,
+    ...extra,
+  }, state);
 }
 
 /** Parses, verifies, migrates and validates a save. A failed decode never throws. */
 export function decodeSave(text: string, options: DecodeOptions = {}): DecodeResult {
-  const migrations = options.migrations ?? SAVE_MIGRATIONS;
-  const current = options.currentVersion ?? SAVE_VERSION;
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch (error) {
-    return fail('NOT_JSON', error instanceof Error ? error.message : undefined);
-  }
-  if (!isRecord(raw) || raw.format !== SAVE_FORMAT || !isRecord(raw.state)) {
-    return fail('NOT_A_SAVE');
-  }
-  const version = raw.version;
-  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-    return fail('UNSUPPORTED_VERSION', String(version));
-  }
-  if (version > current) return fail('NEWER_VERSION', `${version} > ${current}`);
-  if (typeof raw.checksum !== 'string' || raw.checksum !== saveChecksum(raw.state)) {
-    return fail('CHECKSUM');
-  }
-
-  let file: Record<string, unknown> = raw;
-  for (let v = version; v < current; v++) {
-    const migrate = migrations[v];
-    if (!migrate) return fail('UNSUPPORTED_VERSION', `no migration from version ${v}`);
-    try {
-      file = { ...migrate(file), version: v + 1 };
-    } catch (error) {
-      return fail('MIGRATION_FAILED', `${v} -> ${v + 1}: ${String(error)}`);
-    }
-  }
-
+  const decoded = decodeEnvelope(text, {
+    format: SAVE_FORMAT,
+    currentVersion: options.currentVersion ?? SAVE_VERSION,
+    migrations: options.migrations ?? SAVE_MIGRATIONS,
+  });
+  if (!decoded.ok) return decoded;
   const v = new Validator();
-  const snapshot = v.state(file.state);
+  const snapshot = v.state(decoded.file.state);
   if (!snapshot || v.errors.length > 0) return { ok: false, errors: v.errors };
   return {
     ok: true,
     snapshot,
-    meta: metaOf(file.meta, snapshot),
-    migratedFrom: version === current ? null : version,
+    meta: metaOf(decoded.file.meta, snapshot),
+    migratedFrom: decoded.migratedFrom,
   };
-}
-
-function fail(code: SaveErrorCode, detail?: string): DecodeResult {
-  return { ok: false, errors: [detail === undefined ? { code } : { code, detail }] };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function metaOf(raw: unknown, snapshot: EngineSnapshot): SaveMeta {

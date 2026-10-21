@@ -359,6 +359,16 @@ input[type='range'] {
   letter-spacing: 0.5px;
 }
 
+.plot42-link {
+  color: #e8c56b;
+  text-decoration: none;
+}
+
+.plot42-link:hover,
+.plot42-link:focus-visible {
+  text-decoration: underline;
+}
+
 .menu-chrome {
   position: fixed;
   top: 16px;

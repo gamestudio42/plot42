@@ -7,23 +7,35 @@ import {
   type HubSample,
   type VehicleSample,
 } from './animation/AnimationLayer';
-import { Camera } from './camera';
+import {
+  Camera,
+  CHUNK_SIZE,
+  ChunkGrid,
+  HEIGHT_STEP,
+  intersects,
+  isoChunkBounds,
+  isTyping,
+  pickTile,
+  REDRAW_BUDGET,
+  tileCenter,
+  tileQuad,
+  vertexToScreen,
+  type ChunkArea,
+  type Point,
+} from '@shell/view-iso';
 import {
   buildObjects,
   drawGround,
   drawOverlay,
   drawRoads,
   drawWires,
-  type ChunkArea,
   type DrawContext,
   type OverlayMode,
 } from './chunkDraw';
 import { prefersReducedMotion } from '../motion';
-import { HEIGHT_STEP, pickTile, tileCenter, tileQuad, vertexToScreen, type Point } from './iso';
 import { SpriteFactory } from './sprites';
 
-export const CHUNK_SIZE = 16;
-const REDRAW_BUDGET = 12;
+export { CHUNK_SIZE };
 /** Menu background camera: zoom, seconds per loop and loop radius as a fraction of the map. */
 const ATTRACT_ZOOM = 0.9;
 const ATTRACT_PERIOD_S = 150;
@@ -80,8 +92,7 @@ export class GameRenderer {
   private readonly root = new Container();
   private readonly chunkLayer = new Container();
   private readonly highlight = new Graphics();
-  private chunks: Chunk[] = [];
-  private chunksPerSide = 0;
+  private readonly chunkGrid = new ChunkGrid<Chunk>();
   private factory: SpriteFactory | null = null;
   private animation: AnimationLayer | null = null;
   private animationsEnabled = true;
@@ -171,7 +182,7 @@ export class GameRenderer {
 
   /** Back-to-front labels of a map chunk. Tests lock boats under the road/bridge layer. */
   chunkStack(): string[] {
-    const chunk = this.chunks[0];
+    const chunk = this.chunkGrid.chunks[0];
     return chunk ? chunk.root.children.map((child) => child.label) : [];
   }
 
@@ -204,57 +215,43 @@ export class GameRenderer {
     this.world = world;
     this.buildings = buildings;
     if (!this.initialized) return;
-    for (const c of this.chunks) c.root.destroy({ children: true });
-    this.chunks = [];
+    for (const c of this.chunkGrid.chunks) c.root.destroy({ children: true });
     this.chunkLayer.removeChildren();
-    this.chunksPerSide = Math.ceil(world.size / CHUNK_SIZE);
-    const order: Chunk[] = [];
-    for (let cy = 0; cy < this.chunksPerSide; cy++) {
-      for (let cx = 0; cx < this.chunksPerSide; cx++) {
-        const area = {
-          x0: cx * CHUNK_SIZE,
-          y0: cy * CHUNK_SIZE,
-          x1: Math.min(world.size, (cx + 1) * CHUNK_SIZE),
-          y1: Math.min(world.size, (cy + 1) * CHUNK_SIZE),
-        };
-        const chunk: Chunk = {
-          area,
-          root: new Container(),
-          ground: layer(new Graphics(), 'ground'),
-          water: layer(new Container(), 'water'),
-          boats: layer(new Container({ sortableChildren: true }), 'boats'),
-          roads: layer(new Graphics(), 'roads'),
-          overlay: layer(new Graphics(), 'overlay'),
-          vehicles: layer(new Container({ sortableChildren: true }), 'vehicles'),
-          objects: layer(new Container(), 'objects'),
-          wires: layer(new Graphics(), 'wires'),
-          bounds: { x: 0, y: 0, width: 0, height: 0 },
-          dirty: true,
-          overlayDirty: true,
-          hasFire: false,
-        };
-        // Boats on a span sit under roads; boats in open water sit with the cars,
-        // so a hull in front of a bridge is not painted under the deck. Cars stay
-        // under objects so a building in front of a street hides them.
-        chunk.root.addChild(
-          chunk.ground,
-          chunk.water,
-          chunk.boats,
-          chunk.roads,
-          chunk.overlay,
-          chunk.vehicles,
-          chunk.objects,
-          chunk.wires,
-        );
-        this.chunks.push(chunk);
-        order.push(chunk);
-      }
-    }
-    // Back-to-front by chunk diagonal.
-    order.sort((a, b) => a.area.x0 + a.area.y0 - (b.area.x0 + b.area.y0) || a.area.x0 - b.area.x0);
+    const order = this.chunkGrid.rebuild(world.size, (area) => {
+      const chunk: Chunk = {
+        area,
+        root: new Container(),
+        ground: layer(new Graphics(), 'ground'),
+        water: layer(new Container(), 'water'),
+        boats: layer(new Container({ sortableChildren: true }), 'boats'),
+        roads: layer(new Graphics(), 'roads'),
+        overlay: layer(new Graphics(), 'overlay'),
+        vehicles: layer(new Container({ sortableChildren: true }), 'vehicles'),
+        objects: layer(new Container(), 'objects'),
+        wires: layer(new Graphics(), 'wires'),
+        bounds: { x: 0, y: 0, width: 0, height: 0 },
+        dirty: true,
+        overlayDirty: true,
+        hasFire: false,
+      };
+      // Boats on a span sit under roads; boats in open water sit with the cars,
+      // so a hull in front of a bridge is not painted under the deck. Cars stay
+      // under objects so a building in front of a street hides them.
+      chunk.root.addChild(
+        chunk.ground,
+        chunk.water,
+        chunk.boats,
+        chunk.roads,
+        chunk.overlay,
+        chunk.vehicles,
+        chunk.objects,
+        chunk.wires,
+      );
+      return chunk;
+    });
     for (const c of order) this.chunkLayer.addChild(c.root);
-    for (const c of this.chunks) this.computeBounds(c);
-    this.animation?.setWorld(world, buildings, this.chunks, (x, y) => this.chunkAt(x, y));
+    for (const c of this.chunkGrid.chunks) this.computeBounds(c);
+    this.animation?.setWorld(world, buildings, this.chunkGrid.chunks, (x, y) => this.chunkAt(x, y));
 
     const left = vertexToScreen(0, world.size, 0);
     const right = vertexToScreen(world.size, 0, 0);
@@ -277,24 +274,11 @@ export class GameRenderer {
   invalidateTiles(indices: ArrayLike<number> | null): void {
     if (!this.world) return;
     if (indices === null) {
-      for (const c of this.chunks) {
-        c.dirty = true;
-        c.overlayDirty = true;
-        this.computeBounds(c);
-      }
+      this.chunkGrid.invalidateTiles(null, this.world.size);
+      for (const c of this.chunkGrid.chunks) this.computeBounds(c);
       return;
     }
-    const size = this.world.size;
-    for (let k = 0; k < indices.length; k++) {
-      const i = indices[k] as number;
-      const x = i % size;
-      const y = (i / size) | 0;
-      this.markChunkAt(x, y);
-      if (x % CHUNK_SIZE === 0) this.markChunkAt(x - 1, y);
-      if (x % CHUNK_SIZE === CHUNK_SIZE - 1) this.markChunkAt(x + 1, y);
-      if (y % CHUNK_SIZE === 0) this.markChunkAt(x, y - 1);
-      if (y % CHUNK_SIZE === CHUNK_SIZE - 1) this.markChunkAt(x, y + 1);
-    }
+    this.chunkGrid.invalidateTiles(indices, this.world.size);
   }
 
   invalidateBuildings(changed: BuildingRecord[]): void {
@@ -303,13 +287,13 @@ export class GameRenderer {
   }
 
   invalidateOverlay(): void {
-    for (const c of this.chunks) c.overlayDirty = true;
+    for (const c of this.chunkGrid.chunks) c.overlayDirty = true;
   }
 
   setOverlay(mode: OverlayMode): void {
     if (mode === this.overlay) return;
     this.overlay = mode;
-    for (const c of this.chunks) {
+    for (const c of this.chunkGrid.chunks) {
       c.overlayDirty = true;
       c.dirty = true;
     }
@@ -318,13 +302,13 @@ export class GameRenderer {
   setUnderground(on: boolean): void {
     if (on === this.underground) return;
     this.underground = on;
-    for (const c of this.chunks) c.dirty = true;
+    for (const c of this.chunkGrid.chunks) c.dirty = true;
   }
 
   setGrid(on: boolean): void {
     if (on === this.grid) return;
     this.grid = on;
-    for (const c of this.chunks) c.dirty = true;
+    for (const c of this.chunkGrid.chunks) c.dirty = true;
   }
 
   setHighlight(tiles: HighlightTile[]): void {
@@ -373,35 +357,17 @@ export class GameRenderer {
   }
 
   private chunkAt(x: number, y: number): Chunk | null {
-    if (!this.world || x < 0 || y < 0 || x >= this.world.size || y >= this.world.size) return null;
-    return (
-      this.chunks[Math.floor(y / CHUNK_SIZE) * this.chunksPerSide + Math.floor(x / CHUNK_SIZE)] ??
-      null
-    );
+    if (!this.world) return null;
+    return this.chunkGrid.chunkAt(x, y, this.world.size);
   }
 
   private markChunkAt(x: number, y: number): void {
-    const c = this.chunkAt(x, y);
-    if (c) {
-      c.dirty = true;
-      c.overlayDirty = true;
-    }
+    if (!this.world) return;
+    this.chunkGrid.markAt(x, y, this.world.size);
   }
 
   private computeBounds(c: Chunk): void {
-    if (!this.world) return;
-    const { x0, y0, x1, y1 } = c.area;
-    const left = vertexToScreen(x0, y1, 0);
-    const right = vertexToScreen(x1, y0, 0);
-    const top = vertexToScreen(x0, y0, 0);
-    const bottom = vertexToScreen(x1, y1, 0);
-    const margin = BALANCE.map.maxHeight * HEIGHT_STEP + 160;
-    c.bounds = {
-      x: left.x - 8,
-      y: top.y - margin,
-      width: right.x - left.x + 16,
-      height: bottom.y - top.y + margin + 40,
-    };
+    c.bounds = isoChunkBounds(c.area, BALANCE.map.maxHeight);
   }
 
   private context(): DrawContext | null {
@@ -429,12 +395,12 @@ export class GameRenderer {
     if (this.animationTimer > 250) {
       this.animationTimer = 0;
       this.animationFrame++;
-      for (const c of this.chunks) if (c.hasFire) c.dirty = true;
+      for (const c of this.chunkGrid.chunks) if (c.hasFire) c.dirty = true;
     }
 
     const view = this.camera.visibleRect();
     let budget = REDRAW_BUDGET;
-    for (const c of this.chunks) {
+    for (const c of this.chunkGrid.chunks) {
       const visible = intersects(view, c.bounds);
       c.root.visible = visible;
       if (!visible) continue;
@@ -606,14 +572,3 @@ export class GameRenderer {
   }
 }
 
-function intersects(
-  a: { x: number; y: number; width: number; height: number },
-  b: { x: number; y: number; width: number; height: number },
-): boolean {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
-}
-
-function isTyping(e: KeyboardEvent): boolean {
-  const t = e.target as HTMLElement | null;
-  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
-}

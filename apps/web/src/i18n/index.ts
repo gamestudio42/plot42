@@ -1,4 +1,13 @@
-import { useStore, type Store } from '../state/store';
+import {
+  applyDocumentLang,
+  bootLocale as bootStoredLocale,
+  persistLocale as persistStored,
+  readNavigatorLanguages,
+  readStoredLocale,
+  resolveLocale as resolveCatalog,
+  useCatalog,
+  type Store,
+} from '@shell/chrome';
 import { de } from './de';
 import { en, type Strings } from './en';
 import { es } from './es';
@@ -64,29 +73,22 @@ export function resolveLocale(options?: {
   stored?: string | null;
   languages?: readonly string[];
 }): Locale {
-  const stored = options?.stored !== undefined ? options.stored : readStored();
-  if (isLocale(stored)) return stored;
-  const languages = options?.languages ?? readNavigator();
-  for (const tag of languages) {
-    const match = matchLocale(tag);
-    if (match) return match;
-  }
-  return 'en';
+  return resolveCatalog({
+    locales: LOCALES,
+    fallback: 'en',
+    match: matchLocale,
+    stored: options?.stored !== undefined ? options.stored : readStoredLocale(LOCALE_KEY),
+    languages: options?.languages ?? readNavigatorLanguages(),
+  });
 }
 
 export function persistLocale(locale: Locale): void {
-  try {
-    localStorage.setItem(LOCALE_KEY, locale);
-  } catch {
-    // Private mode: the choice lasts for this session only.
-  }
+  persistStored(LOCALE_KEY, locale);
 }
 
 /** Resolves the locale and writes it so the next visit does not flip. */
 export function bootLocale(): Locale {
-  const locale = resolveLocale();
-  persistLocale(locale);
-  return locale;
+  return bootStoredLocale(LOCALE_KEY, (stored) => resolveLocale({ stored }));
 }
 
 export function catalog(locale: Locale): Strings {
@@ -94,8 +96,7 @@ export function catalog(locale: Locale): Strings {
 }
 
 export function useStrings(ui: Store<{ locale: Locale }>): Strings {
-  const locale = useStore(ui, (s) => s.locale);
-  return catalog(locale);
+  return useCatalog(ui, catalog);
 }
 
 export function intlLocale(locale: Locale): string {
@@ -116,21 +117,5 @@ export function months(locale: Locale): readonly string[] {
 }
 
 export function applyDocumentLocale(locale: Locale): void {
-  if (typeof document === 'undefined') return;
-  document.documentElement.lang = locale;
-  document.title = catalog(locale).pageTitle;
-}
-
-function readStored(): string | null {
-  try {
-    return localStorage.getItem(LOCALE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function readNavigator(): string[] {
-  if (typeof navigator === 'undefined') return [];
-  if (navigator.languages?.length) return [...navigator.languages];
-  return navigator.language ? [navigator.language] : [];
+  applyDocumentLang(locale, catalog(locale).pageTitle);
 }

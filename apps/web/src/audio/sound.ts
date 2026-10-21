@@ -1,3 +1,4 @@
+import { AudioGraph, readFlag, Voice, writeFlag } from '@shell/chrome';
 import type { TrackId } from './composer';
 import { MusicPlayer, type MusicState } from './music';
 
@@ -11,70 +12,9 @@ export type SoundName =
 
 const STORAGE_KEY = 'cityBuilder.muted';
 const MUSIC_KEY = 'cityBuilder.music';
-const VOLUME = 0.35;
 const MUSIC_VOLUME = 0.85;
 /** The same effect is not replayed within this window (bursts of events or commands). */
 const MIN_INTERVAL_MS = 120;
-
-interface ToneSpec {
-  type: OscillatorType;
-  freq: number;
-  /** Frequency at the end of the note (exponential glide). */
-  to?: number;
-  start?: number;
-  duration: number;
-  gain: number;
-}
-
-interface NoiseSpec {
-  filter: BiquadFilterType;
-  freq: number;
-  q?: number;
-  start?: number;
-  duration: number;
-  gain: number;
-}
-
-class Voice {
-  constructor(
-    private readonly ctx: AudioContext,
-    private readonly out: AudioNode,
-    private readonly noiseBuffer: AudioBuffer,
-  ) {}
-
-  tone({ type, freq, to, start = 0, duration, gain }: ToneSpec): void {
-    const t = this.ctx.currentTime + start;
-    const osc = this.ctx.createOscillator();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, t);
-    if (to !== undefined) osc.frequency.exponentialRampToValueAtTime(to, t + duration);
-    osc.connect(this.envelope(t, duration, gain));
-    osc.start(t);
-    osc.stop(t + duration + 0.05);
-  }
-
-  noise({ filter, freq, q = 1, start = 0, duration, gain }: NoiseSpec): void {
-    const t = this.ctx.currentTime + start;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer;
-    const biquad = this.ctx.createBiquadFilter();
-    biquad.type = filter;
-    biquad.frequency.value = freq;
-    biquad.Q.value = q;
-    src.connect(biquad).connect(this.envelope(t, duration, gain));
-    src.start(t, 0, duration + 0.05);
-  }
-
-  /** Short attack, exponential decay. */
-  private envelope(t: number, duration: number, gain: number): GainNode {
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-    g.connect(this.out);
-    return g;
-  }
-}
 
 const RECIPES: Record<SoundName, (v: Voice) => void> = {
   build: (v) => {
@@ -119,42 +59,20 @@ const RECIPES: Record<SoundName, (v: Voice) => void> = {
   },
 };
 
-function readFlag(key: string, fallback: boolean): boolean {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored === null ? fallback : stored === '1';
-  } catch {
-    return fallback;
-  }
-}
-
-function writeFlag(key: string, value: boolean): void {
-  try {
-    localStorage.setItem(key, value ? '1' : '0');
-  } catch {
-    // Private mode or disabled storage: the choice lasts for this session only.
-  }
-}
-
 export interface MusicStatus extends MusicState {
   enabled: boolean;
 }
 
 export class SoundBoard {
-  private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private sfx: GainNode | null = null;
-  private noiseBuffer: AudioBuffer | null = null;
+  private readonly graph = new AudioGraph({ mutedKey: STORAGE_KEY });
   private music: MusicPlayer | null = null;
-  private unavailable = false;
-  private mutedValue = readFlag(STORAGE_KEY, false);
   private musicOn = readFlag(MUSIC_KEY, true);
   private musicTrack: TrackId = 'menu';
   private musicDucked = false;
   private readonly lastPlayed = new Map<SoundName, number>();
 
   get muted(): boolean {
-    return this.mutedValue;
+    return this.graph.muted;
   }
 
   get musicEnabled(): boolean {
@@ -162,10 +80,7 @@ export class SoundBoard {
   }
 
   setMuted(muted: boolean): void {
-    this.mutedValue = muted;
-    writeFlag(STORAGE_KEY, muted);
-    if (this.master) this.master.gain.value = muted ? 0 : VOLUME;
-    if (!muted) this.unlock();
+    this.graph.setMuted(muted);
     this.syncMusic();
   }
 
@@ -199,67 +114,44 @@ export class SoundBoard {
 
   /** Creates or resumes the audio context; call it from a user gesture. */
   unlock(): void {
-    if (this.mutedValue) return;
-    const ctx = this.context();
-    if (ctx?.state === 'suspended') void ctx.resume();
+    this.graph.unlock();
+    this.attachMusic();
     this.syncMusic();
   }
 
   play(name: SoundName): void {
-    if (this.mutedValue) return;
-    const ctx = this.context();
+    if (this.graph.muted) return;
+    const ctx = this.graph.ensure();
+    this.attachMusic();
     // A suspended context would queue the sound and play it late, after the gesture.
-    if (!ctx || ctx.state !== 'running' || !this.sfx || !this.noiseBuffer) return;
+    if (!ctx || ctx.state !== 'running' || !this.graph.sfx || !this.graph.noiseBuffer) return;
     const now = ctx.currentTime * 1000;
     if (now - (this.lastPlayed.get(name) ?? Number.NEGATIVE_INFINITY) < MIN_INTERVAL_MS) return;
     this.lastPlayed.set(name, now);
-    RECIPES[name](new Voice(ctx, this.sfx, this.noiseBuffer));
+    RECIPES[name](new Voice(ctx, this.graph.sfx, this.graph.noiseBuffer));
   }
 
   dispose(): void {
     this.music?.dispose();
     this.music = null;
-    void this.ctx?.close();
-    this.ctx = null;
+    this.graph.dispose();
+  }
+
+  private attachMusic(): void {
+    if (this.music || !this.graph.ctx || !this.graph.master || !this.graph.noiseBuffer) return;
+    const musicBus = this.graph.ctx.createGain();
+    musicBus.gain.value = MUSIC_VOLUME;
+    musicBus.connect(this.graph.master);
+    this.music = new MusicPlayer(this.graph.ctx, musicBus, this.graph.noiseBuffer);
   }
 
   private syncMusic(): void {
+    this.attachMusic();
     const music = this.music;
     if (!music) return;
     music.setTrack(this.musicTrack);
     music.setDucked(this.musicDucked);
-    if (this.musicOn && !this.mutedValue) music.start();
+    if (this.musicOn && !this.graph.muted) music.start();
     else music.stop();
-  }
-
-  private context(): AudioContext | null {
-    if (this.ctx || this.unavailable) return this.ctx;
-    try {
-      const ctx = new AudioContext();
-      const master = ctx.createGain();
-      master.gain.value = this.mutedValue ? 0 : VOLUME;
-      master.connect(ctx.destination);
-      const sfx = ctx.createGain();
-      sfx.connect(master);
-      const musicBus = ctx.createGain();
-      musicBus.gain.value = MUSIC_VOLUME;
-      musicBus.connect(master);
-      const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      // Fixed LCG: the noise needs no real randomness.
-      let seed = 0x2545f491;
-      for (let i = 0; i < data.length; i++) {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-        data[i] = seed / 0x80000000 - 1;
-      }
-      this.ctx = ctx;
-      this.master = master;
-      this.sfx = sfx;
-      this.noiseBuffer = buffer;
-      this.music = new MusicPlayer(ctx, musicBus, buffer);
-    } catch {
-      this.unavailable = true;
-    }
-    return this.ctx;
   }
 }

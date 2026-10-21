@@ -232,6 +232,7 @@ export const de = {
     load: 'Datei öffnen…',
     savedCities: 'Gespeicherte Städte',
     noSaves: 'Noch keine gespeicherten Städte.',
+    plot42: 'Plot 42',
     credits: 'Inspiriert von klassischen Stadtbau-Spielen. Eigener Code, eigene Kunst und Musik.',
     soundOn: 'Ton an',
     soundOff: 'Ton aus',

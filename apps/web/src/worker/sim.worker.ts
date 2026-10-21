@@ -9,11 +9,11 @@ import {
   type FromWorkerMessage,
   type FullState,
   type InfluenceLayer,
-  type Speed,
   type StructureLayer,
   type ToWorkerMessage,
 } from '@city/shared';
 import { createEngine, hashState, SIM_PRESETS, SimulationEngine } from '@city/simulation';
+import { startFixedStep, WorkerClock } from '@shell/bridge';
 
 interface WorkerScope {
   postMessage(message: FromWorkerMessage): void;
@@ -21,14 +21,10 @@ interface WorkerScope {
 }
 
 const scope = self as unknown as WorkerScope;
-const FRAME_MS = 50;
-const MAX_TICKS_PER_FRAME = 40;
 const DEMO_PROGRESS_MONTHS = 6;
 
 let engine: SimulationEngine | null = null;
-let speed: Speed = 1;
-let accumulator = 0;
-let lastTime = performance.now();
+const clock = new WorkerClock(SPEED_TICKS_PER_SECOND);
 
 function post(message: FromWorkerMessage): void {
   scope.postMessage(message);
@@ -117,20 +113,8 @@ function publish(): void {
   post({ type: 'delta', delta: buildDelta(engine) });
 }
 
-function frame(): void {
-  const now = performance.now();
-  const elapsed = now - lastTime;
-  lastTime = now;
+function frame(ticks: number): void {
   if (!engine) return;
-  const rate = SPEED_TICKS_PER_SECOND[speed];
-  if (rate === 0) {
-    accumulator = 0;
-    return;
-  }
-  accumulator += (elapsed * rate) / 1000;
-  const ticks = Math.min(MAX_TICKS_PER_FRAME, Math.floor(accumulator));
-  accumulator = Math.min(accumulator - ticks, MAX_TICKS_PER_FRAME);
-  if (ticks <= 0) return;
   engine.runTicks(ticks);
   publish();
 }
@@ -141,13 +125,13 @@ scope.onmessage = (event) => {
     switch (message.type) {
       case 'newCity':
         engine = createEngine(message.options);
-        accumulator = 0;
+        clock.reset();
         post({ type: 'init', state: fullState(engine) });
         break;
       case 'loadCity':
         engine = SimulationEngine.fromSnapshot(message.snapshot);
-        speed = 0;
-        accumulator = 0;
+        clock.setSpeed(0);
+        clock.reset();
         post({ type: 'init', state: fullState(engine) });
         break;
       case 'command': {
@@ -158,8 +142,7 @@ scope.onmessage = (event) => {
         break;
       }
       case 'setSpeed':
-        speed = message.speed;
-        accumulator = 0;
+        clock.setSpeed(message.speed);
         break;
       case 'runTicks':
         if (!engine) throw new Error('No city loaded');
@@ -194,8 +177,8 @@ scope.onmessage = (event) => {
         }
         engine = SimulationEngine.fromSnapshot(decoded.snapshot);
         // Loaded cities start paused so the restored state is exactly the saved one.
-        speed = 0;
-        accumulator = 0;
+        clock.setSpeed(0);
+        clock.reset();
         post({ type: 'init', state: fullState(engine) });
         post({
           type: 'loadResult',
@@ -216,8 +199,8 @@ scope.onmessage = (event) => {
           }
         }
         engine = run.engine;
-        speed = 1;
-        accumulator = 0;
+        clock.setSpeed(1);
+        clock.reset();
         post({ type: 'init', state: fullState(engine) });
         break;
       }
@@ -227,4 +210,4 @@ scope.onmessage = (event) => {
   }
 };
 
-setInterval(frame, FRAME_MS);
+startFixedStep(clock, frame);

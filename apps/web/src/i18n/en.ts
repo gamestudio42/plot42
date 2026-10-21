@@ -231,6 +231,7 @@ export const en = {
     load: 'Open file…',
     savedCities: 'Saved cities',
     noSaves: 'No saved cities yet.',
+    plot42: 'Plot 42',
     credits: 'Inspired by classic city simulators. Original code, art and music.',
     soundOn: 'Sound on',
     soundOff: 'Sound off',

@@ -233,6 +233,7 @@ export const ptBR = {
     load: 'Abrir arquivo…',
     savedCities: 'Cidades salvas',
     noSaves: 'Nenhuma cidade salva ainda.',
+    plot42: 'Plot 42',
     credits: 'Inspirado nos clássicos de simulação urbana. Código, arte e música originais.',
     soundOn: 'Som ligado',
     soundOff: 'Som desligado',

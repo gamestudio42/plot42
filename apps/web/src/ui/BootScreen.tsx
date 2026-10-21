@@ -1,8 +1,7 @@
+import { BootView as ChromeBootView, prefersReducedMotion, useStore } from '@shell/chrome';
 import { useEffect, useState } from 'react';
 import { catalog, type Locale } from '../i18n';
-import { prefersReducedMotion } from '../motion';
 import type { BootState, GameSession } from '../state/session';
-import { useStore } from '../state/store';
 import { Logo } from './Logo';
 
 const FADE_MS = 300;
@@ -34,27 +33,14 @@ export function BootView({
   locale?: Locale;
 }) {
   const t = catalog(locale);
-  const percent = Math.round(boot.progress * 100);
   return (
-    <div
-      className={`boot-screen${leaving ? ' leaving' : ''}`}
-      data-testid="boot-screen"
-      data-step={boot.step}
-      aria-busy={!leaving}
+    <ChromeBootView
+      stepLabel={t.boot[boot.step]}
+      progress={boot.progress}
+      leaving={leaving}
+      step={boot.step}
     >
       <Logo size={96} />
-      <p className="boot-step" data-testid="boot-step">
-        {t.boot[boot.step]}
-      </p>
-      <div
-        className="boot-progress"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-      >
-        <div className="boot-progress-fill" style={{ width: `${percent}%` }} />
-      </div>
-    </div>
+    </ChromeBootView>
   );
 }
