@@ -1,9 +1,10 @@
-import { t } from '../i18n/pt-BR';
+import { useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { TUTORIAL_CHECKS } from '../state/tutorial';
 
 export function Tutorial({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const step = useStore(session.ui, (s) => s.tutorial);
   if (step === null) return null;
   const content = t.tutorial.steps[step];

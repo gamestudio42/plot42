@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { t } from './i18n/pt-BR';
+import { useStrings } from './i18n';
 import { GameSession } from './state/session';
 import { useStore } from './state/store';
 import { BootScreen, BootView } from './ui/BootScreen';
@@ -85,6 +85,7 @@ function Screens({ session }: { session: GameSession }) {
 }
 
 function TileReadout({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const hover = useStore(session.ui, (s) => s.hover);
   const selected = useStore(session.ui, (s) => s.selected);
   return (

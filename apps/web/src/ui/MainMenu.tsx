@@ -1,8 +1,9 @@
 import { DIFFICULTIES, type Difficulty, type TerrainOptions } from '@city/shared';
-import { useState, type ReactNode } from 'react';
-import { t } from '../i18n/pt-BR';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
+import { LocaleSelect } from './LocaleSelect';
 import { Logo } from './Logo';
 
 const SIZES = [64, 96, 128] as const;
@@ -12,8 +13,14 @@ function randomSeed(): string {
 }
 
 export function MainMenu({ session, extra }: { session: GameSession; extra?: ReactNode }) {
+  const t = useStrings(session.ui);
   const m = t.menu;
   const [name, setName] = useState<string>(m.defaultCityName);
+  const defaultName = useRef(m.defaultCityName);
+  useEffect(() => {
+    if (name === defaultName.current || name.trim() === '') setName(m.defaultCityName);
+    defaultName.current = m.defaultCityName;
+  }, [m.defaultCityName, name]);
   const [seed, setSeed] = useState(randomSeed);
   const [size, setSize] = useState<number>(128);
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
@@ -57,7 +64,10 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
 
   return (
     <div className="main-menu" data-testid="main-menu">
-      <SoundToggle session={session} />
+      <div className="menu-chrome">
+        <LocaleSelect session={session} className="menu-locale" />
+        <SoundToggle session={session} />
+      </div>
       <div className="menu-card">
         <h1 className="menu-title">
           <Logo />
@@ -159,6 +169,7 @@ export function MainMenu({ session, extra }: { session: GameSession; extra?: Rea
 
 /** Speaker button: the menu has no system panel and the M shortcut only works in game. */
 function SoundToggle({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
   const muted = useStore(session.ui, (s) => s.muted);
   const label = muted ? t.menu.soundOff : t.menu.soundOn;
   return (

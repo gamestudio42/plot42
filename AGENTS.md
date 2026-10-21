@@ -19,8 +19,10 @@ simulators, playable in the browser. The player creates conditions; the simulato
    `docs/simulation-spec.md`, and their provenance in `docs/mechanics-matrix.md`.
 6. Do not copy code, sprites, sounds or names from SimCity, Micropolis (GPLv3) or OpenSC2K.
    Study them in `references/` (git-ignored) and write independent code.
-7. Code, comments and technical docs are in English. Player-facing text is in Brazilian
-   Portuguese (`apps/web/src/i18n/pt-BR.ts`).
+7. Code, comments and technical docs are in English. Player-facing text lives in
+   `apps/web/src/i18n/` (`en`, `pt-BR`, `es`, `fr`, `de`). English is the type source.
+   The first visit follows the browser language (or English); the choice is persisted
+   in `localStorage.cityBuilder.locale`.
 
 ## Commands
 
@@ -73,7 +75,8 @@ apps/web/src/
   worker/     Web Worker host for the engine
   audio/      Synthesized WebAudio sound effects and procedural music: composer.ts
               (pure bar generator) and music.ts (scheduler and voices); no audio files
-  i18n/       Portuguese strings
+  i18n/       Player catalogs (en type source, pt-BR, es, fr, de), resolveLocale,
+              useStrings, money/number formatters
 packages/simulation/src/
   world/ terrain/ commands/ systems/ persistence/ scenarios/ rng/
   scenarios/presets.ts  scripted cities for `pnpm sim` and `pnpm bench`

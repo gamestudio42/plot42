@@ -14,7 +14,14 @@ import {
 } from '@city/shared';
 import { RoadNetwork, type World } from '@city/simulation';
 import { SoundBoard, type SoundName } from '../audio/sound';
-import { formatNumber, t } from '../i18n/pt-BR';
+import {
+  applyDocumentLocale,
+  bootLocale,
+  catalog,
+  formatNumber,
+  persistLocale,
+  type Locale,
+} from '../i18n';
 import { prefersReducedMotion } from '../motion';
 import {
   AUTOSAVE_ID,
@@ -83,6 +90,8 @@ export interface UiState {
   music: boolean;
   /** Cars, smoke, water glints and fire engines (persisted in localStorage). */
   animations: boolean;
+  /** Player language (persisted in localStorage). */
+  locale: Locale;
 }
 
 const initialUi: UiState = {
@@ -108,6 +117,7 @@ const initialUi: UiState = {
   muted: false,
   music: true,
   animations: true,
+  locale: 'en',
 };
 
 const ANIMATIONS_KEY = 'cityBuilder.animations';
@@ -150,6 +160,7 @@ export class GameSession {
   readonly sound = new SoundBoard();
   readonly ui = new Store<UiState>({
     ...initialUi,
+    locale: bootLocale(),
     muted: this.sound.muted,
     music: this.sound.musicEnabled,
     animations: readAnimations(),
@@ -171,6 +182,7 @@ export class GameSession {
    * always ends in the `done` step, so a failure only costs the menu background.
    */
   async boot(host: HTMLElement): Promise<void> {
+    applyDocumentLocale(this.ui.get().locale);
     this.setBoot('graphics', 0);
     this.syncMusic();
     this.renderer.setAnimations(this.ui.get().animations);
@@ -342,11 +354,11 @@ export class GameSession {
       const id = autosave ? AUTOSAVE_ID : manualSlotId(meta.name, meta.seed);
       await writeSave({ ...meta, id, autosave, bytes: text.length }, text);
       this.lastAutosave = { time: Date.now(), tick: meta.tick };
-      if (!autosave) this.toast('info', t.save.saved);
+      if (!autosave) this.toast('info', this.strings().save.saved);
       await this.refreshSaves();
       return true;
     } catch (error) {
-      this.reportStorageError(error, t.save.failed);
+      this.reportStorageError(error, this.strings().save.failed);
       return false;
     } finally {
       this.ui.set({ busy: false });
@@ -370,7 +382,7 @@ export class GameSession {
         await deleteSave(id).catch(() => undefined);
         await this.refreshSaves();
       }
-      this.reportStorageError(error, t.save.loadFailed);
+      this.reportStorageError(error, this.strings().save.loadFailed);
       return null;
     }
   }
@@ -384,7 +396,7 @@ export class GameSession {
     try {
       await deleteSave(id);
     } catch (error) {
-      this.reportStorageError(error, t.save.failed);
+      this.reportStorageError(error, this.strings().save.failed);
     }
     await this.refreshSaves();
   }
@@ -399,13 +411,14 @@ export class GameSession {
         console.warn('[saves] invalid save', result.errors);
         this.toast(
           'error',
-          `${t.save.loadFailed} ${first ? t.save.errors[first.code] : t.save.errors.INVALID}`,
+          `${this.strings().save.loadFailed} ${first ? this.strings().save.errors[first.code] : this.strings().save.errors.INVALID}`,
         );
         return result;
       }
       this.enterGame({ tutorial: false, paused: true });
-      this.toast('info', t.save.loaded(result.meta.name));
-      if (result.migratedFrom !== null) this.toast('info', t.save.migrated(result.migratedFrom));
+      this.toast('info', this.strings().save.loaded(result.meta.name));
+      if (result.migratedFrom !== null)
+        this.toast('info', this.strings().save.migrated(result.migratedFrom));
       return result;
     } finally {
       this.ui.set({ busy: false });
@@ -428,13 +441,13 @@ export class GameSession {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    this.toast('info', t.save.exported);
+    this.toast('info', this.strings().save.exported);
   }
 
   private reportStorageError(error: unknown, fallback: string): void {
     console.warn('[saves]', error);
     if (error instanceof SaveStorageError && error.kind !== 'unknown') {
-      this.toast('error', t.save[error.kind]);
+      this.toast('error', this.strings().save[error.kind]);
     } else {
       this.toast('error', fallback);
     }
@@ -548,7 +561,7 @@ export class GameSession {
     this.sound.play('error');
     this.toast(
       reason === 'INSUFFICIENT_FUNDS' || reason === 'BANKRUPT' ? 'error' : 'warning',
-      t.reasons[reason],
+      this.strings().reasons[reason],
     );
   }
 
@@ -579,6 +592,16 @@ export class GameSession {
     }
   }
 
+  setLocale(locale: Locale): void {
+    persistLocale(locale);
+    applyDocumentLocale(locale);
+    this.ui.set({ locale });
+  }
+
+  private strings() {
+    return catalog(this.ui.get().locale);
+  }
+
   dispose(): void {
     this.disposed = true;
     if (this.autosaveTimer) clearInterval(this.autosaveTimer);
@@ -602,6 +625,7 @@ export class GameSession {
   private announce(event: SimEvent): void {
     const sound = EVENT_SOUNDS[event.type];
     if (sound) this.sound.play(sound);
+    const t = this.strings();
     const e = t.events;
     switch (event.type) {
       case 'fireStarted':
@@ -623,7 +647,7 @@ export class GameSession {
       case 'recovered':
         return this.toast('info', e.recovered);
       case 'milestone': {
-        this.toast('info', e.milestone(formatNumber(event.population)));
+        this.toast('info', e.milestone(formatNumber(event.population, this.ui.get().locale)));
         const unlocked = PLACEABLE_KINDS.filter(
           (kind) => PLACEABLE_SPECS[kind].minPopulation === event.population,
         );

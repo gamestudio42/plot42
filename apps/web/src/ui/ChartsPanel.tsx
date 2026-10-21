@@ -1,24 +1,27 @@
 import { BALANCE, type HistoryEntry } from '@city/shared';
 import { START_YEAR } from '@city/simulation';
 import { useEffect, useRef, useState } from 'react';
-import { formatMoney, formatNumber, MONTHS, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, months, useStrings, type Locale, type Strings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { drawLineChart, type ChartSeries } from './lineChart';
 import { Panel } from './Panel';
 
-type Tab = keyof typeof t.charts.tabs;
-type SeriesKey = keyof typeof t.charts.series;
+type Tab = keyof Strings['charts']['tabs'];
+type SeriesKey = keyof Strings['charts']['series'];
 
-const TABS: Record<
-  Tab,
-  { keys: SeriesKey[]; format: (v: number) => string; includeZero?: boolean }
-> = {
-  people: { keys: ['population', 'jobs'], format: formatNumber },
-  money: { keys: ['funds', 'revenue', 'expenses'], format: formatMoney },
-  demand: { keys: ['demandR', 'demandC', 'demandI'], format: (v) => `${Math.round(v * 100)}%` },
-  environment: { keys: ['pollution', 'crime', 'landValue'], format: formatNumber },
+const TAB_KEYS: Record<Tab, { keys: SeriesKey[]; kind: 'number' | 'money' | 'percent' }> = {
+  people: { keys: ['population', 'jobs'], kind: 'number' },
+  money: { keys: ['funds', 'revenue', 'expenses'], kind: 'money' },
+  demand: { keys: ['demandR', 'demandC', 'demandI'], kind: 'percent' },
+  environment: { keys: ['pollution', 'crime', 'landValue'], kind: 'number' },
 };
+
+function tabFormat(kind: 'number' | 'money' | 'percent', locale: Locale): (v: number) => string {
+  if (kind === 'money') return (v) => formatMoney(v, locale);
+  if (kind === 'percent') return (v) => `${Math.round(v * 100)}%`;
+  return (v) => formatNumber(v, locale);
+}
 
 const COLORS: Record<SeriesKey, string> = {
   population: '#4ade80',
@@ -36,19 +39,22 @@ const COLORS: Record<SeriesKey, string> = {
 
 const RANGES = [12, 60, 0] as const;
 
-function monthLabel(entry: HistoryEntry | undefined): string {
+function monthLabel(entry: HistoryEntry | undefined, locale: Locale): string {
   if (!entry) return '';
   const perYear = BALANCE.clock.monthsPerYear;
-  return `${MONTHS[entry.month % perYear]}/${String(START_YEAR + Math.floor(entry.month / perYear)).slice(2)}`;
+  return `${months(locale)[entry.month % perYear]}/${String(START_YEAR + Math.floor(entry.month / perYear)).slice(2)}`;
 }
 
 export function ChartsPanel({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const history = useStore(session.ui, (s) => s.history);
   const [tab, setTab] = useState<Tab>('people');
   const [range, setRange] = useState<(typeof RANGES)[number]>(60);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rows = range === 0 ? history : history.slice(-range);
-  const config = TABS[tab];
+  const config = TAB_KEYS[tab];
+  const format = tabFormat(config.kind, locale);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,24 +66,24 @@ export function ChartsPanel({ session }: { session: GameSession }) {
     }));
     const draw = () =>
       drawLineChart(canvas, series, {
-        format: config.format,
-        xLabel: (i) => monthLabel(rows[i]),
-        ...(config.includeZero === undefined ? {} : { includeZero: config.includeZero }),
+        format,
+        xLabel: (i) => monthLabel(rows[i], locale),
       });
     draw();
     window.addEventListener('resize', draw);
     return () => window.removeEventListener('resize', draw);
-  }, [rows, config]);
+  }, [rows, config, format, locale, t.charts.series]);
 
   return (
     <Panel
       title={t.charts.title}
       testId="charts-panel"
       onClose={() => session.closePanel()}
+      closeLabel={t.ui.close}
       className="charts-panel"
     >
       <div className="tabs" role="tablist">
-        {(Object.keys(TABS) as Tab[]).map((key) => (
+        {(Object.keys(TAB_KEYS) as Tab[]).map((key) => (
           <button
             key={key}
             type="button"
@@ -111,7 +117,7 @@ export function ChartsPanel({ session }: { session: GameSession }) {
             {config.keys.map((key) => (
               <li key={key}>
                 <span className="swatch" style={{ background: COLORS[key] }} />
-                {t.charts.series[key]}: <strong>{config.format(rows.at(-1)?.[key] ?? 0)}</strong>
+                {t.charts.series[key]}: <strong>{format(rows.at(-1)?.[key] ?? 0)}</strong>
               </li>
             ))}
           </ul>

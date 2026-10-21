@@ -11,10 +11,12 @@ import type {
 } from '@city/shared';
 import type { OverlayMode } from '../renderer/chunkDraw';
 import type { ToolGroup, ToolId } from '../tools/tools';
+import type { Strings } from './en';
 
-/** All player-facing text. Code identifiers stay in English; only strings live here. */
+/** Brazilian Portuguese player-facing catalog. */
 export const ptBR = {
   appTitle: 'Urbe',
+  pageTitle: 'Urbe — construa sua cidade',
   tools: {
     select: 'Inspecionar',
     road: 'Estrada',
@@ -197,8 +199,14 @@ export const ptBR = {
     close: 'Fechar',
     yes: 'Sim',
     no: 'Não',
+    tools: 'Ferramentas',
+    shortcut: 'Atalho',
+    perTile: '/lote',
+    bridge: 'ponte',
+    perHeight: '/unidade de altura',
   },
   menu: {
+    language: 'Idioma',
     subtitle: 'Construa, administre e faça sua cidade crescer.',
     cityName: 'Nome da cidade',
     defaultCityName: 'Nova Cidade',
@@ -272,6 +280,7 @@ export const ptBR = {
     perMonth: '/mês',
     date: 'Data',
     demand: 'Demanda',
+    speed: 'Velocidade',
     speeds: ['Pausar', 'Normal', 'Rápido', 'Muito rápido'] as const,
     budget: 'Orçamento',
     charts: 'Gráficos',
@@ -425,6 +434,7 @@ export const ptBR = {
     newGame: 'Voltar ao menu principal',
     confirmLeave: 'Voltar ao menu principal? A cidade será salva automaticamente.',
     settings: 'Configurações',
+    language: 'Idioma',
     disasters: 'Desastres',
     randomDisasters: 'Desastres e incêndios aleatórios',
     trigger: 'Provocar:',
@@ -436,31 +446,4 @@ export const ptBR = {
     animations: 'Animações (carros, fumaça, água)',
     help: 'Atalhos: Q inspecionar · R estrada · 1–6 zonas · 0 remover zona · E energia · T água · B demolir · N nivelar · H elevar · F árvores · P pausa · M som · U subterrâneo · G grade · Esc cancelar',
   },
-};
-
-export type Strings = typeof ptBR;
-export const t: Strings = ptBR;
-
-export function formatMoney(value: number): string {
-  const sign = value < 0 ? '−' : '';
-  return `${sign}$${Math.abs(Math.round(value)).toLocaleString('pt-BR')}`;
-}
-
-export function formatNumber(value: number): string {
-  return Math.round(value).toLocaleString('pt-BR');
-}
-
-export const MONTHS = [
-  'Jan',
-  'Fev',
-  'Mar',
-  'Abr',
-  'Mai',
-  'Jun',
-  'Jul',
-  'Ago',
-  'Set',
-  'Out',
-  'Nov',
-  'Dez',
-] as const;
+} satisfies Strings;

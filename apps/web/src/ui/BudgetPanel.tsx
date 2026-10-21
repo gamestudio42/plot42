@@ -1,5 +1,5 @@
 import { BALANCE, DEPARTMENTS, EXPENSE_CATEGORIES, type ZoneBuildingKind } from '@city/shared';
-import { formatMoney, t } from '../i18n/pt-BR';
+import { formatMoney, useStrings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
 import { Panel } from './Panel';
@@ -7,9 +7,12 @@ import { Panel } from './Panel';
 const ZONES: ZoneBuildingKind[] = ['residential', 'commercial', 'industrial'];
 
 export function BudgetPanel({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const stats = useStore(session.ui, (s) => s.stats);
   if (!stats) return null;
   const b = t.budget;
+  const money = (value: number) => formatMoney(value, locale);
   const report = stats.lastMonth;
   const revenue = ZONES.reduce((sum, z) => sum + report.revenue[z], 0);
   const expenses = EXPENSE_CATEGORIES.reduce((sum, c) => sum + report.expenses[c], 0);
@@ -19,6 +22,7 @@ export function BudgetPanel({ session }: { session: GameSession }) {
       title={b.title}
       testId="budget-panel"
       onClose={() => session.closePanel()}
+      closeLabel={t.ui.close}
       className="budget-panel"
     >
       {stats.bankrupt && <p className="alert bad">{b.bankrupt}</p>}
@@ -73,12 +77,12 @@ export function BudgetPanel({ session }: { session: GameSession }) {
             {ZONES.map((z) => (
               <tr key={z}>
                 <th>{t.zones[z]}</th>
-                <td>{formatMoney(report.revenue[z])}</td>
+                <td>{money(report.revenue[z])}</td>
               </tr>
             ))}
             <tr className="total">
               <th>Total</th>
-              <td>{formatMoney(revenue)}</td>
+              <td>{money(revenue)}</td>
             </tr>
           </tbody>
         </table>
@@ -88,25 +92,25 @@ export function BudgetPanel({ session }: { session: GameSession }) {
             {EXPENSE_CATEGORIES.map((c) => (
               <tr key={c}>
                 <th>{t.expenses[c]}</th>
-                <td>{formatMoney(report.expenses[c])}</td>
+                <td>{money(report.expenses[c])}</td>
               </tr>
             ))}
             <tr className="total">
               <th>Total</th>
-              <td>{formatMoney(expenses)}</td>
+              <td>{money(expenses)}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <dl className="budget-summary">
         <dt>{b.construction}</dt>
-        <dd>{formatMoney(report.construction)}</dd>
+        <dd>{money(report.construction)}</dd>
         <dt>{b.net}</dt>
         <dd className={report.net < 0 ? 'bad' : 'good'} data-testid="budget-net">
-          {formatMoney(report.net)}
+          {money(report.net)}
         </dd>
         <dt>{b.yearly}</dt>
-        <dd className={report.net < 0 ? 'bad' : 'good'}>{formatMoney(report.net * 12)}</dd>
+        <dd className={report.net < 0 ? 'bad' : 'good'}>{money(report.net * 12)}</dd>
       </dl>
     </Panel>
   );

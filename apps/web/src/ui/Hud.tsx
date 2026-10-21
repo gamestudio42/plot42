@@ -1,5 +1,5 @@
 import type { RciValues, Speed } from '@city/shared';
-import { formatMoney, formatNumber, MONTHS, t } from '../i18n/pt-BR';
+import { formatMoney, formatNumber, months, useStrings } from '../i18n';
 import type { GameSession, PanelId } from '../state/session';
 import { useStore } from '../state/store';
 
@@ -7,11 +7,14 @@ const SPEEDS: Speed[] = [0, 1, 2, 3];
 const SPEED_ICONS = ['❚❚', '▶', '▶▶', '▶▶▶'] as const;
 
 export function Hud({ session }: { session: GameSession }) {
+  const t = useStrings(session.ui);
+  const locale = useStore(session.ui, (s) => s.locale);
   const stats = useStore(session.ui, (s) => s.stats);
   const speed = useStore(session.ui, (s) => s.speed);
   const panel = useStore(session.ui, (s) => s.panel);
   if (!stats) return null;
   const h = t.hud;
+  const monthNames = months(locale);
   const net = stats.lastMonth.net;
   const panelButton = (id: PanelId, label: string) => (
     <button
@@ -30,15 +33,15 @@ export function Hud({ session }: { session: GameSession }) {
       <div className="hud-city">
         <strong data-testid="city-name">{stats.name}</strong>
         <span className="muted" data-testid="date">
-          {stats.day} {MONTHS[stats.month]} {stats.year}
+          {stats.day} {monthNames[stats.month]} {stats.year}
         </span>
       </div>
       <div className={`hud-stat ${stats.funds < 0 ? 'bad' : ''}`} title={h.funds}>
         <span className="hud-label">{h.funds}</span>
-        <span data-testid="funds">{formatMoney(stats.funds)}</span>
+        <span data-testid="funds">{formatMoney(stats.funds, locale)}</span>
         <span className={`hud-delta ${net < 0 ? 'bad' : 'good'}`}>
           {net >= 0 ? '+' : ''}
-          {formatMoney(net)}
+          {formatMoney(net, locale)}
           {h.perMonth}
         </span>
         {stats.bankrupt && <span className="badge bad">{h.bankrupt}</span>}
@@ -46,9 +49,9 @@ export function Hud({ session }: { session: GameSession }) {
       </div>
       <div className="hud-stat" title={h.population}>
         <span className="hud-label">{h.population}</span>
-        <span data-testid="population">{formatNumber(stats.population)}</span>
+        <span data-testid="population">{formatNumber(stats.population, locale)}</span>
       </div>
-      <RciBars demand={stats.demand} />
+      <RciBars demand={stats.demand} session={session} />
       {(stats.activeFires > 0 || stats.disasters.length > 0) && (
         <div className="hud-alerts" data-testid="hud-alerts">
           {stats.activeFires > 0 && (
@@ -63,7 +66,7 @@ export function Hud({ session }: { session: GameSession }) {
           ))}
         </div>
       )}
-      <div className="speed-controls" role="group" aria-label="Velocidade">
+      <div className="speed-controls" role="group" aria-label={h.speed}>
         {SPEEDS.map((s) => (
           <button
             key={s}
@@ -95,7 +98,8 @@ const RCI_KEYS = [
   ['industrial', 'I', 'var(--ind)'],
 ] as const;
 
-export function RciBars({ demand }: { demand: RciValues }) {
+export function RciBars({ demand, session }: { demand: RciValues; session: GameSession }) {
+  const t = useStrings(session.ui);
   return (
     <div className="rci" data-testid="rci" title={t.hud.demand}>
       {RCI_KEYS.map(([key, letter, color]) => {
