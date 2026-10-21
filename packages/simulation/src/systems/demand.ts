@@ -1,4 +1,10 @@
-import { BALANCE, isZoneKind, type RciValues } from '@city/shared';
+import {
+  BALANCE,
+  PLACEABLE_SPECS,
+  isZoneKind,
+  type PlaceableSpec,
+  type RciValues,
+} from '@city/shared';
 import type { SimulationEngine } from '../engine';
 
 /** City-wide aggregates of zone buildings used by demand, growth and the economy. */
@@ -10,6 +16,10 @@ export interface CityTotals {
   industrialJobs: number;
   commercialWorkers: number;
   industrialWorkers: number;
+  /** Extra commercial market numerator from powered hubs. */
+  hubCommercialMarket: number;
+  /** Extra industrial market numerator from powered hubs. */
+  hubIndustrialMarket: number;
   /** Mean (landValue - pollution - crime) / 255 over developed residential tiles, or 0. */
   residentialQuality: number;
   developedResidential: number;
@@ -26,32 +36,56 @@ export function cityTotals(engine: SimulationEngine): CityTotals {
     industrialJobs: 0,
     commercialWorkers: 0,
     industrialWorkers: 0,
+    hubCommercialMarket: 0,
+    hubIndustrialMarket: 0,
     residentialQuality: 0,
     developedResidential: 0,
   };
   let quality = 0;
   for (const b of engine.buildings.values()) {
-    if (!isZoneKind(b.kind) || b.abandoned) continue;
-    if (b.kind === 'residential') {
-      totals.residents += b.occupancy;
-      totals.housing += b.capacity;
-      const i = w.index(b.x, b.y);
-      quality +=
-        ((inf.landValue[i] as number) - (inf.pollution[i] as number) - (inf.crime[i] as number)) /
-        255;
-      totals.developedResidential++;
-    } else if (b.kind === 'commercial') {
-      totals.commercialJobs += b.capacity;
+    if (isZoneKind(b.kind)) {
+      if (b.abandoned) continue;
+      if (b.kind === 'residential') {
+        totals.residents += b.occupancy;
+        totals.housing += b.capacity;
+        const i = w.index(b.x, b.y);
+        quality +=
+          ((inf.landValue[i] as number) - (inf.pollution[i] as number) - (inf.crime[i] as number)) /
+          255;
+        totals.developedResidential++;
+      } else if (b.kind === 'commercial') {
+        totals.commercialJobs += b.capacity;
+        totals.commercialWorkers += b.occupancy;
+      } else {
+        totals.industrialJobs += b.capacity;
+        totals.industrialWorkers += b.occupancy;
+      }
+      continue;
+    }
+    // Hub occupancy holds the jobs of an operating hub (0 when dark), set by the utilities pass.
+    const spec = PLACEABLE_SPECS[b.kind];
+    if (spec.jobs <= 0 || b.occupancy <= 0) continue;
+    const market = b.occupancy * BALANCE.demand.hubMarketPerJob;
+    if (spec.jobKind === 'commercial') {
+      totals.commercialJobs += b.occupancy;
       totals.commercialWorkers += b.occupancy;
-    } else {
-      totals.industrialJobs += b.capacity;
+      totals.hubCommercialMarket += market;
+    } else if (spec.jobKind === 'industrial') {
+      totals.industrialJobs += b.occupancy;
       totals.industrialWorkers += b.occupancy;
+      totals.hubIndustrialMarket += market;
     }
   }
   totals.workforce = BALANCE.demand.laborRate * totals.residents;
   totals.residentialQuality =
     totals.developedResidential === 0 ? 0 : quality / totals.developedResidential;
   return totals;
+}
+
+/** Jobs of one operating hub: base plus a share of the city-size bonus, capped (spec section 4). */
+export function hubJobs(spec: PlaceableSpec, residents: number, sameKind: number): number {
+  const extra = Math.floor((residents * spec.jobsPer1000) / 1000 / Math.max(1, sameKind));
+  return Math.min(spec.maxJobs, spec.jobs + extra);
 }
 
 function clamp(v: number, lo = -1, hi = 1): number {
@@ -92,7 +126,10 @@ export function demandTargets({ totals, taxes, edgeConnected, crisis }: DemandIn
 
   const labor = clamp((W - (Jc + Ji)) / Math.max(W, 20));
   const cMarket =
-    d.commercial.perCapita * P + d.commercial.perIndustrialJob * Ji + d.commercial.base;
+    d.commercial.perCapita * P +
+    d.commercial.perIndustrialJob * Ji +
+    d.commercial.base +
+    totals.hubCommercialMarket;
   const commercialMarket = (cMarket - Jc) / Math.max(cMarket, Jc, 10);
   const commercial = clamp(
     d.commercial.market * commercialMarket +
@@ -100,7 +137,7 @@ export function demandTargets({ totals, taxes, edgeConnected, crisis }: DemandIn
       d.commercial.tax * taxPressure(taxes.commercial),
   );
 
-  const iMarket = d.industrial.base + d.industrial.perCapita * P;
+  const iMarket = d.industrial.base + d.industrial.perCapita * P + totals.hubIndustrialMarket;
   const industrialMarket = (iMarket - Ji) / Math.max(iMarket, Ji, 10);
   const industrial = clamp(
     d.industrial.market * industrialMarket * crisis +

@@ -3,7 +3,15 @@ import { clientPointOf, startCity } from './helpers';
 
 const stats = (page: Page) =>
   page.evaluate(
-    () => window.__cityDebug?.animationStats() ?? { cars: 0, trucks: 0, puffs: 0, sparkles: 0 },
+    () =>
+      window.__cityDebug?.animationStats() ?? {
+        cars: 0,
+        trucks: 0,
+        puffs: 0,
+        sparkles: 0,
+        boats: 0,
+        planes: 0,
+      },
   );
 
 test('cars, smoke, water glints and fire engines animate the city', async ({ page }) => {
@@ -119,6 +127,8 @@ test('cars, smoke, water glints and fire engines animate the city', async ({ pag
   // Switched off from the system panel, and remembered.
   await page.getByTestId('open-system').click();
   await page.getByTestId('animations-enabled').uncheck();
-  await expect.poll(() => stats(page)).toEqual({ cars: 0, trucks: 0, puffs: 0, sparkles: 0 });
+  await expect
+    .poll(() => stats(page))
+    .toEqual({ cars: 0, trucks: 0, puffs: 0, sparkles: 0, boats: 0, planes: 0 });
   expect(await page.evaluate(() => localStorage.getItem('cityBuilder.animations'))).toBe('0');
 });

@@ -14,6 +14,7 @@ import {
 } from '@city/shared';
 import { maxLevel, ZONE_KIND } from './systems/growth';
 import { RoadNetwork } from './systems/roads';
+import { gatewayRoads, hubRoad } from './systems/traffic';
 import type { World } from './world/world';
 
 /** Everything diagnostics need; works on the engine or on the UI's mirror world. */
@@ -62,8 +63,13 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
 
   if (building && !isZoneKind(building.kind)) {
     const spec = PLACEABLE_SPECS[building.kind];
-    const needsPower = spec.powerUse > 0 || building.kind === 'waterPump';
+    const needsPower = spec.powerUse > 0;
     if (needsPower && !building.powered) add(powerProblem(ctx), 3);
+    if (spec.requiresRoad) {
+      const roads = ctx.roads ?? new RoadNetwork(w);
+      roads.update();
+      if (hubRoad(w, roads, building) < 0) add('NO_ROAD', 3);
+    }
     return sortProblems(problems);
   }
 
@@ -81,7 +87,7 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
   roads.update();
   if (!roads.hasAccess(i)) {
     add('NO_ROAD', 3);
-  } else if (!reachesDestination(w, roads, i, zone)) {
+  } else if (!reachesDestination(ctx, roads, i, zone)) {
     add(NO_DESTINATION[kind], 3);
   } else if ((w.influence.access[i] as number) < THRESHOLDS.lowAccess) {
     add(NO_DESTINATION[kind], 2);
@@ -130,10 +136,19 @@ function powerProblem(ctx: DiagnoseContext): ProblemCode {
 }
 
 /** Same rule as `hasDestination` in the traffic system, evaluated on demand. */
-function reachesDestination(w: World, roads: RoadNetwork, i: number, zone: ZoneType): boolean {
+function reachesDestination(
+  ctx: DiagnoseContext,
+  roads: RoadNetwork,
+  i: number,
+  zone: ZoneType,
+): boolean {
+  const w = ctx.world;
   const c = roads.componentOf(i);
   if (c === 0) return false;
   if (roads.edgeConnected[c] === 1) return true;
+  for (const g of gatewayRoads(w, roads, worldBuildings(ctx))) {
+    if (roads.componentOf(g) === c) return true;
+  }
   for (let t = 0; t < w.tileCount; t++) {
     const z = w.zone[t] as ZoneType;
     if (z === ZoneType.None) continue;
@@ -142,6 +157,21 @@ function reachesDestination(w: World, roads: RoadNetwork, i: number, zone: ZoneT
     if (isTarget && roads.componentOf(t) === c) return true;
   }
   return false;
+}
+
+/** Placeable buildings on the map, each once (zone buildings never act as gateways). */
+function worldBuildings(ctx: DiagnoseContext): BuildingRecord[] {
+  const seen = new Set<number>();
+  const list: BuildingRecord[] = [];
+  const ids = ctx.world.buildingId;
+  for (let t = 0; t < ids.length; t++) {
+    const id = ids[t] as number;
+    if (id === 0 || seen.has(id)) continue;
+    seen.add(id);
+    const b = ctx.building(id);
+    if (b && !isZoneKind(b.kind)) list.push(b);
+  }
+  return list;
 }
 
 function sortProblems(problems: Problem[]): Problem[] {

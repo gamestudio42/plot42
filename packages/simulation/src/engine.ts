@@ -37,7 +37,12 @@ import { updateGrowth, type GrowthResult } from './systems/growth';
 import { updateInfluence } from './systems/influence';
 import { RoadNetwork } from './systems/roads';
 import { updateServices } from './systems/services';
-import { componentStats, updateTraffic, type TrafficResult } from './systems/traffic';
+import {
+  componentStats,
+  gatewayRoads,
+  updateTraffic,
+  type TrafficResult,
+} from './systems/traffic';
 import { updateUtilities, type UtilityResult } from './systems/utilities';
 import { DEFAULT_TERRAIN, generateTerrain } from './terrain/generate';
 import { dateOf, isDayStart, monthIndex, monthStage } from './time';
@@ -269,6 +274,7 @@ export class SimulationEngine {
       building: (id) => this.buildings.get(id),
       funds: this.economy.funds,
       bankrupt: this.economy.bankrupt,
+      population: cityTotals(this).residents,
     };
   }
 
@@ -305,7 +311,7 @@ export class SimulationEngine {
         else counts[b.kind]++;
       } else if (b.kind === 'coalPlant' || b.kind === 'gasPlant' || b.kind === 'windTurbine')
         counts.plants++;
-      else if (b.kind !== 'waterPump') counts.services++;
+      else if (b.kind !== 'waterPump' && b.kind !== 'well') counts.services++;
     }
     const w = this.world;
     let fires = 0;
@@ -363,8 +369,14 @@ export class SimulationEngine {
       activeFires: fires,
       disasters: this.disasters.map((d) => ({ ...d })),
       disastersEnabled: this.disastersEnabled,
-      edgeConnected,
+      edgeConnected: edgeConnected || this.hasGateway(),
     };
+  }
+
+  /** Some operating airport or marina links the city to the region. */
+  private hasGateway(): boolean {
+    this.roads.update();
+    return gatewayRoads(this.world, this.roads, this.buildings.values()).length > 0;
   }
 
   /** Recomputes power and water networks now. */
@@ -389,7 +401,7 @@ export class SimulationEngine {
     updateDemand(this, {
       totals: before,
       taxes: this.economy.taxes,
-      edgeConnected: this.roads.edgeRoads.length > 0,
+      edgeConnected: this.roads.edgeRoads.length > 0 || this.hasGateway(),
       crisis: crisis ? d.crisisIndustrialFactor : 1,
     });
     const healthCover = epidemic ? computeLayerStats(this).coverage.health : 0;

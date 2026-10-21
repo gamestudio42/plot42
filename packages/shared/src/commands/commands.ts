@@ -18,6 +18,8 @@ export type ToolCommand =
   | ({ type: 'zone'; zone: ZoneType; density: ZoneDensity } & Area)
   | ({ type: 'demolish'; underground?: boolean } & Area)
   | ({ type: 'level' } & Area)
+  | ({ type: 'raise' } & Area)
+  | ({ type: 'lower' } & Area)
   | ({ type: 'plantTrees' } & Area)
   | { type: 'place'; kind: PlaceableKind; x: number; y: number };
 
@@ -39,6 +41,8 @@ const TOOL_TYPES: ReadonlySet<string> = new Set<ToolType>([
   'zone',
   'demolish',
   'level',
+  'raise',
+  'lower',
   'plantTrees',
   'place',
 ]);
@@ -60,6 +64,9 @@ export const RejectReason = {
   NothingToDo: 'NOTHING_TO_DO',
   Rubble: 'RUBBLE',
   OnFire: 'ON_FIRE',
+  Locked: 'LOCKED',
+  NeedsWater: 'NEEDS_WATER',
+  NeedsRoad: 'NEEDS_ROAD',
   Invalid: 'INVALID',
 } as const;
 export type RejectReason = (typeof RejectReason)[keyof typeof RejectReason];

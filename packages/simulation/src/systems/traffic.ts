@@ -1,4 +1,12 @@
-import { BALANCE, Infra, ZoneType, isZoneKind } from '@city/shared';
+import {
+  BALANCE,
+  Infra,
+  PLACEABLE_SPECS,
+  ZoneType,
+  isZoneKind,
+  type BuildingRecord,
+  type PlaceableKind,
+} from '@city/shared';
 import type { SimulationEngine } from '../engine';
 import type { World } from '../world/world';
 import { MinHeap } from './heap';
@@ -30,17 +38,49 @@ export interface TrafficResult {
   components: ComponentStats;
 }
 
+/** A hub that operates: powered, intact and with jobs. */
+export function isOperatingHub(b: BuildingRecord): boolean {
+  if (isZoneKind(b.kind)) return false;
+  return PLACEABLE_SPECS[b.kind].jobs > 0 && b.powered && b.offline === 0;
+}
+
+/**
+ * Road tiles beside operating gateway hubs (airport, marina). Each one links its road component
+ * to the region like a road leaving the map: external jobs and workers arrive there.
+ */
+export function gatewayRoads(
+  world: World,
+  roads: RoadNetwork,
+  buildings: Iterable<BuildingRecord>,
+): number[] {
+  const list: number[] = [];
+  for (const b of buildings) {
+    if (!isOperatingHub(b) || !PLACEABLE_SPECS[b.kind as PlaceableKind].gateway) continue;
+    const road = hubRoad(world, roads, b);
+    if (road >= 0) list.push(road);
+  }
+  return list;
+}
+
+/** `roads.edgeConnected`, plus the components reached by a gateway road. */
+export function regionalComponents(roads: RoadNetwork, gateways: readonly number[]): Uint8Array {
+  if (gateways.length === 0) return roads.edgeConnected;
+  const edge = roads.edgeConnected.slice();
+  for (const g of gateways) edge[roads.componentOf(g)] = 1;
+  return edge;
+}
+
 export function componentStats(engine: SimulationEngine, roads: RoadNetwork): ComponentStats {
   const n = roads.componentCount + 1;
+  const w = engine.world;
   const stats: ComponentStats = {
     residents: new Float64Array(n),
     commercialJobs: new Float64Array(n),
     industrialJobs: new Float64Array(n),
     residentialZones: new Float64Array(n),
     jobZones: new Float64Array(n),
-    edge: roads.edgeConnected,
+    edge: regionalComponents(roads, gatewayRoads(w, roads, engine.buildings.values())),
   };
-  const w = engine.world;
   for (let i = 0; i < w.tileCount; i++) {
     const zone = w.zone[i] as ZoneType;
     if (zone === ZoneType.None) continue;
@@ -59,7 +99,39 @@ export function componentStats(engine: SimulationEngine, roads: RoadNetwork): Co
       stats.commercialJobs[c] = (stats.commercialJobs[c] as number) + b.capacity;
     else stats.industrialJobs[c] = (stats.industrialJobs[c] as number) + b.capacity;
   }
+  for (const b of engine.buildings.values()) {
+    if (!isOperatingHub(b)) continue;
+    const road = hubRoad(w, roads, b);
+    if (road < 0) continue;
+    const c = roads.componentOf(road);
+    stats.jobZones[c] = (stats.jobZones[c] as number) + 1;
+    const spec = PLACEABLE_SPECS[b.kind as PlaceableKind];
+    if (spec.jobKind === 'commercial')
+      stats.commercialJobs[c] = (stats.commercialJobs[c] as number) + b.occupancy;
+    else if (spec.jobKind === 'industrial')
+      stats.industrialJobs[c] = (stats.industrialJobs[c] as number) + b.occupancy;
+  }
   return stats;
+}
+
+/** First road tile orthogonally beside the footprint that belongs to a component, or -1. */
+export function hubRoad(
+  world: World,
+  roads: RoadNetwork,
+  b: { x: number; y: number; w: number; h: number },
+): number {
+  for (let y = b.y - 1; y <= b.y + b.h; y++) {
+    for (let x = b.x - 1; x <= b.x + b.w; x++) {
+      const outsideX = x < b.x || x >= b.x + b.w;
+      const outsideY = y < b.y || y >= b.y + b.h;
+      if (outsideX === outsideY) continue;
+      if (!world.inBounds(x, y)) continue;
+      const i = world.index(x, y);
+      if (!world.hasInfra(i, Infra.Road)) continue;
+      if (roads.componentOf(i) !== 0) return i;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -175,8 +247,8 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
       if (b.kind === 'commercial') shopSites.push(road);
     }
   }
-  // Roads leaving the map connect to the region: external jobs and workers.
-  for (const r of roads.edgeRoads) {
+  // Roads leaving the map and gateway hubs connect to the region: external jobs and workers.
+  for (const r of [...roads.edgeRoads, ...gatewayRoads(w, roads, engine.buildings.values())]) {
     jobSites.push(r);
     homeSites.push(r);
   }
@@ -199,7 +271,7 @@ export function updateTraffic(engine: SimulationEngine, roads: RoadNetwork): Tra
       continue;
     }
     const c = roads.component[road] as number;
-    const edge = roads.edgeConnected[c] === 1;
+    const edge = comps.edge[c] === 1;
     const residents = comps.residents[c] as number;
     const workforce = labor * residents + (edge ? extWorkers : 0);
     const allJobs =

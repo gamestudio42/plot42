@@ -107,6 +107,7 @@ export function computeMonthlyReport(
         ex.power += spec.upkeep;
         break;
       case 'waterPump':
+      case 'well':
         ex.water += spec.upkeep;
         break;
       case 'policeStation':
@@ -123,6 +124,10 @@ export function computeMonthlyReport(
         break;
       case 'park':
         ex.parks += spec.upkeep;
+        break;
+      case 'marina':
+      case 'airport':
+        ex.transport += spec.upkeep;
         break;
     }
   }

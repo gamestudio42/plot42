@@ -1,5 +1,11 @@
 export { GAME_NAME } from '@city/shared';
-export { planToolCommand, DemolishOp, type PlanContext, type ToolPlan } from './commands/plan';
+export {
+  planToolCommand,
+  DemolishOp,
+  footprintTouches,
+  type PlanContext,
+  type ToolPlan,
+} from './commands/plan';
 export { lPath, normalizeArea, rectTiles } from './commands/shapes';
 export {
   createEngine,
@@ -26,6 +32,7 @@ export { SIM_PRESETS, type PresetRun, type SimPreset } from './scenarios/presets
 export {
   cityTotals,
   demandTargets,
+  hubJobs,
   taxPressure,
   type CityTotals,
   type DemandInputs,
@@ -34,7 +41,17 @@ export { attractiveness, maxLevel, transportScore, ZONE_KIND } from './systems/g
 export { boxBlur, populationCentre } from './systems/influence';
 export { RoadNetwork } from './systems/roads';
 export { SERVICE_LAYERS, stationAccessRoads } from './systems/services';
-export { commuteDecay, hasDestination, roadDijkstra, type TrafficResult } from './systems/traffic';
+export {
+  commuteDecay,
+  componentStats,
+  gatewayRoads,
+  hasDestination,
+  hubRoad,
+  isOperatingHub,
+  regionalComponents,
+  roadDijkstra,
+  type TrafficResult,
+} from './systems/traffic';
 export {
   powerDemand,
   powerSupply,

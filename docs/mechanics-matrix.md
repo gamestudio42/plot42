@@ -24,6 +24,8 @@ References studied (cloned into the git-ignored `references/` folder):
 | Clock       | Tick = 1/4 day, month = 30 days                             | New        |                                                                       |
 | Map         | Grid with corner heights and slopes                         | Observed   | SC2000 terrain. Our heights are 0..12.                                |
 | Map         | Adjacent vertex heights differ by at most 1                 | Observed   | Constraint used by SC2000 terrain tools.                              |
+| Map         | Raise/lower move a rectangle by ±1 then relax slopes        | Observed   | SC2000 raise/lower land. Same BFS and refusals as our level tool.     |
+| Roads       | Road on water is a bridge (cost, upkeep, one component)     | Observed   | No extra Infra bit. Renderer draws a raised deck, piers and railings. |
 | Terrain gen | Value noise, rivers by random walk, sea by percentile       | New        |                                                                       |
 | Zoning      | Zones develop only with power                               | Code       | `doResidential`: unpowered `zscore = −500`.                           |
 | Zoning      | Zone growth = global demand + local evaluation + randomness | Code       | `zscore = resValve + evalRes()` compared against a random number.     |
@@ -41,13 +43,17 @@ References studied (cloned into the git-ignored `references/` folder):
 | Demand      | Tax table: higher tax lowers every valve                    | Code       | `taxTable[21]`, neutral around 7%. We use `T = (t − 7)/13`.           |
 | Demand      | Formula of section 4                                        | New        | Blueprint hypothesis with explicit normalization.                     |
 | Demand      | Regional bonus for roads on the map edge                    | Observed   | SC2000 neighbour connections. Value is ours.                          |
+| Hubs        | Marina (shore) and airport as late unlocks with jobs        | Observed   | SC2000 seaport/airport idea. Shore siting, jobs and market are ours.  |
+| Hubs        | Hub jobs scale with population, shared per kind, capped     | New        | `base + per1000 · P / 1000 / n`, market 2 per job.                    |
+| Hubs        | Operating hub links its road to the region like an edge     | New        | Inspired by SC2000 connections; the gateway rule is ours.             |
+| Hubs        | Marina raises nearby land value, airport noise lowers it    | New        | Linear falloff over a Chebyshev radius around the footprint.          |
 | Note        | `resRatio = min(indRatio, indRatioMax)` typo in Micropolis  | Code       | Known bug; not reproduced.                                            |
 | Power       | Flood fill from plants through conductive tiles             | Code       | `doPowerScan`.                                                        |
 | Power       | Plant capacity limits the number of powered tiles           | Code       | Coal 700, nuclear 2000 units in Micropolis.                           |
 | Power       | Consumption per building level, nearest-first allocation    | New        | Micropolis counts tiles; we count building consumption.               |
 | Power       | Zones conduct power                                         | Code       | `CONDBIT` on zone tiles.                                              |
 | Water       | Pumps, pipes, buildings relay water                         | Observed   | SC2000 has pumps and pipes. Relay through buildings is ours.          |
-| Water       | Pumps need power and output more next to water              | Observed   | Values are ours.                                                      |
+| Water       | Pumps need power and output more next to water              | Observed   | Values are ours. The 1×1 well uses the same rule at about 1/5 output. |
 | Traffic     | Trips from zones to destinations within a max distance      | Code       | `tryDrive`, `MAX_TRAFFIC_DISTANCE = 30`.                              |
 | Traffic     | Aggregated flow with Dijkstra and congestion feedback       | New        | Replaces Micropolis' random walk.                                     |
 | Traffic     | Congestion averaged over months                             | New        | Avoids the empty/jammed oscillation of a single bottleneck road.      |

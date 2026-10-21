@@ -17,12 +17,20 @@ Byte maps (0..255) are normalized by dividing by 255.
   forests, one or two rivers carved by a seeded random walk, sea level by percentile, then a
   relaxation pass to enforce the slope constraint. Water tiles have all corners at height 0.
 - Rules:
-  - Water blocks zones and buildings. Roads over water are bridges (higher cost); power
-    lines may cross water; pipes are underground and may cross anything.
+  - Water blocks zones and buildings. Roads over water are bridges (higher cost and upkeep,
+    same `Infra.Road` bit); power lines may cross water; pipes are underground and may cross
+    anything. The renderer lifts the deck and draws piers; the road graph is unchanged.
   - Zones and buildings need flat tiles (all footprint tiles flat and at the same height).
   - Roads, power lines and pipes accept flat tiles and simple slopes (`max − min ≤ 1`).
   - The level tool flattens a rectangle to the height of the drag start tile and propagates
     the slope constraint outwards; it is refused if a neighbour with construction would change.
+  - Raise and lower move every vertex in the rectangle by +1 or −1 (clamped to `0..MAX_HEIGHT`)
+    and reuse that same slope BFS and the same refusals. Cost is `units · levelPerUnit`.
+    Raising a water tile so any corner is above 0 turns it into sand.
+  - The marina (3×3) must sit on land, touch water and an orthogonal road, and needs 1 000
+    residents. The airport (4×4) must be flat land with an orthogonal road and 2 000 residents.
+    The population lock is checked first and rejects every footprint tile with `LOCKED`; then
+    the per-tile checks run, and finally `NEEDS_WATER` and `NEEDS_ROAD` for the whole lot.
 
 ## 2. Construction
 
@@ -36,9 +44,11 @@ Construction never makes funds negative. A bankrupt city cannot build.
 | Power line | L-path    | May share a tile with a road.                            |
 | Water pipe | L-path    | Underground layer, independent of the surface.           |
 | Zone       | Rectangle | R/C/I, light or dense. Re-zoning needs an empty tile.    |
-| Building   | Point     | Plants, pump, services, park. Footprint must be valid.   |
+| Building   | Point     | Plants, pump, well, services, park, marina, airport.     |
 | Demolish   | Rectangle | Removes whole buildings, networks, zones, trees, rubble. |
-| Level      | Rectangle | Cost per vertex height unit changed.                     |
+| Level      | Rectangle | Flatten to the drag-start height. Cost per vertex unit.  |
+| Raise      | Rectangle | Each vertex +1, then the same slope BFS as level.        |
+| Lower      | Rectangle | Each vertex −1 (no-op at height 0).                      |
 
 Roads choose their sprite from a 4-bit mask of orthogonal road neighbours (auto-tiling).
 
@@ -67,6 +77,7 @@ Residential (blueprint hypothesis `D_R = clamp(a1·J + a2·Q − a3·T − a4·H
 
 ```
 J  = clamp((Jc + Ji + EXTERNAL_JOBS − W) / max(W, 50), −1, 1)
+     (Jc and Ji include the jobs of operating hubs, see "Transport hubs" below)
 Q  = mean over developed residential tiles of (landValue − pollution − crime) / 255 − 0.15
      (0 while no residential building exists)
 H  = max(0, (Hc − P) / max(Hc, 1) − 0.10)          (10% natural vacancy is tolerated)
@@ -77,7 +88,8 @@ Commercial:
 
 ```
 labor  = clamp((W − (Jc + Ji)) / max(W, 20), −1, 1)
-market = (0.20·P + 0.05·Ji + 2 − Jc) / max(0.20·P + 0.05·Ji + 2, Jc, 10)
+market = (0.20·P + 0.05·Ji + 2 + airportMarket − Jc) / max(0.20·P + 0.05·Ji + 2 + airportMarket, Jc, 10)
+         airportMarket = 2 · (airport jobs)
 DC     = clamp(0.8·market + 0.3·labor − 0.5·T(tC), −1, 1)
 ```
 
@@ -85,9 +97,22 @@ Industrial (external market grows with the city; a road on the map edge adds a r
 of 0.1):
 
 ```
-market = (30 + 0.25·P − Ji) / max(30 + 0.25·P, Ji, 10)
+market = (30 + 0.25·P + marinaMarket − Ji) / max(30 + 0.25·P + marinaMarket, Ji, 10)
+         marinaMarket = 2 · (marina jobs)
 DI     = clamp(0.8·market·crisis + 0.4·labor − 0.5·T(tI) + edgeBonus, −1, 1)
 ```
+
+Transport hubs. A hub **operates** when it is powered, not offline and has jobs. Its jobs grow
+with the city and are shared by hubs of the same kind:
+
+```
+jobs = min(maxJobs, base + floor(P · per1000 / 1000 / max(1, operating hubs of that kind)))
+       marina:  base 40, +25 per 1 000 residents, max 200, industrial jobs
+       airport: base 60, +50 per 1 000 residents, max 600, commercial jobs
+```
+
+The utilities pass stores them as the hub's `capacity` and `occupancy` (0 when idle). The
+market bonus is `hubMarketPerJob` (2) per job, so a hub pulls in as much trade as it employs.
 
 The per-capita market factors (0.20 and 0.25) are tuned so that a balanced city keeps roughly
 one job per resident in the workforce; lower values stall residential demand on `J`.
@@ -138,7 +163,11 @@ Requirements for any development: road within 3 tiles and power.
    world's `roadVersion` changes.
 3. Per component: residents, workforce, commercial and industrial jobs, edge connection.
    A component touching the map edge counts as a source of external jobs and workers (the
-   neighbouring region), so edge roads also seed the Dijkstra below.
+   neighbouring region), so edge roads also seed the Dijkstra below. An operating marina or
+   airport is a **regional gateway**: the road orthogonally next to its footprint (the first in
+   index order) links its component to the region exactly like an edge road. It seeds the
+   Dijkstra as a job and home site, satisfies trip generation and counts as edge-connected for
+   the industrial `edgeBonus`. The hub itself is a job site of its component.
    **Trip generation:** a zone tile can develop (and its building keeps residents or workers)
    only if its road component contains a destination zone: any C or I zone tile for homes, any
    R zone tile for job sites, or a map-edge road. Empty zones count as destinations, so a new
@@ -165,7 +194,8 @@ Conductors:
 
 - Power: power lines, building footprints and zoned tiles. Laying a power line on a zone or a
   building is refused with `ALREADY_BUILT`, because those tiles already conduct.
-- Water: pipes and building footprints. Pumps only run when powered.
+- Water: pipes and building footprints. Any placeable with `waterSupply > 0` (the 2×2 pump
+  and the 1×1 well) only runs when powered and `offline === 0`.
 - Conduction jumps over a single plain road tile between two conductors (a road with no line
   or pipe on it). This mirrors the classic behaviour where a street between two blocks does
   not break the grid; two or more road tiles in a row do.
@@ -183,6 +213,9 @@ unserved, which makes brownouts spread from the far end of the network.
 | Gas plant  | +400 (2×2)         | –                                        |
 | Wind       | +60 (1×1)          | –                                        |
 | Pump       | −10                | +400 next to water, +150 otherwise (2×2) |
+| Well       | −2                 | +80 next to water, +40 otherwise (1×1)   |
+| Marina     | −8 (3×3)           | –                                        |
+| Airport    | −16 (4×4)          | –                                        |
 | Res L1..L5 | −1, 2, 4, 7, 12    | −2, 4, 9, 18, 36                         |
 | Com L1..L5 | −3, 6, 10, 16, 25  | −2, 5, 10, 18, 30                        |
 | Ind L1..L5 | −6, 12, 18, 25, 35 | −4, 8, 14, 20, 28                        |
@@ -229,8 +262,10 @@ copy, because a city loaded between the stages never ran that stage in memory.
   `0.3·traffic`, fire 80) blurred twice with a 5×5 box filter and multiplied by a gain of 4
   (the blur spreads a source over 25 tiles), minus `4·trees` and 20 near parks.
 - **Land value:** `60 + water proximity (30) + 3·elevation + 2·trees + parks + 0.1·(education +
-health) + 0.05·police + 10·(road access) + city centre bonus max(0, 40 − d/2) − 0.5·pollution −
-0.3·crime − 0.1·traffic`, blurred once. Water tiles are 0. The distance to water is a capped
+health) + 0.05·police + 10·(road access) + hubs + city centre bonus max(0, 40 − d/2) −
+0.5·pollution − 0.3·crime − 0.1·traffic`, blurred once. `hubs` sums, for each operating hub,
+  `landValue · (1 − d / (radius + 1))` with `d` the Chebyshev distance to its footprint, up to
+  `radius`: the marina's waterfront adds +30 within 6 tiles, the airport's noise −35 within 5. Water tiles are 0. The distance to water is a capped
   search over the terrain, cached per world and recomputed only when `world.terrainVersion`
   changes. `setLayer('terrain', …)` bumps that version; code that writes the terrain array
   directly (tests, generators) must bump it too.

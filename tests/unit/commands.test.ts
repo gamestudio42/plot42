@@ -1,7 +1,13 @@
 import { BALANCE, Infra, PLACEABLE_SPECS, RejectReason, ZoneDensity, ZoneType } from '@city/shared';
 import { Connection, connectionMask, createEngine, hashState, lPath } from '@city/simulation';
 import { describe, expect, it } from 'vitest';
-import { addHill, addWater, flatEngine, slopeConstraintHolds } from '../helpers/engine';
+import {
+  addHill,
+  addWater,
+  flatEngine,
+  seedResidents,
+  slopeConstraintHolds,
+} from '../helpers/engine';
 
 describe('lPath', () => {
   it('walks the longer axis first', () => {
@@ -343,6 +349,47 @@ describe('level tool', () => {
   });
 });
 
+describe('raise and lower tools', () => {
+  it('raises a rectangle by one and keeps the slope constraint', () => {
+    const e = flatEngine();
+    const result = e.execute({ type: 'raise', x0: 8, y0: 8, x1: 10, y1: 10 });
+    expect(result.ok).toBe(true);
+    expect(e.world.elevation(9, 9)).toBe(1);
+    expect(e.world.isFlat(9, 9)).toBe(true);
+    expect(slopeConstraintHolds(e)).toBe(true);
+    expect(result.cost).toBeGreaterThan(0);
+    expect(result.cost % BALANCE.costs.levelPerUnit).toBe(0);
+  });
+
+  it('refuses when raising would affect a road', () => {
+    const e = flatEngine();
+    expect(e.execute({ type: 'road', x0: 8, y0: 8, x1: 10, y1: 8 }).ok).toBe(true);
+    const before = hashState(e);
+    const result = e.execute({ type: 'raise', x0: 8, y0: 8, x1: 10, y1: 8 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe(RejectReason.LevelAffectsConstruction);
+    expect(hashState(e)).toBe(before);
+  });
+
+  it('turns raised water tiles into land', () => {
+    const e = flatEngine();
+    addWater(e, 6, 6, 8, 6);
+    expect(e.execute({ type: 'raise', x0: 6, y0: 6, x1: 8, y1: 6 }).ok).toBe(true);
+    expect(e.world.isWater(e.world.index(7, 6))).toBe(false);
+    expect(slopeConstraintHolds(e)).toBe(true);
+  });
+
+  it('does nothing when lowering already-flat land', () => {
+    const e = flatEngine();
+    const before = hashState(e);
+    const result = e.execute({ type: 'lower', x0: 4, y0: 4, x1: 6, y1: 6 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe(RejectReason.NothingToDo);
+    expect(result.cost).toBe(0);
+    expect(hashState(e)).toBe(before);
+  });
+});
+
 describe('preview and replay', () => {
   it('previews without mutating the state and matches execution', () => {
     const e = flatEngine();
@@ -383,6 +430,47 @@ describe('preview and replay', () => {
     const b = createEngine({ seed: 'replay', size: 48 });
     for (const { command } of a.commandLog) b.execute(command);
     expect(hashState(b)).toBe(hashState(a));
+  });
+});
+
+describe('marina and airport hubs', () => {
+  it('refuses a marina while the city is too small, inland or without a road', () => {
+    const e = flatEngine();
+    e.execute({ type: 'road', x0: 10, y0: 10, x1: 16, y1: 10 });
+    const locked = e.preview({ type: 'place', kind: 'marina', x: 12, y: 11 });
+    expect(locked.reason).toBe(RejectReason.Locked);
+    expect(locked.invalid).toHaveLength(9);
+    seedResidents(e, 1000);
+    expect(e.execute({ type: 'place', kind: 'marina', x: 12, y: 11 }).reason).toBe(
+      RejectReason.NeedsWater,
+    );
+    addWater(e, 0, 0, 31, 0);
+    expect(e.execute({ type: 'place', kind: 'marina', x: 2, y: 1 }).reason).toBe(
+      RejectReason.NeedsRoad,
+    );
+    e.execute({ type: 'road', x0: 1, y0: 4, x1: 8, y1: 4 });
+    expect(e.execute({ type: 'place', kind: 'marina', x: 2, y: 1 }).ok).toBe(true);
+  });
+
+  it('places a 4×4 airport on flat land with a road once unlocked', () => {
+    const e = flatEngine();
+    e.execute({ type: 'road', x0: 3, y0: 8, x1: 10, y1: 8 });
+    expect(e.execute({ type: 'place', kind: 'airport', x: 4, y: 4 }).reason).toBe(
+      RejectReason.Locked,
+    );
+    seedResidents(e, 2000);
+    expect(e.execute({ type: 'place', kind: 'airport', x: 4, y: 4 }).ok).toBe(true);
+    expect(e.buildings.ofKind('airport')[0]?.w).toBe(4);
+  });
+
+  it('refuses an airport that is not flat', () => {
+    const e = flatEngine();
+    addHill(e, 6, 6, 3);
+    e.execute({ type: 'road', x0: 3, y0: 8, x1: 10, y1: 8 });
+    seedResidents(e, 2000);
+    expect(e.execute({ type: 'place', kind: 'airport', x: 4, y: 4 }).reason).toBe(
+      RejectReason.NotFlatFootprint,
+    );
   });
 });
 

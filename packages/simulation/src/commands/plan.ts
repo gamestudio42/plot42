@@ -22,6 +22,7 @@ export interface PlanContext {
   building(id: number): BuildingRecord | undefined;
   readonly funds: number;
   readonly bankrupt: boolean;
+  readonly population: number;
 }
 
 /** What demolish removes on a tile, decided at planning time. */
@@ -138,6 +139,12 @@ export function planToolCommand(ctx: PlanContext, command: ToolCommand): ToolPla
       break;
     case 'level':
       planLevel(ctx, command, plan);
+      break;
+    case 'raise':
+      planHeightChange(ctx, command, plan, (h) => Math.min(BALANCE.map.maxHeight, h + 1));
+      break;
+    case 'lower':
+      planHeightChange(ctx, command, plan, (h) => Math.max(0, h - 1));
       break;
   }
   return plan.finish(ctx);
@@ -307,6 +314,12 @@ function planPlace(
     plan.reject(-1, RejectReason.OutOfBounds);
     return;
   }
+  if (spec.minPopulation > 0 && ctx.population < spec.minPopulation) {
+    for (let y = y0; y < y0 + spec.size; y++) {
+      for (let x = x0; x < x0 + spec.size; x++) plan.reject(w.index(x, y), RejectReason.Locked);
+    }
+    return;
+  }
   const h0 = w.elevation(x0, y0);
   let cost = spec.cost;
   for (let y = y0; y < y0 + spec.size; y++) {
@@ -326,9 +339,53 @@ function planPlace(
     }
   }
   plan.cost = cost;
+  const origin = w.index(x0, y0);
+  if (spec.requiresWater && !footprintTouches(w, x0, y0, spec.size, (i) => w.isWater(i))) {
+    plan.reject(origin, RejectReason.NeedsWater);
+  } else if (
+    spec.requiresRoad &&
+    !footprintTouches(w, x0, y0, spec.size, (i) => w.hasInfra(i, Infra.Road), true)
+  ) {
+    plan.reject(origin, RejectReason.NeedsRoad);
+  }
+}
+
+/** True when a neighbour of the square footprint matches `pred`. */
+export function footprintTouches(
+  world: World,
+  x0: number,
+  y0: number,
+  size: number,
+  pred: (i: number) => boolean,
+  orthogonal = false,
+): boolean {
+  for (let y = y0 - 1; y <= y0 + size; y++) {
+    for (let x = x0 - 1; x <= x0 + size; x++) {
+      const outsideX = x < x0 || x >= x0 + size;
+      const outsideY = y < y0 || y >= y0 + size;
+      if (!outsideX && !outsideY) continue;
+      if (orthogonal && outsideX && outsideY) continue;
+      if (world.inBounds(x, y) && pred(world.index(x, y))) return true;
+    }
+  }
+  return false;
 }
 
 function planLevel(ctx: PlanContext, area: Area, plan: PlanBuilder): void {
+  const w = ctx.world;
+  const sx = Math.min(Math.max(area.x0, 0), w.size - 1);
+  const sy = Math.min(Math.max(area.y0, 0), w.size - 1);
+  const target = w.elevation(sx, sy);
+  planHeightChange(ctx, area, plan, () => target);
+}
+
+/** Raise, lower or flatten: set each vertex in the rectangle, then keep |Δh| ≤ 1. */
+function planHeightChange(
+  ctx: PlanContext,
+  area: Area,
+  plan: PlanBuilder,
+  targetOf: (current: number) => number,
+): void {
   const w = ctx.world;
   plan.atomic = true;
   const r = normalizeArea(area);
@@ -340,9 +397,6 @@ function planLevel(ctx: PlanContext, area: Area, plan: PlanBuilder): void {
     plan.outOfBounds++;
     return;
   }
-  const sx = Math.min(Math.max(area.x0, 0), w.size - 1);
-  const sy = Math.min(Math.max(area.y0, 0), w.size - 1);
-  const target = w.elevation(sx, sy);
   const vs = w.vertexSize;
   const next = new Map<number, number>();
   const queue: number[] = [];
@@ -351,6 +405,7 @@ function planLevel(ctx: PlanContext, area: Area, plan: PlanBuilder): void {
   for (let vy = y0; vy <= y1 + 1; vy++) {
     for (let vx = x0; vx <= x1 + 1; vx++) {
       const v = vy * vs + vx;
+      const target = targetOf(heightOf(v));
       if (heightOf(v) !== target) {
         next.set(v, target);
         queue.push(v);

@@ -10,7 +10,11 @@ import {
 } from '@city/shared';
 import type { MusicStatus } from '../audio/sound';
 import type { SaveSlot } from '../persistence/saves';
-import type { AnimationStats, VehicleSample } from '../renderer/animation/AnimationLayer';
+import type {
+  AnimationStats,
+  HubSample,
+  VehicleSample,
+} from '../renderer/animation/AnimationLayer';
 import type { Point } from '../renderer/iso';
 import type { BootState, GameSession } from './session';
 
@@ -34,6 +38,8 @@ export interface CityDebugApi {
   animationStats(): AnimationStats;
   /** Screen positions of a few vehicles. */
   vehicleSample(): VehicleSample[];
+  /** Screen positions of boats and planes, in world (not client) pixels. */
+  hubSample(): HubSample[];
   /** Background music: toggle, whether bars are being scheduled, current track, pause ducking. */
   musicState(): MusicStatus;
   /** Steps of the loading screen. */
@@ -88,6 +94,7 @@ export function installDebugApi(session: GameSession): void {
     fps: () => session.renderer.fps,
     animationStats: () => session.renderer.animationStats(),
     vehicleSample: () => session.renderer.vehicleSample(),
+    hubSample: () => session.renderer.hubSample(),
     musicState: () => session.sound.musicStatus(),
     bootStep: () => session.ui.get().boot.step,
     exportText: async () => (await session.client.exportSave(new Date().toISOString())).text,
