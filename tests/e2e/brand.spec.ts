@@ -25,6 +25,10 @@ test('the share card points at the Open Graph image', async ({ page }) => {
   expect(card).toBe('summary_large_image');
   const response = await page.request.get('/og.jpg');
   expect(response.ok()).toBe(true);
+  await expect(page.locator('script[data-goatcounter]')).toHaveAttribute(
+    'data-goatcounter',
+    'https://gamestudio42.goatcounter.com/count',
+  );
 });
 
 test('the page carries the Urbe name and icon, and boots before the menu', async ({ page }) => {
