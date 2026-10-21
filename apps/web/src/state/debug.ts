@@ -52,6 +52,8 @@ export interface CityDebugApi {
   saveGame(autosave?: boolean): Promise<boolean>;
   listSaves(): Promise<SaveSlot[]>;
   triggerDisaster(disaster: DisasterKind, x?: number, y?: number): Promise<CommandResult>;
+  /** Queues a cosmetic fire engine even if the `fireStarted` event was already drained. */
+  reportFire(x: number, y: number): void;
 }
 
 declare global {
@@ -113,6 +115,7 @@ export function installDebugApi(session: GameSession): void {
           ? { type: 'triggerDisaster', disaster }
           : { type: 'triggerDisaster', disaster, x, y },
       ),
+    reportFire: (x, y) => session.renderer.reportFire(x, y),
   };
   window.__cityDebug = api;
 }

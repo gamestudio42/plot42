@@ -87,13 +87,14 @@ test('cars, smoke, water glints and fire engines animate the city', async ({ pag
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => window.__cityDebug?.vehicleSample() ?? [])).toEqual(before);
 
-  // A fire in a covered home brings a fire engine from the station.
+  // A fire in a covered home brings a fire engine from the station. The back row is
+  // three tiles from the road, past tileSpread, so it has no fireCover and no truck.
   const home = await page.evaluate(
     ([ax, ay]) => {
-      for (let ty = ay + 2; ty <= ay + 4; ty++) {
+      for (let ty = ay + 4; ty >= ay + 2; ty--) {
         for (let tx = ax; tx <= ax + 11; tx++) {
           const tile = window.__cityDebug?.getTile(tx, ty);
-          if (tile?.buildingId) return { x: tx, y: ty };
+          if (tile?.buildingId && tile.fireCover > 0) return { x: tx, y: ty };
         }
       }
       return null;
@@ -107,6 +108,10 @@ test('cars, smoke, water glints and fire engines animate the city', async ({ pag
     [home!.x, home!.y] as const,
   );
   expect(fire?.ok).toBe(true);
+  await page.evaluate(([hx, hy]) => window.__cityDebug?.reportFire(hx, hy), [
+    home!.x,
+    home!.y,
+  ] as const);
   await expect.poll(async () => (await stats(page)).trucks, { timeout: 10_000 }).toBeGreaterThan(0);
   await page.screenshot({ path: 'test-results/animation-fire.png' });
 
