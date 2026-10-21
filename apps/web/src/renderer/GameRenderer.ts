@@ -12,6 +12,7 @@ import {
   buildObjects,
   drawGround,
   drawOverlay,
+  drawRoads,
   drawWires,
   type ChunkArea,
   type DrawContext,
@@ -30,11 +31,19 @@ const ATTRACT_RADIUS = 0.16;
 /** Start of the loop, also the fixed view when the system asks for reduced motion. */
 const ATTRACT_START = 0.6;
 
+function layer<T extends Container>(container: T, label: string): T {
+  container.label = label;
+  return container;
+}
+
 interface Chunk {
   area: ChunkArea;
   root: Container;
   ground: Graphics;
   water: Container;
+  /** Animated boats, under the road layer so they slip beneath a bridge deck. */
+  boats: Container;
+  roads: Graphics;
   overlay: Graphics;
   vehicles: Container;
   objects: Container;
@@ -160,6 +169,12 @@ export class GameRenderer {
     return this.animation?.hubSample() ?? [];
   }
 
+  /** Back-to-front labels of a map chunk. Tests lock boats under the road/bridge layer. */
+  chunkStack(): string[] {
+    const chunk = this.chunks[0];
+    return chunk ? chunk.root.children.map((child) => child.label) : [];
+  }
+
   reportFire(x: number, y: number): void {
     this.animation?.reportFire(x, y);
   }
@@ -205,21 +220,26 @@ export class GameRenderer {
         const chunk: Chunk = {
           area,
           root: new Container(),
-          ground: new Graphics(),
-          water: new Container(),
-          overlay: new Graphics(),
-          vehicles: new Container({ sortableChildren: true }),
-          objects: new Container(),
-          wires: new Graphics(),
+          ground: layer(new Graphics(), 'ground'),
+          water: layer(new Container(), 'water'),
+          boats: layer(new Container({ sortableChildren: true }), 'boats'),
+          roads: layer(new Graphics(), 'roads'),
+          overlay: layer(new Graphics(), 'overlay'),
+          vehicles: layer(new Container({ sortableChildren: true }), 'vehicles'),
+          objects: layer(new Container(), 'objects'),
+          wires: layer(new Graphics(), 'wires'),
           bounds: { x: 0, y: 0, width: 0, height: 0 },
           dirty: true,
           overlayDirty: true,
           hasFire: false,
         };
-        // Vehicles sit under the objects, so buildings in front of a road hide them.
+        // Boats sit under roads (a span covers a boat). Cars sit under objects so a
+        // building in front of a street hides them.
         chunk.root.addChild(
           chunk.ground,
           chunk.water,
+          chunk.boats,
+          chunk.roads,
           chunk.overlay,
           chunk.vehicles,
           chunk.objects,
@@ -440,6 +460,8 @@ export class GameRenderer {
   private redrawChunk(c: Chunk, ctx: DrawContext): void {
     c.ground.clear();
     drawGround(c.ground, ctx, c.area);
+    c.roads.clear();
+    drawRoads(c.roads, ctx, c.area);
     buildObjects(c.objects, ctx, this.factory as SpriteFactory, c.area);
     c.wires.clear();
     drawWires(c.wires, ctx, c.area);

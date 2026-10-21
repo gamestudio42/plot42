@@ -155,10 +155,24 @@ export function drawGround(g: Graphics, ctx: DrawContext, area: ChunkArea): void
       }
     }
 
-    if (infra & Infra.Road) drawRoad(g, ctx, x, y, q, terrain === Terrain.Water);
-
     if ((world.flood[i] as number) > 0) fillQuad(g, q, FLOOD_COLOR, 0.6);
     if (ctx.grid) outline(g, q, 0.08);
+  });
+}
+
+/**
+ * Roads and bridge decks, drawn above boats so a boat sailing a water tile slips under the
+ * span instead of painting over it. Cars stay in the vehicles layer, above this one.
+ */
+export function drawRoads(g: Graphics, ctx: DrawContext, area: ChunkArea): void {
+  if (ctx.underground) return;
+  const { world } = ctx;
+  const size = world.size;
+  const infraLayer = world.infra;
+  forEachTile(area, (x, y) => {
+    const i = y * size + x;
+    if (!((infraLayer[i] as number) & Infra.Road)) return;
+    drawRoad(g, ctx, x, y, tileQuad(world, x, y), world.terrain[i] === Terrain.Water);
   });
 }
 

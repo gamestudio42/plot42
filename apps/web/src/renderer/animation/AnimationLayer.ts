@@ -28,6 +28,7 @@ export interface AnimatedChunk {
   readonly root: Container;
   readonly vehicles: Container;
   readonly water: Container;
+  readonly boats: Container;
 }
 
 export interface AnimationFrame {
@@ -67,6 +68,8 @@ export interface HubSample {
   x: number;
   y: number;
   visible: boolean;
+  tileX?: number;
+  tileY?: number;
 }
 
 interface VentPosition {
@@ -261,8 +264,20 @@ export class AnimationLayer {
   /** Screen positions of boats and planes (tests check that they move). */
   hubSample(): HubSample[] {
     const list: HubSample[] = [];
-    for (const [id, sprite] of this.boatSprites) {
-      list.push({ id, kind: 'boat', x: sprite.x, y: sprite.y, visible: sprite.visible });
+    const size = this.world?.size ?? 0;
+    for (const boat of this.hubs.boats) {
+      const sprite = this.boatSprites.get(boat.id);
+      if (!sprite) continue;
+      const pose = boatPose(boat, size);
+      list.push({
+        id: boat.id,
+        kind: 'boat',
+        x: sprite.x,
+        y: sprite.y,
+        visible: sprite.visible,
+        tileX: pose.x,
+        tileY: pose.y,
+      });
     }
     for (const [id, s] of this.planeSprites) {
       list.push({ id, kind: 'plane', x: s.plane.x, y: s.plane.y, visible: s.plane.visible });
@@ -395,7 +410,7 @@ export class AnimationLayer {
         sprite.texture = tex.texture;
       }
       sprite.anchor.set(tex.anchorX, tex.anchorY);
-      if (sprite.parent !== chunk.vehicles) chunk.vehicles.addChild(sprite);
+      if (sprite.parent !== chunk.boats) chunk.boats.addChild(sprite);
       const p = tileLocalToScreen(tileQuad(world, tx, ty), pose.x - tx, pose.y - ty);
       sprite.position.set(p.x, p.y);
       sprite.zIndex = pose.x + pose.y;
