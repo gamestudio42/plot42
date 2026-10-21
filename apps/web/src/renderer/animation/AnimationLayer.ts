@@ -1,6 +1,7 @@
 import { Infra, type BuildingRecord, type Speed } from '@city/shared';
 import type { World } from '@city/simulation';
 import { Container, Sprite } from 'pixi.js';
+import { roadSurfaceLift } from '../bridge';
 import { tileLocalToScreen, tileQuad, vertexToScreen } from '../iso';
 import type { SpriteFactory } from '../sprites';
 import { FireDispatch, type FireView, type StationFootprint } from './fireDispatch';
@@ -382,7 +383,7 @@ export class AnimationLayer {
       if (sprite.parent !== chunk.vehicles) chunk.vehicles.addChild(sprite);
       const { u, v: lv } = lanePoint(v.travelIn, v.travelOut, v.t);
       const p = tileLocalToScreen(tileQuad(world, x, y), u, lv);
-      sprite.position.set(p.x, p.y);
+      sprite.position.set(p.x, p.y - roadSurfaceLift(world, x, y, u, lv));
       sprite.zIndex = x + u + y + lv;
       sprite.alpha = alpha;
       sprite.visible = show;

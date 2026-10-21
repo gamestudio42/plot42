@@ -63,6 +63,7 @@ export function SystemPanel({ session, children }: { session: GameSession; child
           type="checkbox"
           checked={underground}
           onChange={(e) => session.setUnderground(e.target.checked)}
+          data-testid="underground-enabled"
         />
         {s.underground}
       </label>
