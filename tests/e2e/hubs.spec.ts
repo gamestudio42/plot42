@@ -16,7 +16,7 @@ function hubCitySave(): string {
     const r = e.execute(c);
     if (!r.ok) throw new Error(`${c.type} failed: ${r.reason ?? ''}`);
   };
-  run({ type: 'road', x0: 20, y0: 29, x1: 20, y1: 52 });
+  run({ type: 'road', x0: 20, y0: 29, x1: 20, y1: 60 });
   run({ type: 'road', x0: 8, y0: 52, x1: 44, y1: 52 });
   for (let m = 0; m < 120 && e.stats().population < 2200; m++) {
     e.runMonths(1);
@@ -66,12 +66,27 @@ test('marinas send boats out and the airport flies planes', async ({ page }) => 
   await page.screenshot({ path: 'test-results/hubs-inspector.png' });
   await page.keyboard.press('Escape');
 
+  // Boats sit in their own layer under the road/bridge deck.
+  expect(await page.evaluate(() => window.__cityDebug?.chunkStack())).toEqual([
+    'ground',
+    'water',
+    'boats',
+    'roads',
+    'overlay',
+    'vehicles',
+    'objects',
+    'wires',
+  ]);
+
   // At 1× boats leave the marinas and a plane uses the runway.
   await clientPointOf(page, 24, 50);
   await page.getByTestId('speed-1').click();
   await expect.poll(async () => (await stats(page))?.boats ?? 0).toBeGreaterThan(0);
   await expect.poll(async () => (await stats(page))?.planes ?? 0).toBeGreaterThan(0);
   await page.waitForTimeout(2500);
+  await clientPointOf(page, 20, 58);
+  await page.screenshot({ path: 'test-results/hubs-bridge.png' });
+  await clientPointOf(page, 24, 50);
   await page.screenshot({ path: 'test-results/hubs.png' });
 
   // Paused: boats and planes hold still.

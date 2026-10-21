@@ -40,6 +40,8 @@ export interface CityDebugApi {
   vehicleSample(): VehicleSample[];
   /** Screen positions of boats and planes, in world (not client) pixels. */
   hubSample(): HubSample[];
+  /** Back-to-front labels of a map chunk (boats must sit under roads). */
+  chunkStack(): string[];
   /** Background music: toggle, whether bars are being scheduled, current track, pause ducking. */
   musicState(): MusicStatus;
   /** Steps of the loading screen. */
@@ -50,6 +52,8 @@ export interface CityDebugApi {
   saveGame(autosave?: boolean): Promise<boolean>;
   listSaves(): Promise<SaveSlot[]>;
   triggerDisaster(disaster: DisasterKind, x?: number, y?: number): Promise<CommandResult>;
+  /** Queues a cosmetic fire engine even if the `fireStarted` event was already drained. */
+  reportFire(x: number, y: number): void;
 }
 
 declare global {
@@ -95,6 +99,7 @@ export function installDebugApi(session: GameSession): void {
     animationStats: () => session.renderer.animationStats(),
     vehicleSample: () => session.renderer.vehicleSample(),
     hubSample: () => session.renderer.hubSample(),
+    chunkStack: () => session.renderer.chunkStack(),
     musicState: () => session.sound.musicStatus(),
     bootStep: () => session.ui.get().boot.step,
     exportText: async () => (await session.client.exportSave(new Date().toISOString())).text,
@@ -110,6 +115,7 @@ export function installDebugApi(session: GameSession): void {
           ? { type: 'triggerDisaster', disaster }
           : { type: 'triggerDisaster', disaster, x, y },
       ),
+    reportFire: (x, y) => session.renderer.reportFire(x, y),
   };
   window.__cityDebug = api;
 }
