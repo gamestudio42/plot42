@@ -86,3 +86,61 @@ test('is deterministic: the same seed and command log hash the same', async ({ p
   // Running ticks is the only difference, so the hash must move forward, not reset.
   expect(typeof first).toBe('string');
 });
+
+test('drone ports put drones in the air above their lane', async ({ page }) => {
+  test.setTimeout(120_000);
+  await startNeonCity(page, 'neon-drones');
+  const area = await page.evaluate(() => window.__cityDebug?.findFlatArea(18, 10) ?? null);
+  expect(area).not.toBeNull();
+  if (!area) return;
+
+  // A straight street east of the port, then the port and the grid that feeds it.
+  const built = await page.evaluate(async (p) => {
+    const d = window.__cityDebug;
+    if (!d) return null;
+    await d.command({ type: 'road', x0: p.x + 9, y0: p.y + 7, x1: p.x + 17, y1: p.y + 7 });
+    const ok: Record<string, boolean> = {};
+    for (const [kind, dx] of [
+      ['dronePort', 7],
+      ['substation', 3],
+      ['battery', 5],
+      ['firewall', 6],
+    ] as const) {
+      ok[kind] = (await d.command({ type: 'place', kind, x: p.x + dx, y: p.y + 7 })).ok;
+    }
+    await d.command({ type: 'place', kind: 'coalPlant', x: p.x + 3, y: p.y + 4 });
+    await d.runTicks(60);
+    d.centerOnTile(p.x + 11, p.y + 7);
+    return ok;
+  }, area);
+  expect(built?.dronePort).toBe(true);
+
+  await page.getByTestId('speed-1').click();
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__cityDebug?.animationStats()))?.drones ?? 0, {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(0);
+
+  const drones = await page.evaluate(
+    () => window.__cityDebug?.hubSample().filter((s) => s.kind === 'drone') ?? [],
+  );
+  expect(drones.length).toBeGreaterThan(0);
+  for (const drone of drones) {
+    expect(Number.isFinite(drone.x)).toBe(true);
+    expect(Number.isFinite(drone.y)).toBe(true);
+    expect(drone.visible).toBe(true);
+  }
+
+  // Paused, the drones hold still.
+  await page.getByTestId('speed-0').click();
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(
+    () => window.__cityDebug?.hubSample().filter((s) => s.kind === 'drone') ?? [],
+  );
+  await page.waitForTimeout(800);
+  const after = await page.evaluate(
+    () => window.__cityDebug?.hubSample().filter((s) => s.kind === 'drone') ?? [],
+  );
+  expect(after).toEqual(before);
+});

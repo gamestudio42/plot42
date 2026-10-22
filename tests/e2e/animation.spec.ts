@@ -11,6 +11,7 @@ const stats = (page: Page) =>
         sparkles: 0,
         boats: 0,
         planes: 0,
+        drones: 0,
       },
   );
 
@@ -134,6 +135,6 @@ test('cars, smoke, water glints and fire engines animate the city', async ({ pag
   await page.getByTestId('animations-enabled').uncheck();
   await expect
     .poll(() => stats(page))
-    .toEqual({ cars: 0, trucks: 0, puffs: 0, sparkles: 0, boats: 0, planes: 0 });
+    .toEqual({ cars: 0, trucks: 0, puffs: 0, sparkles: 0, boats: 0, planes: 0, drones: 0 });
   expect(await page.evaluate(() => localStorage.getItem('cityBuilder.animations'))).toBe('0');
 });

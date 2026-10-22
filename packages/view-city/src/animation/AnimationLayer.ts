@@ -7,6 +7,7 @@ import { tileLocalToScreen, tileQuad, vertexToScreen } from '../iso';
 import type { SpriteFactory } from '../sprites';
 import { FireDispatch, type FireView, type StationFootprint } from './fireDispatch';
 import { RUNWAY } from '../hubSprites';
+import { DRONE_MIN_ZOOM, DroneTraffic, dronePose } from './drones';
 import { HubTraffic, boatPose, flightState } from './hubs';
 import { createRandom } from './random';
 import { headingAt, lanePoint, worldRoadView, type RoadView } from './roads';
@@ -48,6 +49,7 @@ export interface AnimationStats {
   sparkles: number;
   boats: number;
   planes: number;
+  drones: number;
 }
 
 /** Boats are too small to read below this zoom. */
@@ -66,7 +68,7 @@ export interface VehicleSample {
 
 export interface HubSample {
   id: number;
-  kind: 'boat' | 'plane';
+  kind: 'boat' | 'plane' | 'drone';
   x: number;
   y: number;
   visible: boolean;
@@ -107,6 +109,7 @@ export class AnimationLayer {
   private trucks = new FireDispatch();
   private puffs = new SmokeSim(createRandom(2));
   private hubs: HubTraffic;
+  private aerial: DroneTraffic;
   private vents: VentPosition[] = [];
   private stations: StationFootprint[] = [];
   private buildingsDirty = true;
@@ -119,6 +122,7 @@ export class AnimationLayer {
   private readonly puffSprites: Sprite[] = [];
   private readonly boatSprites = new Map<number, Sprite>();
   private readonly planeSprites = new Map<number, { plane: Sprite; shadow: Sprite }>();
+  private readonly droneSprites = new Map<number, { drone: Sprite; shadow: Sprite }>();
   private readonly glints = new Map<AnimatedChunk, WaterGlints>();
 
   constructor(
@@ -126,6 +130,7 @@ export class AnimationLayer {
     private readonly theme: Theme,
   ) {
     this.hubs = new HubTraffic(createRandom(3), theme);
+    this.aerial = new DroneTraffic(createRandom(4));
   }
 
   setWorld(
@@ -148,11 +153,13 @@ export class AnimationLayer {
     this.vehicleSprites.clear();
     this.boatSprites.clear();
     this.clearPlanes();
+    this.clearDrones();
     this.glints.clear();
     this.cars = new VehicleSim(createRandom(world.size * 7919 + 1));
     this.trucks = new FireDispatch();
     this.puffs = new SmokeSim(createRandom(world.size * 7919 + 2));
     this.hubs = new HubTraffic(createRandom(world.size * 7919 + 3), this.theme);
+    this.aerial = new DroneTraffic(createRandom(world.size * 7919 + 4));
     this.buildingsDirty = true;
     this.sinceVents = VENT_REFRESH;
     this.sincePopulate = POPULATE_INTERVAL;
@@ -234,12 +241,15 @@ export class AnimationLayer {
     this.trucks.step(fireView, this.stations, dt);
     this.puffs.step(frame.underground ? [] : this.ventsInView(frame.view), dt);
     this.hubs.step(dt);
+    this.aerial.setPorts(world, this.buildings.values());
+    this.aerial.step(dt);
 
     const alpha = frame.overlay ? OVERLAY_ALPHA : 1;
     this.syncVehicles(world, !frame.underground, alpha);
     this.syncPuffs(!frame.underground, alpha, frame.zoom);
     this.syncBoats(world, !frame.underground && frame.zoom >= BOAT_MIN_ZOOM, alpha);
     this.syncPlanes(world, !frame.underground, alpha);
+    this.syncDrones(world, !frame.underground && frame.zoom >= DRONE_MIN_ZOOM, alpha);
   }
 
   stats(): AnimationStats {
@@ -256,6 +266,7 @@ export class AnimationLayer {
       sparkles,
       boats: this.hubs.boats.length,
       planes: this.hubs.planes.length,
+      drones: this.aerial.drones.length,
     };
   }
 
@@ -294,6 +305,9 @@ export class AnimationLayer {
     for (const [id, s] of this.planeSprites) {
       list.push({ id, kind: 'plane', x: s.plane.x, y: s.plane.y, visible: s.plane.visible });
     }
+    for (const [id, s] of this.droneSprites) {
+      list.push({ id, kind: 'drone', x: s.drone.x, y: s.drone.y, visible: s.drone.visible });
+    }
     return list;
   }
 
@@ -302,11 +316,13 @@ export class AnimationLayer {
     this.trucks.clear();
     this.puffs.clear();
     this.hubs.clear();
+    this.aerial.clear();
     for (const sprite of this.vehicleSprites.values()) sprite.destroy();
     this.vehicleSprites.clear();
     for (const sprite of this.boatSprites.values()) sprite.destroy();
     this.boatSprites.clear();
     this.clearPlanes();
+    this.clearDrones();
     for (const sprite of this.puffSprites) sprite.visible = false;
   }
 
@@ -316,6 +332,14 @@ export class AnimationLayer {
       s.shadow.destroy();
     }
     this.planeSprites.clear();
+  }
+
+  private clearDrones(): void {
+    for (const s of this.droneSprites.values()) {
+      s.drone.destroy();
+      s.shadow.destroy();
+    }
+    this.droneSprites.clear();
   }
 
   private isTileVisible(tile: number): boolean {
@@ -477,6 +501,50 @@ export class AnimationLayer {
       s.plane.destroy();
       s.shadow.destroy();
       this.planeSprites.delete(id);
+    }
+  }
+
+  /**
+   * Drones cruise `DRONE_ALTITUDE` pixels above the street along their lane, turning at the far
+   * end and coming back. The shadow drifts with altitude, so the climb out and the landing read.
+   */
+  private syncDrones(world: World, show: boolean, alpha: number): void {
+    const live = new Set<number>();
+    for (const drone of this.aerial.drones) {
+      const lane = this.aerial.laneOf(drone.portId);
+      if (!lane) continue;
+      live.add(drone.id);
+      const pose = dronePose(drone, lane);
+      const ground = vertexToScreen(
+        pose.x,
+        pose.y,
+        world.elevation(Math.floor(pose.x), Math.floor(pose.y)),
+      );
+      let s = this.droneSprites.get(drone.id);
+      if (!s) {
+        const tex = this.factory.drone(0);
+        const shadowTex = this.factory.droneShadow();
+        s = { drone: new Sprite(tex.texture), shadow: new Sprite(shadowTex.texture) };
+        s.shadow.anchor.set(shadowTex.anchorX, shadowTex.anchorY);
+        s.drone.anchor.set(tex.anchorX, tex.anchorY);
+        this.sky.addChild(s.shadow, s.drone);
+        this.droneSprites.set(drone.id, s);
+      }
+      const lift = drone.altitude + pose.bob;
+      s.shadow.position.set(ground.x + lift * SHADOW_SHIFT.x, ground.y + lift * SHADOW_SHIFT.y);
+      s.shadow.alpha = PLANE_SHADOW_ALPHA * alpha * Math.max(0, 1 - lift / 120);
+      s.drone.position.set(ground.x, ground.y - lift);
+      s.drone.alpha = alpha;
+      // Rotor flicker: four blade phases cycled on the animation clock.
+      s.drone.texture = this.factory.drone(Math.floor(this.time * 18 + drone.id)).texture;
+      s.shadow.visible = show;
+      s.drone.visible = show;
+    }
+    for (const [id, s] of this.droneSprites) {
+      if (live.has(id)) continue;
+      s.drone.destroy();
+      s.shadow.destroy();
+      this.droneSprites.delete(id);
     }
   }
 
