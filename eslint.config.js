@@ -12,6 +12,7 @@ export default defineConfig(
   {
     ignores: [
       '**/dist/**',
+      '**/dist-site/**',
       'site/**',
       '**/node_modules/**',
       'references/**',

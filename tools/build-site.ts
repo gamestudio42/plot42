@@ -17,8 +17,13 @@ const root = join(import.meta.dirname, '..');
 const site = join(root, 'site');
 const baseRoot = (process.env.BASE_PATH ?? '/').replace(/\/?$/, '/');
 
+/**
+ * Builds one app into `dist-site` instead of `dist`. The plain `dist` folders belong to the
+ * per-game dev builds that `vite preview` serves, so writing there while a preview server is
+ * running would swap the served bundle for one built with a different base path.
+ */
 function run(filter: string, basePath: string): void {
-  execSync(`pnpm --filter ${filter} build`, {
+  execSync(`pnpm --filter ${filter} exec vite build --outDir dist-site --emptyOutDir`, {
     cwd: root,
     stdio: 'inherit',
     env: { ...process.env, BASE_PATH: basePath },
@@ -29,21 +34,21 @@ rmSync(site, { recursive: true, force: true });
 mkdirSync(site, { recursive: true });
 
 run('@plot42/lobby', baseRoot);
-cpSync(join(root, 'apps/lobby/dist'), site, { recursive: true });
+cpSync(join(root, 'apps/lobby/dist-site'), site, { recursive: true });
 
 run('@city/web', `${baseRoot}urbe/`);
-cpSync(join(root, 'apps/web/dist'), join(site, 'urbe'), { recursive: true });
+cpSync(join(root, 'apps/web/dist-site'), join(site, 'urbe'), { recursive: true });
 
 run('@horta/web', `${baseRoot}horta/`);
-cpSync(join(root, 'apps/horta/dist'), join(site, 'horta'), { recursive: true });
+cpSync(join(root, 'apps/horta/dist-site'), join(site, 'horta'), { recursive: true });
 
 run('@posto/web', `${baseRoot}posto/`);
-cpSync(join(root, 'apps/posto/dist'), join(site, 'posto'), { recursive: true });
+cpSync(join(root, 'apps/posto/dist-site'), join(site, 'posto'), { recursive: true });
 
 run('@mata/web', `${baseRoot}mata/`);
-cpSync(join(root, 'apps/mata/dist'), join(site, 'mata'), { recursive: true });
+cpSync(join(root, 'apps/mata/dist-site'), join(site, 'mata'), { recursive: true });
 
 run('@neon/web', `${baseRoot}neon/`);
-cpSync(join(root, 'apps/neon/dist'), join(site, 'neon'), { recursive: true });
+cpSync(join(root, 'apps/neon/dist-site'), join(site, 'neon'), { recursive: true });
 
 console.log(`Assembled site/ with BASE_PATH=${baseRoot}`);
