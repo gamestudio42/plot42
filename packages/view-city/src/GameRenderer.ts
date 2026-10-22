@@ -179,7 +179,15 @@ export class GameRenderer {
 
   animationStats(): AnimationStats {
     return (
-      this.animation?.stats() ?? { cars: 0, trucks: 0, puffs: 0, sparkles: 0, boats: 0, planes: 0 }
+      this.animation?.stats() ?? {
+        cars: 0,
+        trucks: 0,
+        puffs: 0,
+        sparkles: 0,
+        boats: 0,
+        planes: 0,
+        drones: 0,
+      }
     );
   }
 

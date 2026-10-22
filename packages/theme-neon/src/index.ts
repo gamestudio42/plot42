@@ -120,6 +120,49 @@ const NEON_OVERRIDES: Record<string, number> = {
   'boat.sail': 0x2de2e6,
   'boat.sailShade': 0x1a9fa6,
   'boat.wake': 0x9beef0,
+
+  // Power grid: cold steel lit by electric arcs.
+  'substation.wall': 0x2a3040,
+  'substation.roof': 0x141922,
+  'substation.coil': 0x8f96a8,
+  'substation.arc': 0x2de2e6,
+  'substation.busbar': 0xffd21f,
+
+  // Battery bank: black cells with a charge column.
+  'battery.wall': 0x1a1f2a,
+  'battery.roof': 0x0d1118,
+  'battery.cell': 0x232a38,
+  'battery.charge': 0x22e6a0,
+  'battery.strip': 0xffd21f,
+
+  // Firewall: matte rack with magenta status LEDs.
+  'firewall.wall': 0x1c222c,
+  'firewall.roof': 0x0b0e15,
+  'firewall.rack': 0x101622,
+  'firewall.led': 0xff3ea5,
+  'firewall.dish': 0x2de2e6,
+
+  // Drone port: lit deck, cyan pad ring, blinking beacons.
+  'dronePort.deck': 0x161c26,
+  'dronePort.deckEdge': 0x2de2e6,
+  'dronePort.pad': 0x0e1a22,
+  'dronePort.padRing': 0x2de2e6,
+  'dronePort.beacon': 0xff3ea5,
+  'dronePort.tower': 0x232a36,
+  'dronePort.towerLamp': 0x22e6a0,
+  'dronePort.droneBody': 0x2b3340,
+  'dronePort.droneTrim': 0x0c1018,
+  'dronePort.droneGlow': 0x2de2e6,
+
+  // Corporate HQ: glass slab, magenta crown sign, gold beacon.
+  'corpHQ.wall': 0x1b2330,
+  'corpHQ.roof': 0x0a0e16,
+  'corpHQ.window': 0x2de2e6,
+  'corpHQ.trim': 0xff3ea5,
+  'corpHQ.sign': 0xffd21f,
+  'corpHQ.signGlow': 0xff3ea5,
+  'corpHQ.spire': 0x6f7788,
+  'corpHQ.beacon': 0xff2d55,
 };
 
 const colors: Record<string, number> = {};

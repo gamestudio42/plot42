@@ -1,7 +1,9 @@
 import type { BuildingRecord } from '@city/shared';
 import { color, shade, type Theme } from '@theme/core';
 import { Container, Graphics, type Renderer, type Texture } from 'pixi.js';
-import { COAL_PLANT_BOX, GAS_PLANT_BOX, chimneys, footprint, lerp, up } from './chimneys';
+import { footprint, lerp, up } from './chimneys';
+import { drawCivic } from './civicSprites';
+import { drawUtility } from './utilitySprites';
 import {
   HEADINGS,
   drawAirport,
@@ -12,6 +14,15 @@ import {
   type BoatKind,
 } from './hubSprites';
 import { TILE_H, TILE_W, type Point } from './iso';
+import {
+  drawBattery,
+  drawCorpHQ,
+  drawDrone,
+  drawDronePort,
+  drawDroneShadow,
+  drawFirewall,
+  drawSubstation,
+} from './neonSprites';
 import type { VehicleKind } from './animation/vehicles';
 import { drawCommercial, drawIndustrial, drawResidential } from './zoneSprites';
 
@@ -19,12 +30,6 @@ export interface SpriteTexture {
   texture: Texture;
   anchorX: number;
   anchorY: number;
-}
-
-interface BoxColors {
-  wall: number;
-  roof: number;
-  window?: number;
 }
 
 const HALF_W = TILE_W / 2;
@@ -35,243 +40,8 @@ function poly(g: Graphics, points: Point[], fill: number, alpha = 1): void {
 }
 
 /** Draws an isometric box and returns its top face corners. */
-function box(
-  g: Graphics,
-  n: number,
-  inset: number,
-  height: number,
-  colors: BoxColors,
-  floors = 0,
-): Point[] {
-  const { b, r, t, l } = footprint(n, inset);
-  poly(g, [l, b, up(b, height), up(l, height)], shade(colors.wall, 0.78));
-  poly(g, [b, r, up(r, height), up(b, height)], shade(colors.wall, 0.95));
-  const top = [up(t, height), up(r, height), up(b, height), up(l, height)];
-  poly(g, top, colors.roof);
-  if (floors > 0 && colors.window !== undefined) {
-    windows(g, l, b, height, floors, shade(colors.window, 0.85));
-    windows(g, b, r, height, floors, colors.window);
-  }
-  g.poly([...top, top[0] as Point].flatMap((p) => [p.x, p.y])).stroke({
-    width: 1,
-    color: shade(colors.roof, 0.7),
-    alpha: 0.6,
-  });
-  return top;
-}
-
-function windows(
-  g: Graphics,
-  from: Point,
-  to: Point,
-  height: number,
-  floors: number,
-  fill: number,
-): void {
-  const columns = Math.max(2, Math.round(Math.hypot(to.x - from.x, to.y - from.y) / 9));
-  const floorH = height / floors;
-  for (let f = 0; f < floors; f++) {
-    const z0 = f * floorH + floorH * 0.3;
-    const z1 = f * floorH + floorH * 0.75;
-    for (let c = 0; c < columns; c++) {
-      const t0 = (c + 0.25) / columns;
-      const t1 = (c + 0.7) / columns;
-      const a = lerp(from, to, t0);
-      const b = lerp(from, to, t1);
-      poly(g, [up(a, z0), up(b, z0), up(b, z1), up(a, z1)], fill);
-    }
-  }
-}
-
-function chimney(g: Graphics, base: Point, height: number, fill: number, flue: number): void {
-  poly(
-    g,
-    [
-      { x: base.x - 4, y: base.y },
-      { x: base.x, y: base.y + 2 },
-      { x: base.x, y: base.y + 2 - height },
-      { x: base.x - 4, y: base.y - height },
-    ],
-    shade(fill, 0.8),
-  );
-  poly(
-    g,
-    [
-      { x: base.x, y: base.y + 2 },
-      { x: base.x + 4, y: base.y },
-      { x: base.x + 4, y: base.y - height },
-      { x: base.x, y: base.y + 2 - height },
-    ],
-    fill,
-  );
-  g.ellipse(base.x, base.y - height, 4, 2).fill(flue);
-}
-
 function drawPlaceable(g: Graphics, theme: Theme, kind: string, size: number): void {
-  const flue = color(theme, 'lot.chimneyFlue');
   switch (kind) {
-    case 'coalPlant': {
-      box(
-        g,
-        size,
-        COAL_PLANT_BOX.inset,
-        COAL_PLANT_BOX.height,
-        {
-          wall: color(theme, 'coal.wall'),
-          roof: color(theme, 'coal.roof'),
-          window: color(theme, 'coal.window'),
-        },
-        2,
-      );
-      for (const c of chimneys(kind, 1, size, theme)) chimney(g, c.base, c.height, c.color, flue);
-      break;
-    }
-    case 'gasPlant': {
-      const top = box(
-        g,
-        size,
-        GAS_PLANT_BOX.inset,
-        GAS_PLANT_BOX.height,
-        {
-          wall: color(theme, 'gas.wall'),
-          roof: color(theme, 'gas.roof'),
-          window: color(theme, 'gas.window'),
-        },
-        1,
-      );
-      const c = lerp(top[0] as Point, top[2] as Point, 0.5);
-      g.ellipse(c.x - 14, c.y + 2, 10, 5).fill(color(theme, 'gas.tankRim'));
-      g.rect(c.x - 24, c.y - 16, 20, 18).fill(color(theme, 'gas.tankBody'));
-      g.ellipse(c.x - 14, c.y - 16, 10, 5).fill(color(theme, 'gas.tankTop'));
-      for (const ch of chimneys(kind, 1, size, theme)) chimney(g, ch.base, ch.height, ch.color, flue);
-      break;
-    }
-    case 'windTurbine': {
-      g.rect(-1.5, -52, 3, 46).fill(color(theme, 'wind.tower'));
-      const hub = { x: 0, y: -52 };
-      for (const [dx, dy] of [
-        [0, -20],
-        [17, 10],
-        [-17, 10],
-      ] as const) {
-        g.moveTo(hub.x, hub.y)
-          .lineTo(hub.x + dx, hub.y + dy)
-          .stroke({ width: 3, color: color(theme, 'wind.blade') });
-      }
-      g.circle(hub.x, hub.y, 3).fill(color(theme, 'wind.hub'));
-      break;
-    }
-    case 'waterPump': {
-      const top = box(
-        g,
-        size,
-        0.12,
-        14,
-        {
-          wall: color(theme, 'pump.wall'),
-          roof: color(theme, 'pump.roof'),
-          window: color(theme, 'pump.window'),
-        },
-        1,
-      );
-      const c = lerp(top[0] as Point, top[2] as Point, 0.6);
-      g.rect(c.x - 9, c.y - 26, 18, 22).fill(color(theme, 'pump.tank'));
-      g.ellipse(c.x, c.y - 26, 9, 4).fill(color(theme, 'pump.tankTop'));
-      break;
-    }
-    case 'well': {
-      box(
-        g,
-        size,
-        0.22,
-        8,
-        {
-          wall: color(theme, 'well.wall'),
-          roof: color(theme, 'well.roof'),
-          window: color(theme, 'well.window'),
-        },
-        0,
-      );
-      g.rect(-5, -22, 10, 16).fill(color(theme, 'well.pipe'));
-      g.ellipse(0, -22, 5, 2.4).fill(color(theme, 'well.pipeTop'));
-      g.ellipse(0, -6, 5, 2.2).fill(color(theme, 'well.base'));
-      break;
-    }
-    case 'policeStation': {
-      const top = box(
-        g,
-        size,
-        0.1,
-        24,
-        {
-          wall: color(theme, 'police.wall'),
-          roof: color(theme, 'police.roof'),
-          window: color(theme, 'police.window'),
-        },
-        2,
-      );
-      const c = lerp(top[0] as Point, top[2] as Point, 0.5);
-      star(g, c.x, c.y - 4, 7, color(theme, 'police.star'));
-      break;
-    }
-    case 'fireStation': {
-      box(
-        g,
-        size,
-        0.1,
-        22,
-        {
-          wall: color(theme, 'fire.wall'),
-          roof: color(theme, 'fire.roof'),
-          window: color(theme, 'fire.window'),
-        },
-        2,
-      );
-      const { b, r } = footprint(size, 0.1);
-      for (const t of [0.2, 0.55]) {
-        const a = lerp(b, r, t);
-        const e = lerp(b, r, t + 0.25);
-        poly(g, [a, e, up(e, 12), up(a, 12)], color(theme, 'fire.door'));
-      }
-      break;
-    }
-    case 'school': {
-      const top = box(
-        g,
-        size,
-        0.1,
-        20,
-        {
-          wall: color(theme, 'school.wall'),
-          roof: color(theme, 'school.roof'),
-          window: color(theme, 'school.window'),
-        },
-        2,
-      );
-      const c = top[0] as Point;
-      g.rect(c.x, c.y - 26, 1.5, 26).fill(color(theme, 'school.pole'));
-      g.rect(c.x + 1.5, c.y - 26, 12, 7).fill(color(theme, 'school.flag'));
-      break;
-    }
-    case 'hospital': {
-      const top = box(
-        g,
-        size,
-        0.1,
-        30,
-        {
-          wall: color(theme, 'hospital.wall'),
-          roof: color(theme, 'hospital.roof'),
-          window: color(theme, 'hospital.window'),
-        },
-        3,
-      );
-      const c = lerp(top[0] as Point, top[2] as Point, 0.5);
-      const cross = color(theme, 'hospital.cross');
-      g.rect(c.x - 9, c.y - 3, 18, 6).fill(cross);
-      g.rect(c.x - 3, c.y - 9, 6, 18).fill(cross);
-      break;
-    }
     case 'park': {
       const { b, r, t, l } = footprint(size, 0.04);
       poly(g, [t, r, b, l], color(theme, 'park.ground'));
@@ -282,16 +52,6 @@ function drawPlaceable(g: Graphics, theme: Theme, kind: string, size: number): v
       break;
     }
   }
-}
-
-function star(g: Graphics, cx: number, cy: number, r: number, fill: number): void {
-  const points: number[] = [];
-  for (let i = 0; i < 10; i++) {
-    const a = (Math.PI * i) / 5 - Math.PI / 2;
-    const radius = i % 2 === 0 ? r : r * 0.45;
-    points.push(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius * 0.6);
-  }
-  g.poly(points).fill(fill);
 }
 
 function tree(g: Graphics, theme: Theme, base: Point, scale: number): void {
@@ -371,7 +131,16 @@ export class SpriteFactory {
       else if (b.kind === 'industrial') drawIndustrial(g, this.theme, level, b.variant, b.abandoned);
       else if (b.kind === 'marina') drawMarina(g, this.theme, side);
       else if (b.kind === 'airport') drawAirport(g, this.theme);
-      else drawPlaceable(g, this.theme, b.kind, b.w);
+      else if (b.kind === 'substation') drawSubstation(g, this.theme);
+      else if (b.kind === 'battery') drawBattery(g, this.theme);
+      else if (b.kind === 'firewall') drawFirewall(g, this.theme);
+      else if (b.kind === 'dronePort') drawDronePort(g, this.theme);
+      else if (b.kind === 'corpHQ') drawCorpHQ(g, this.theme);
+      else if (drawCivic(g, this.theme, b.kind)) {
+        // Service buildings draw their own silhouette.
+      } else if (drawUtility(g, this.theme, b.kind, b.w)) {
+        // Power plants and water infrastructure draw their own silhouette.
+      } else drawPlaceable(g, this.theme, b.kind, b.w);
     });
   }
 
@@ -402,6 +171,17 @@ export class SpriteFactory {
     return this.get(`planeShadow:${heading}`, (g) =>
       drawPlaneShadow(g, this.theme, { x: 0, y: 0 }, HEADINGS[heading] as Point),
     );
+  }
+
+  /** Drone centred on its position, rotors at `frame` (an animation step, not a heading). */
+  drone(frame: number): SpriteTexture {
+    return this.get(`drone:${frame}`, (g) =>
+      drawDrone(g, this.theme, { x: 0, y: 0 }, (frame % 4) * 0.5),
+    );
+  }
+
+  droneShadow(): SpriteTexture {
+    return this.get('droneShadow', (g) => drawDroneShadow(g, this.theme, { x: 0, y: 0 }));
   }
 
   trees(density: number, variant: number): SpriteTexture {

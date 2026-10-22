@@ -26,6 +26,27 @@ export {
   type HubSample,
   type VehicleSample,
 } from './animation/AnimationLayer';
+export {
+  DRONE_ALTITUDE,
+  DRONE_BOB,
+  DRONES_PER_PORT,
+  DRONE_SPEED,
+  DroneTraffic,
+  DRONE_LANE_OFFSET,
+  SIDES,
+  dronePose,
+  laneOf,
+  type Drone,
+  type DroneLane,
+  type DronePhase,
+} from './animation/drones';
 export { CAR_COLORS, VehicleSim, carDensity, congestionSpeed } from './animation/vehicles';
 export { createRandom, pickWeighted, type Random } from './animation/random';
 export { RUNWAY, HEADINGS, headingIndex, type BoatKind } from './hubSprites';
+export {
+  ZONE_HEIGHTS,
+  zoneFloors,
+  zoneHeight,
+  type ZonedKind,
+} from './zoneSprites';
+export { INDUSTRIAL_HEIGHTS } from './chimneys';
