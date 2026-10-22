@@ -27,6 +27,10 @@ export interface CityDebugApi {
   getStats(): CityStats | null;
   tileToClient(x: number, y: number): Point | null;
   centerOnTile(x: number, y: number): void;
+  /** Sets the camera zoom, keeping the current centre. */
+  setZoom(zoom: number): void;
+  /** Id and architecture style of the theme the renderer is drawing with. */
+  themeInfo(): { id: string; style: string };
   findFlatArea(width: number, height: number): Point | null;
   command(command: Command): Promise<CommandResult>;
   runTicks(ticks: number): Promise<void>;
@@ -74,6 +78,8 @@ export function installDebugApi(session: GameSession): void {
     getStats: () => session.client.stats,
     tileToClient: (x, y) => session.renderer.tileToClient(x, y),
     centerOnTile: (x, y) => session.renderer.centerOnTile(x, y),
+    setZoom: (zoom) => session.renderer.setZoom(zoom),
+    themeInfo: () => ({ id: session.renderer.theme.id, style: session.renderer.theme.style }),
     findFlatArea: (width, height) => {
       const w = session.client.world;
       if (!w) return null;

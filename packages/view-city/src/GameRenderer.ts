@@ -359,6 +359,12 @@ export class GameRenderer {
     this.input.onCamera?.();
   }
 
+  /** Sets the camera zoom, keeping the current centre. Used by tests and the inspector. */
+  setZoom(zoom: number): void {
+    this.camera.setZoom(zoom);
+    this.input.onCamera?.();
+  }
+
   /** Tells listeners the camera moved after an external change (e.g. the minimap). */
   notifyCamera(): void {
     this.input.onCamera?.();

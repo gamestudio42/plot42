@@ -3,6 +3,7 @@ import { color, shade, type Theme } from '@theme/core';
 import { Container, Graphics, type Renderer, type Texture } from 'pixi.js';
 import { footprint, lerp, up } from './chimneys';
 import { drawCivic } from './civicSprites';
+import { drawCyberCivic, drawCyberUtility } from './cyberSprites';
 import { drawUtility } from './utilitySprites';
 import {
   HEADINGS,
@@ -112,6 +113,43 @@ function groundBox(
   return top;
 }
 
+/**
+ * Draws one placeable into `g`, picking the architecture the theme asks for.
+ *
+ * Kept separate from the factory so the routing can be tested without a GPU: the cyberpunk
+ * variants and the classic ones are different shapes, and a theme must never mix them.
+ */
+export function drawBuilding(
+  g: Graphics,
+  theme: Theme,
+  kind: string,
+  size: number,
+  level: number,
+  variant: number,
+  abandoned: boolean,
+  side = 0,
+): void {
+  if (kind === 'residential') drawResidential(g, theme, level, variant, abandoned);
+  else if (kind === 'commercial') drawCommercial(g, theme, level, variant, abandoned);
+  else if (kind === 'industrial') drawIndustrial(g, theme, level, variant, abandoned);
+  else if (kind === 'marina') drawMarina(g, theme, side);
+  else if (kind === 'airport') drawAirport(g, theme);
+  else if (kind === 'substation') drawSubstation(g, theme);
+  else if (kind === 'battery') drawBattery(g, theme);
+  else if (kind === 'firewall') drawFirewall(g, theme);
+  else if (kind === 'dronePort') drawDronePort(g, theme);
+  else if (kind === 'corpHQ') drawCorpHQ(g, theme);
+  else if (theme.style === 'cyber' && drawCyberCivic(g, theme, kind)) {
+    // Cyberpunk service buildings draw their own silhouette.
+  } else if (theme.style === 'cyber' && drawCyberUtility(g, theme, kind, size)) {
+    // Cyberpunk power and water infrastructure draw their own silhouette.
+  } else if (drawCivic(g, theme, kind)) {
+    // Service buildings draw their own silhouette.
+  } else if (drawUtility(g, theme, kind, size)) {
+    // Power plants and water infrastructure draw their own silhouette.
+  } else drawPlaceable(g, theme, kind, size);
+}
+
 /** Generates and caches procedural textures for one theme. */
 export class SpriteFactory {
   private readonly cache = new Map<string, SpriteTexture>();
@@ -126,21 +164,16 @@ export class SpriteFactory {
     const level = Math.max(1, b.level);
     const key = `b:${b.kind}:${level}:${b.variant & 3}:${b.abandoned ? 1 : 0}:${side}`;
     return this.get(key, (g) => {
-      if (b.kind === 'residential') drawResidential(g, this.theme, level, b.variant, b.abandoned);
-      else if (b.kind === 'commercial') drawCommercial(g, this.theme, level, b.variant, b.abandoned);
-      else if (b.kind === 'industrial') drawIndustrial(g, this.theme, level, b.variant, b.abandoned);
-      else if (b.kind === 'marina') drawMarina(g, this.theme, side);
-      else if (b.kind === 'airport') drawAirport(g, this.theme);
-      else if (b.kind === 'substation') drawSubstation(g, this.theme);
-      else if (b.kind === 'battery') drawBattery(g, this.theme);
-      else if (b.kind === 'firewall') drawFirewall(g, this.theme);
-      else if (b.kind === 'dronePort') drawDronePort(g, this.theme);
-      else if (b.kind === 'corpHQ') drawCorpHQ(g, this.theme);
-      else if (drawCivic(g, this.theme, b.kind)) {
-        // Service buildings draw their own silhouette.
-      } else if (drawUtility(g, this.theme, b.kind, b.w)) {
-        // Power plants and water infrastructure draw their own silhouette.
-      } else drawPlaceable(g, this.theme, b.kind, b.w);
+      drawBuilding(
+        g,
+        this.theme,
+        b.kind,
+        b.w,
+        level,
+        b.variant,
+        b.abandoned,
+        side,
+      );
     });
   }
 

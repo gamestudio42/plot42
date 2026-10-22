@@ -6,6 +6,7 @@ import type { Theme } from '@theme/core';
  */
 export const urbe: Theme = {
   id: 'urbe',
+  style: 'classic',
   background: 0x1d2a38,
 
   terrain: [0x3b78b8, 0xdcc78f, 0x74ad52, 0x9d8a5a, 0x8f8e86],
@@ -142,12 +143,29 @@ export const urbe: Theme = {
     'school.window': 0xfff2d0,
     'school.pole': 0x555555,
     'school.flag': 0x2f9f4f,
-    'hospital.wall': 0xf0f0f0,
-    'hospital.roof': 0xc8c8c8,
-    'hospital.window': 0x9fc8e8,
-    'hospital.cross': 0xd83030,
-    'park.ground': 0x58b848,
-    'park.pond': 0x4f9fe0,
+  'hospital.wall': 0xf0f0f0,
+  'hospital.roof': 0xc8c8c8,
+  'hospital.window': 0x9fc8e8,
+  'hospital.cross': 0xd83030,
+  'hospital.padMark': 0x8a9099,
+  'hospital.glow': 0xbfe4ff,
+  'police.glow': 0xd8e8ff,
+  'police.beacon': 0xff5a4a,
+  'fire.glow': 0xffd9a0,
+  'fire.ladder': 0xc8483a,
+  'school.glow': 0xfff2d0,
+  'school.banner': 0x2f9f4f,
+  'coal.glow': 0xffb060,
+  'coal.stack': 0x8a8078,
+  'coal.silo': 0x6a625c,
+  'gas.glow': 0x9fd8ff,
+  'gas.flare': 0xff8a3a,
+  'pump.glow': 0xcfe8ff,
+  'pump.frame': 0x5a6a78,
+  'well.glow': 0x8fc0e8,
+  'wind.glow': 0xffffff,
+  'park.ground': 0x58b848,
+  'park.pond': 0x4f9fe0,
 
     // Neon placeables. A classic city never builds them, but every theme still answers for the
     // tokens so the renderer never has to guard on the ruleset.

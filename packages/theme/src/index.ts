@@ -8,9 +8,20 @@ export { COLOR_TOKENS, type BoxColors, type ColorToken, type LotPalette } from '
  * Everything the isometric renderer needs to know about art direction. The renderer only reads
  * this object, so a new look is a new theme rather than a copy of the drawing code.
  */
+/**
+ * Architecture style: the shape language a theme asks the renderer for.
+ *
+ * `classic` draws the traditional civic and utility silhouettes; `cyber` draws the armoured,
+ * neon-lit variants that read as a high-tech installation. Colours and shapes stay separate
+ * concerns, so a theme can recolour the classic shapes or swap in its own architecture.
+ */
+export type ThemeStyle = 'classic' | 'cyber';
+
 export interface Theme {
   /** Stable identifier, used for CSS and diagnostics. */
   readonly id: string;
+  /** Architecture style for the civic and utility buildings. */
+  readonly style: ThemeStyle;
   /** Semantic colours; every token in `COLOR_TOKENS` must be present. */
   readonly colors: Readonly<Record<string, number>>;
   /** Ground colour per `Terrain` value. */

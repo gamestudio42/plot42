@@ -56,6 +56,12 @@ export class Camera {
     this.clamp();
   }
 
+  /** Sets the zoom directly, keeping the current centre. */
+  setZoom(zoom: number): void {
+    this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+    this.clamp();
+  }
+
   /** Visible world rectangle. */
   visibleRect(): { x: number; y: number; width: number; height: number } {
     const tl = this.screenToWorld(0, 0);
