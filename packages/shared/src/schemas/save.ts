@@ -9,6 +9,7 @@ import {
   type SaveMigration,
 } from '@shell/kernel';
 import { BALANCE, DEPARTMENTS } from '../balance/balance';
+import { NEON_VERTICAL } from '../balance/neon';
 import type { DisasterKind } from '../commands/commands';
 import { PLACEABLE_KINDS, ZONE_BUILDING_KINDS, type BuildingRecord } from '../types/buildings';
 import type { NeonState } from '../types/neon';
@@ -414,7 +415,7 @@ class Validator {
         y,
         w,
         h,
-        level: this.int(b.level, `${path}.level`, 0, 5),
+        level: this.int(b.level, `${path}.level`, 0, NEON_VERTICAL.maxLevelDense),
         capacity: this.num(b.capacity, `${path}.capacity`, 0),
         occupancy: this.num(b.occupancy, `${path}.occupancy`, 0),
         condition: this.num(b.condition, `${path}.condition`, 0, 100),

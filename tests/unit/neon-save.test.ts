@@ -89,4 +89,33 @@ describe('neon save envelope', () => {
     expect(restored.stats()).toEqual(e.stats());
     expect(restored.ruleset).toBe('neon');
   });
+
+  it('round-trips the spires above the classic level cap', () => {
+    const e = neonCity();
+    const zone = e.buildings.add({
+      kind: 'residential',
+      x: 20,
+      y: 14,
+      w: 1,
+      h: 1,
+      level: 7,
+      capacity: 120,
+      occupancy: 90,
+      condition: 100,
+      age: 0,
+      abandoned: false,
+      emptyMonths: 0,
+      variant: 1,
+      powered: true,
+      watered: true,
+      offline: 0,
+      attractiveness: 0,
+    });
+    const file = encodeSave(e.serialize(), meta, neonOptions);
+    const decoded = decodeSave(stringifySave(file), neonOptions);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    const kept = decoded.snapshot.buildings.find((b) => b.id === zone.id);
+    expect(kept?.level).toBe(7);
+  });
 });

@@ -183,6 +183,34 @@ function antenna(g: Graphics, p: Point, height: number, theme: Theme): void {
   g.circle(p.x, p.y - height, 1.8).fill(color(theme, 'lot.antennaLight'));
 }
 
+/**
+ * Lit rim along the two camera-facing edges of a roof: the cheap trick that turns any block into
+ * a neon tower without a new palette entry. The glow is a wider, fainter stroke under the line.
+ */
+function litRim(g: Graphics, top: Point[], width: number, fill: number): void {
+  const [, r, b, l] = top as [Point, Point, Point, Point];
+  for (const [a, c] of [
+    [l, b],
+    [b, r],
+  ] as const) {
+    g.moveTo(a.x, a.y).lineTo(c.x, c.y).stroke({ width: width * 3, color: fill, alpha: 0.16 });
+    g.moveTo(a.x, a.y).lineTo(c.x, c.y).stroke({ width, color: fill, alpha: 0.95 });
+  }
+}
+
+/** Antenna mast with a warning beacon, planted on a roof point. */
+function spireMast(g: Graphics, p: Point, height: number, theme: Theme): void {
+  const pole = color(theme, 'lot.antennaPole');
+  const light = color(theme, 'lot.antennaLight');
+  g.rect(p.x - 1, p.y - height, 2, height).fill(pole);
+  g.moveTo(p.x - 6, p.y - height * 0.35)
+    .lineTo(p.x, p.y - height * 0.45)
+    .lineTo(p.x + 6, p.y - height * 0.35)
+    .stroke({ width: 1, color: pole, alpha: 0.85 });
+  g.circle(p.x, p.y - height, 4).fill({ color: light, alpha: 0.18 });
+  g.circle(p.x, p.y - height, 1.9).fill(light);
+}
+
 function tank(g: Graphics, p: Point, radius: number, height: number, fill: number): void {
   g.ellipse(p.x, p.y, radius, radius * 0.45).fill(shade(fill, 0.7));
   g.rect(p.x - radius, p.y - height, radius * 2, height).fill(fill);
@@ -294,6 +322,30 @@ function styleOf(variant: number): number {
   return variant & 3;
 }
 
+/** Sprite height in pixels per zone level, shared by the drawing code and its tests. */
+export const ZONE_HEIGHTS: Record<'residential' | 'commercial', readonly number[]> = {
+  residential: [0, 0, 0, 40, 68, 104, 148, 196],
+  commercial: [0, 16, 28, 50, 84, 128, 174, 226],
+};
+
+/** Floors drawn on the facade per level; windows follow the height ladder. */
+const ZONE_FLOORS: Record<'residential' | 'commercial', readonly number[]> = {
+  residential: [0, 0, 0, 4, 7, 11, 16, 21],
+  commercial: [0, 1, 2, 4, 7, 11, 16, 21],
+};
+
+export type ZonedKind = keyof typeof ZONE_HEIGHTS;
+
+export function zoneHeight(kind: ZonedKind, level: number): number {
+  const table = ZONE_HEIGHTS[kind];
+  return table[level] ?? (kind === 'residential' ? 40 : 16);
+}
+
+export function zoneFloors(kind: ZonedKind, level: number): number {
+  const table = ZONE_FLOORS[kind];
+  return table[level] ?? (kind === 'residential' ? 4 : 1);
+}
+
 export function drawResidential(
   g: Graphics,
   theme: Theme,
@@ -342,17 +394,23 @@ export function drawResidential(
     return;
   }
 
-  const heights = [0, 0, 0, 40, 68, 104];
-  const floors = [0, 0, 0, 4, 7, 11];
-  const h = heights[level] ?? 40;
-  const f = floors[level] ?? 4;
+  const h = zoneHeight('residential', level);
+  const f = zoneFloors('residential', level);
   const tower: BoxColors = { wall: p.wall, roof: p.roof, window: p.window };
+  const spire = level >= 6;
 
   if (style === 0) {
     const top = boxUV(g, 0.08, 0.08, 0.92, 0.92, h, tower, f);
     balconyRows(g, 0.08, 0.08, 0.92, 0.92, h, f, 0, shade(p.accent, 0.9));
     parapet(g, top, 4, p.roof);
     if (abandoned) return;
+    if (spire) {
+      // Setback crown and a lit rim: the silhouette of a vertical neon tower.
+      const crown = boxUV(g, 0.18, 0.18, 0.82, 0.82, h * 0.16, tower, Math.round(f * 0.2), h);
+      litRim(g, top, 2, p.accent);
+      spireMast(g, onTop(crown, 0.5, 0.5), 34, theme);
+      return;
+    }
     waterTank(g, onTop(top, 0.55, 0.4), theme);
     if (level >= 5) antenna(g, onTop(top, 0.28, 0.68), 16, theme);
     return;
@@ -375,6 +433,10 @@ export function drawResidential(
     const top = boxUV(g, 0.3, 0.3, 0.7, 0.7, cap, tower, Math.max(1, Math.round(f * 0.28)), h - cap);
     parapet(g, top, 3, p.roof);
     if (!abandoned) miniBox(g, onTop(top, 0.5, 0.45), 6, 5, shade(p.wall, 0.7));
+    if (spire && !abandoned) {
+      litRim(g, top, 1.8, p.accent);
+      spireMast(g, onTop(top, 0.5, 0.5), 40, theme);
+    }
     return;
   }
   if (style === 2) {
@@ -392,12 +454,21 @@ export function drawResidential(
     const top = boxUV(g, 0.24, 0.12, 0.92, 0.76, h - podium, tower, f, podium);
     parapet(g, top, 3, p.roof);
     if (!abandoned) antenna(g, onTop(top, 0.7, 0.3), 14, theme);
+    if (spire && !abandoned) {
+      litRim(g, top, 1.8, p.accent);
+      spireMast(g, onTop(top, 0.3, 0.6), 36, theme);
+    }
     return;
   }
   const bar = boxUV(g, 0.08, 0.08, 0.92, 0.38, h, tower, f);
   const wing = boxUV(g, 0.08, 0.38, 0.4, 0.92, h * 0.82, tower, Math.max(2, f - 2));
   parapet(g, bar, 3, p.roof);
   if (abandoned) return;
+  if (spire) {
+    litRim(g, bar, 2, p.accent);
+    spireMast(g, onTop(bar, 0.5, 0.24), 38, theme);
+    return;
+  }
   waterTank(g, onTop(bar, 0.72, 0.45), theme);
   if (level >= 5) antenna(g, onTop(wing, 0.45, 0.55), 16, theme);
 }
@@ -466,16 +537,21 @@ export function drawCommercial(
     return;
   }
 
-  const heights = [0, 16, 28, 50, 84, 128];
-  const floors = [0, 1, 2, 4, 7, 11];
-  const h = heights[level] ?? 16;
-  const f = floors[level] ?? 1;
+  const h = zoneHeight('commercial', level);
+  const f = zoneFloors('commercial', level);
   const colors: BoxColors = { wall: p.wall, roof: p.roof, window: p.window };
   const rooftop = color(theme, 'lot.rooftopUnit');
+  const spire = level >= 6;
 
   if (style === 0) {
     const top = boxUV(g, 0.1, 0.1, 0.9, 0.9, h, colors, f);
     if (abandoned) return;
+    if (spire) {
+      const crown = boxUV(g, 0.2, 0.2, 0.8, 0.8, h * 0.18, colors, Math.round(f * 0.18), h);
+      litRim(g, top, 2, p.accent);
+      spireMast(g, onTop(crown, 0.45, 0.55), 44, theme);
+      return;
+    }
     if (level === 3) {
       miniBox(g, onTop(top, 0.35, 0.35), 5, 4, rooftop);
       miniBox(g, onTop(top, 0.7, 0.55), 5, 4, rooftop);
@@ -489,18 +565,21 @@ export function drawCommercial(
     boxUV(g, 0.1, 0.1, 0.9, 0.9, h * 0.78, colors, Math.max(2, f - 2));
     const top = boxUV(g, 0.2, 0.2, 0.8, 0.8, h * 0.22, colors, 2, h * 0.78);
     if (!abandoned) antenna(g, onTop(top, 0.55, 0.45), level >= 5 ? 22 : 14, theme);
+    if (spire && !abandoned) litRim(g, top, 1.8, p.accent);
     return;
   }
   if (style === 2) {
     const back = boxUV(g, 0.1, 0.08, 0.9, 0.58, h, colors, f);
     boxUV(g, 0.1, 0.58, 0.5, 0.9, h * 0.78, colors, Math.max(2, f - 2));
     if (!abandoned) miniBox(g, onTop(back, 0.75, 0.35), 6, 5, shade(p.roof, 0.85));
+    if (spire && !abandoned) spireMast(g, onTop(back, 0.72, 0.3), 40, theme);
     return;
   }
   const top = boxUV(g, 0.1, 0.1, 0.9, 0.9, h, colors, f);
   if (abandoned) return;
   billboard(g, onTop(top, 0.2, 0.55), p.accent, color(theme, 'lot.billboardPost'));
   antenna(g, onTop(top, 0.75, 0.3), level >= 5 ? 24 : 16, theme);
+  if (spire) litRim(g, top, 1.8, p.accent);
 }
 
 export function drawIndustrial(

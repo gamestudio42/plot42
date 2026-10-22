@@ -30,7 +30,7 @@ export function topFace(n: number, inset: number, height: number): Point[] {
   return [up(t, height), up(r, height), up(b, height), up(l, height)];
 }
 
-export const INDUSTRIAL_HEIGHTS = [0, 12, 18, 22, 28, 34] as const;
+export const INDUSTRIAL_HEIGHTS = [0, 12, 18, 22, 28, 34, 44, 56] as const;
 export const INDUSTRIAL_INSET = 0.12;
 export const COAL_PLANT_BOX = { inset: 0.08, height: 26 } as const;
 export const GAS_PLANT_BOX = { inset: 0.1, height: 20 } as const;
