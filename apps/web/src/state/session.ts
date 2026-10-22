@@ -730,7 +730,7 @@ export class GameSession {
     if (key === 'm') return this.setMuted(!this.ui.get().muted);
     if (key === 'u') return this.setUnderground(!this.ui.get().underground);
     if (key === 'g') return this.setGrid(!this.ui.get().grid);
-    const tool = toolByHotkey(key);
+    const tool = toolByHotkey(key, this.ruleset);
     if (tool) this.setTool(tool.id);
   }
 }

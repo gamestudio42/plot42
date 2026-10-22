@@ -9,6 +9,7 @@ const MODES: OverlayMode[] = [
   'none',
   'power',
   'water',
+  'data',
   'traffic',
   'pollution',
   'crime',
@@ -30,8 +31,11 @@ function gradient(scale: (v: number) => number): string {
 function Legend({ mode, t, theme }: { mode: OverlayMode; t: Strings; theme: Theme }) {
   const o = t.overlayPanel;
   if (mode === 'none') return null;
-  if (mode === 'power' || mode === 'water') {
-    const on = color(theme, mode === 'power' ? 'overlay.powerOn' : 'overlay.waterOn');
+  if (mode === 'power' || mode === 'water' || mode === 'data') {
+    const on = color(
+      theme,
+      mode === 'power' ? 'overlay.powerOn' : mode === 'water' ? 'overlay.waterOn' : 'overlay.dataOn',
+    );
     const off = color(theme, 'overlay.unserved');
     return (
       <div className="legend" data-testid="overlay-legend">
@@ -57,6 +61,8 @@ function Legend({ mode, t, theme }: { mode: OverlayMode; t: Strings; theme: Them
 export function OverlayPanel({ session }: { session: GameSession }) {
   const t = useStrings(session.ui);
   const overlay = useStore(session.ui, (s) => s.overlay);
+  const ruleset = useStore(session.ui, (s) => s.stats?.ruleset ?? 'classic');
+  const modes = ruleset === 'neon' ? MODES : MODES.filter((mode) => mode !== 'data');
   const theme = session.renderer.theme;
   return (
     <Panel
@@ -67,7 +73,7 @@ export function OverlayPanel({ session }: { session: GameSession }) {
       className="overlay-panel"
     >
       <div className="overlay-grid">
-        {MODES.map((mode) => (
+        {modes.map((mode) => (
           <button
             key={mode}
             type="button"

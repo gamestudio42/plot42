@@ -1,6 +1,7 @@
 import {
   BALANCE,
   Infra,
+  NEON_DATA,
   PLACEABLE_SPECS,
   RejectReason,
   ZoneDensity,
@@ -10,6 +11,7 @@ import {
   type BuildingRecord,
   type CommandPreview,
   type PlaceableKind,
+  type Ruleset,
   type TileRejection,
   type ToolCommand,
 } from '@city/shared';
@@ -23,6 +25,8 @@ export interface PlanContext {
   readonly funds: number;
   readonly bankrupt: boolean;
   readonly population: number;
+  /** Absent means classic, so a fiber command cannot slip into a city that has no data rules. */
+  readonly ruleset?: Ruleset;
 }
 
 /** What demolish removes on a tile, decided at planning time. */
@@ -32,6 +36,7 @@ export const DemolishOp = {
   Zone: 3,
   Trees: 4,
   Pipe: 5,
+  Fiber: 6,
 } as const;
 export type DemolishOp = (typeof DemolishOp)[keyof typeof DemolishOp];
 
@@ -119,6 +124,9 @@ export function planToolCommand(ctx: PlanContext, command: ToolCommand): ToolPla
     case 'pipe':
       forTiles(ctx.world, lPath(command), plan, (i) => planPipe(ctx, i, plan));
       break;
+    case 'fiber':
+      forTiles(ctx.world, lPath(command), plan, (i) => planFiber(ctx, i, plan));
+      break;
     case 'zone':
       forTiles(ctx.world, rectTiles(command), plan, (i) =>
         planZone(ctx, i, command.zone, command.density, plan),
@@ -205,6 +213,13 @@ function planPipe(ctx: PlanContext, i: number, plan: PlanBuilder): void {
   plan.accept(i, BALANCE.costs.pipe);
 }
 
+/** Same placement rules as a pipe. Classic cities reject the command so the bit stays unset. */
+function planFiber(ctx: PlanContext, i: number, plan: PlanBuilder): void {
+  if ((ctx.ruleset ?? 'classic') !== 'neon') return plan.reject(i, RejectReason.Invalid);
+  if (ctx.world.hasInfra(i, Infra.Fiber)) return plan.reject(i, RejectReason.AlreadyBuilt);
+  plan.accept(i, NEON_DATA.fiberCost);
+}
+
 function planZone(
   ctx: PlanContext,
   i: number,
@@ -267,6 +282,7 @@ function planDemolish(
   if (seen.has(i)) return;
   if (underground) {
     if (w.hasInfra(i, Infra.Pipe)) plan.accept(i, BALANCE.costs.demolishTile, DemolishOp.Pipe);
+    if (w.hasInfra(i, Infra.Fiber)) plan.accept(i, BALANCE.costs.demolishTile, DemolishOp.Fiber);
     return;
   }
   const id = w.buildingId[i] as number;

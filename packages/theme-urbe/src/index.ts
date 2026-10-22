@@ -84,6 +84,8 @@ export const urbe: Theme = {
     'infra.rubble': 0x7b6f63,
     'infra.pipe': 0x2fa3ff,
     'infra.pipeDry': 0x8090a0,
+    'infra.fiber': 0x8a4ab0,
+    'infra.fiberDark': 0x5c4a68,
     'infra.roadShadow': 0x3a3a3a,
     'infra.wire': 0x2b2420,
     'infra.wireCut': 0x9a3030,
@@ -91,6 +93,7 @@ export const urbe: Theme = {
 
     'overlay.powerOn': 0xf8e040,
     'overlay.waterOn': 0x30a0f0,
+    'overlay.dataOn': 0x9b59d0,
     'overlay.unserved': 0xd03030,
     'overlay.heatLow': 0x2fbf4f,
     'overlay.heatMid': 0xf0d040,

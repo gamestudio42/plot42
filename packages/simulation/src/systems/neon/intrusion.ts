@@ -81,13 +81,13 @@ function isServiceTarget(b: BuildingRecord): boolean {
 
 /**
  * Firewall coverage 0..1 at a building: the best node within `firewallRadius` scaled by its
- * distance, capped at 1. Nodes only cover while they are powered.
+ * distance, capped at 1. Nodes only cover while they are powered, online and on the data network.
  */
 export function firewallCoverage(engine: SimulationEngine, b: BuildingRecord): number {
   let best = 0;
   const radius = NEON_INTRUSION.firewallRadius;
   for (const node of engine.buildings.ofKind('firewall')) {
-    if (!node.powered || node.offline > 0) continue;
+    if (!node.powered || node.offline > 0 || node.linked !== true) continue;
     const d = Math.max(
       Math.max(node.x - b.x, b.x - (node.x + node.w - 1), 0),
       Math.max(node.y - b.y, b.y - (node.y + node.h - 1), 0),

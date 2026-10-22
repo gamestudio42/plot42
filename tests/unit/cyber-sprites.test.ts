@@ -3,10 +3,11 @@ import { neon } from '../../packages/theme-neon/src';
 import { urbe } from '../../packages/theme-urbe/src';
 import {
   drawCyberCivic,
+  drawCyberPole,
   drawCyberUtility,
 } from '../../packages/view-city/src/cyberSprites';
 import { drawCivic } from '../../packages/view-city/src/civicSprites';
-import { drawBuilding } from '../../packages/view-city/src/sprites';
+import { drawBuilding, drawVehicle } from '../../packages/view-city/src/sprites';
 import { drawUtility } from '../../packages/view-city/src/utilitySprites';
 
 /**
@@ -222,6 +223,103 @@ describe('cyberpunk civic and utility sprites', () => {
       drawCyberUtility(direct.g, neon, kind, size);
       expect(signature(cyber)).toBe(signature(direct));
       expect(signature(cyber)).not.toBe(signature(classic));
+    }
+  });
+
+  it('draws the marina and the power pole in the cyber set', () => {
+    const signature = (r: ReturnType<typeof recorder>) => {
+      const s = r.stats();
+      return `${s.points}:${s.rects}:${s.ellipses}:${s.fills.length}`;
+    };
+    const marina = recorder();
+    drawBuilding(marina.g, neon, 'marina', 3, 1, 0, false, 0);
+    const classic = recorder();
+    drawBuilding(classic.g, urbe, 'marina', 3, 1, 0, false, 0);
+    expect(signature(marina)).not.toBe(signature(classic));
+    expect(marina.stats().points).toBeGreaterThan(20);
+
+    const allowed = [...PALETTE, ...neon.boats];
+    const nearest = (c: number) => {
+      let best = Infinity;
+      for (const p of allowed) {
+        const d = distance(c, p);
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    for (const c of [...marina.stats().fills, ...marina.stats().strokes]) {
+      expect(nearest(c)).toBeLessThan(48);
+    }
+    const used = [...marina.stats().fills, ...marina.stats().strokes];
+    expect(used.some((c) => distance(c, neon.colors['marina.clubWindow'] as number) < 24)).toBe(true);
+    expect(used.some((c) => distance(c, neon.colors['marina.flagCloth'] as number) < 24)).toBe(true);
+
+    const pole = recorder();
+    drawCyberPole(pole.g, neon);
+    expect(pole.stats().ellipses).toBeGreaterThan(0);
+    for (const c of [...pole.stats().fills, ...pole.stats().strokes]) {
+      expect(nearestNeonColor(c)).toBeLessThan(48);
+    }
+    const poleColors = [...pole.stats().fills, ...pole.stats().strokes];
+    expect(poleColors.some((c) => distance(c, neon.colors['infra.pipe'] as number) < 24)).toBe(true);
+  });
+
+  it('draws cyber cars and trucks as a dark chassis with an emissive mark', () => {
+    const signature = (r: ReturnType<typeof recorder>) => {
+      const s = r.stats();
+      return `${s.points}:${s.rects}:${s.ellipses}:${s.fills.length}`;
+    };
+    const allowed = [...PALETTE, ...neon.cars];
+    const nearest = (c: number) => {
+      let best = Infinity;
+      for (const p of allowed) {
+        const d = distance(c, p);
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    for (const kind of ['car', 'truck'] as const) {
+      const cyber = recorder();
+      drawVehicle(cyber.g, neon, kind, 'x', 0, false);
+      const classic = recorder();
+      drawVehicle(classic.g, urbe, kind, 'x', 0, false);
+      expect(signature(cyber)).not.toBe(signature(classic));
+      for (const c of [...cyber.stats().fills, ...cyber.stats().strokes]) {
+        expect(nearest(c)).toBeLessThan(48);
+      }
+    }
+    const amber = recorder();
+    drawVehicle(amber.g, neon, 'car', 'y', 2, false);
+    const mark = neon.cars[2] as number;
+    const used = [...amber.stats().fills, ...amber.stats().strokes];
+    expect(used.some((c) => distance(c, mark) < 24)).toBe(true);
+    expect(used.some((c) => distance(c, neon.colors['road.mark'] as number) < 24)).toBe(true);
+    // The steel swatch matches the chassis, so that car's mark is the rail colour.
+    const steel = recorder();
+    drawVehicle(steel.g, neon, 'car', 'x', 5, false);
+    const steelUsed = [...steel.stats().fills, ...steel.stats().strokes];
+    expect(steelUsed.some((c) => c === (neon.colors['road.bridgeRail'] as number))).toBe(true);
+
+    const fireCyber = recorder();
+    drawVehicle(fireCyber.g, neon, 'fireTruck', 'x', 0, true);
+    const fireClassic = recorder();
+    drawVehicle(fireClassic.g, urbe, 'fireTruck', 'x', 0, true);
+    expect(signature(fireCyber)).toBe(signature(fireClassic));
+  });
+
+  it('draws the datacenter and the edge node only for the cyber style', () => {
+    for (const kind of ['datacenter', 'edgeNode'] as const) {
+      const cyber = recorder();
+      drawBuilding(cyber.g, neon, kind, kind === 'datacenter' ? 2 : 1, 1, 0, false);
+      const drawn = cyber.stats();
+      expect(drawn.points + drawn.rects + drawn.ellipses).toBeGreaterThan(0);
+      for (const c of [...drawn.fills, ...drawn.strokes]) {
+        expect(nearestNeonColor(c)).toBeLessThan(48);
+      }
+      const classic = recorder();
+      drawBuilding(classic.g, urbe, kind, kind === 'datacenter' ? 2 : 1, 1, 0, false);
+      const plain = classic.stats();
+      expect(plain.points + plain.rects + plain.ellipses + plain.roundRects).toBe(0);
     }
   });
 

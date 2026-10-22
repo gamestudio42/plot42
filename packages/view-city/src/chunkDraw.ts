@@ -21,6 +21,7 @@ export type OverlayMode =
   | 'traffic'
   | 'power'
   | 'water'
+  | 'data'
   | 'police'
   | 'fireCover'
   | 'health'
@@ -57,6 +58,10 @@ function forEachTile(area: ChunkArea, fn: (x: number, y: number) => void): void 
 /** Pumps and wells are the only buildings that matter while laying pipes. */
 function isWaterSource(kind: string): boolean {
   return kind === 'waterPump' || kind === 'well';
+}
+
+function isDataSource(kind: string): boolean {
+  return kind === 'datacenter' || kind === 'edgeNode';
 }
 
 function fillQuad(g: Graphics, q: Point[], fill: number, alpha = 1): void {
@@ -114,8 +119,12 @@ export function drawGround(g: Graphics, theme: Theme, ctx: DrawContext, area: Ch
         if (b && isWaterSource(b.kind)) {
           fillQuad(g, rect(q, 0.06, 0.06, 0.94, 0.94), color(theme, 'overlay.waterOn'), 0.45);
         }
+        if (b && isDataSource(b.kind)) {
+          fillQuad(g, rect(q, 0.06, 0.06, 0.94, 0.94), color(theme, 'overlay.dataOn'), 0.45);
+        }
       }
       if (infra & Infra.Pipe) drawPipe(g, theme, ctx, x, y, q);
+      if (infra & Infra.Fiber) drawFiber(g, theme, ctx, x, y, q);
       if (infra & Infra.Road) fillQuad(g, rect(q, 0.35, 0.35, 0.65, 0.65), roadShadow, 0.5);
       if (ctx.grid) outline(g, q, 0.08, color(theme, 'ground.outline'));
       return;
@@ -255,6 +264,16 @@ function drawMarinaPiers(
   boatAt(0.27, 0.7, 2);
   boatAt(0.73, 0.7, 3);
   deck(0.18, 0.88, 0.82, 0.95);
+  if (theme.style === 'cyber') {
+    const glow = color(theme, 'marina.clubWindow');
+    const lip = (a0: number, o0: number, a1: number, o1: number) => {
+      const from = at(a0, o0, PIER_LIFT);
+      const to = at(a1, o1, PIER_LIFT);
+      g.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 1.1, color: glow, alpha: 0.8 });
+    };
+    lip(0.08, 0.52, 0.92, 0.52);
+    lip(0.18, 0.95, 0.82, 0.95);
+  }
   for (const a of [0.44, 0.56]) {
     const p = at(a, 0.95, PIER_LIFT);
     g.rect(p.x - 0.5, p.y, 1, 3).fill(pierSide);
@@ -463,6 +482,36 @@ function drawPipe(
   g.circle(c.x, c.y, any ? 3 : 4).fill(fill);
 }
 
+/** Fiber, drawn only underground. Thinner than a pipe so the two can share a tile. */
+function drawFiber(
+  g: Graphics,
+  theme: Theme,
+  ctx: DrawContext,
+  x: number,
+  y: number,
+  q: [Point, Point, Point, Point],
+): void {
+  const w = ctx.world;
+  const c = tileLocalToScreen(q, 0.5, 0.5);
+  const mask = connectionMask(w, x, y, Infra.Fiber);
+  const linked = w.linked[w.index(x, y)] === 1;
+  const fill = linked ? color(theme, 'infra.fiber') : color(theme, 'infra.fiberDark');
+  const links: Array<[boolean, number, number]> = [
+    [(mask & Connection.North) !== 0, 0.5, 0.18],
+    [(mask & Connection.East) !== 0, 0.82, 0.5],
+    [(mask & Connection.South) !== 0, 0.5, 0.82],
+    [(mask & Connection.West) !== 0, 0.18, 0.5],
+  ];
+  let any = false;
+  for (const [on, u, v] of links) {
+    if (!on) continue;
+    any = true;
+    const p = tileLocalToScreen(q, u, v);
+    g.moveTo(c.x, c.y).lineTo(p.x, p.y).stroke({ width: 2.2, color: fill, alpha: 0.95 });
+  }
+  g.circle(c.x, c.y, any ? 1.8 : 2.4).fill(fill);
+}
+
 /** Pole top position for a power line tile. */
 function poleTop(world: World, x: number, y: number): Point {
   const q = tileQuad(world, x, y);
@@ -474,7 +523,9 @@ function poleTop(world: World, x: number, y: number): Point {
 export function drawWires(g: Graphics, theme: Theme, ctx: DrawContext, area: ChunkArea): void {
   if (ctx.underground) return;
   const w = ctx.world;
-  const wireColor = color(theme, 'infra.wire');
+  const cyber = theme.style === 'cyber';
+  const sheath = color(theme, 'infra.wire');
+  const core = color(theme, 'infra.pipe');
   const cutColor = color(theme, 'infra.wireCut');
   forEachTile(area, (x, y) => {
     if (!w.hasInfra(w.index(x, y), Infra.PowerLine)) return;
@@ -489,13 +540,17 @@ export function drawWires(g: Graphics, theme: Theme, ctx: DrawContext, area: Chu
       if (!w.inBounds(nx, ny) || !w.hasInfra(w.index(nx, ny), Infra.PowerLine)) continue;
       const b = poleTop(w, nx, ny);
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + 2 };
-      g.moveTo(a.x, a.y)
-        .quadraticCurveTo((a.x + mid.x) / 2, (a.y + mid.y) / 2 + 1, mid.x, mid.y)
-        .stroke({
-          width: 1,
-          color: powered ? wireColor : cutColor,
-          alpha: 0.9,
-        });
+      const stroke = (width: number, fill: number, alpha: number) => {
+        g.moveTo(a.x, a.y)
+          .quadraticCurveTo((a.x + mid.x) / 2, (a.y + mid.y) / 2 + 1, mid.x, mid.y)
+          .stroke({ width, color: fill, alpha });
+      };
+      if (!powered) stroke(1, cutColor, 0.9);
+      else if (cyber) {
+        // Dark conduit with a lit core, clamped at the pole head.
+        stroke(1.7, sheath, 0.95);
+        stroke(0.7, core, 0.7);
+      } else stroke(1, sheath, 0.9);
     }
   });
 }
@@ -603,15 +658,18 @@ export function isGoodOverlay(mode: OverlayMode): boolean {
 export function overlayColor(w: World, i: number, mode: OverlayMode, theme: Theme): number | null {
   if (mode === 'none') return null;
   if (w.terrain[i] === Terrain.Water && mode !== 'traffic') return null;
-  if (mode === 'power' || mode === 'water') {
+  if (mode === 'power' || mode === 'water' || mode === 'data') {
+    const flag =
+      mode === 'power' ? Infra.PowerLine : mode === 'water' ? Infra.Pipe : Infra.Fiber;
     const consumer =
-      (w.buildingId[i] as number) !== 0 ||
-      (w.zone[i] as number) !== 0 ||
-      w.hasInfra(i, mode === 'power' ? Infra.PowerLine : Infra.Pipe);
+      (w.buildingId[i] as number) !== 0 || (w.zone[i] as number) !== 0 || w.hasInfra(i, flag);
     if (!consumer) return null;
-    const served = mode === 'power' ? w.powered[i] === 1 : w.watered[i] === 1;
+    const served =
+      mode === 'power' ? w.powered[i] === 1 : mode === 'water' ? w.watered[i] === 1 : w.linked[i] === 1;
     if (!served) return color(theme, 'overlay.unserved');
-    return mode === 'power' ? color(theme, 'overlay.powerOn') : color(theme, 'overlay.waterOn');
+    if (mode === 'power') return color(theme, 'overlay.powerOn');
+    if (mode === 'water') return color(theme, 'overlay.waterOn');
+    return color(theme, 'overlay.dataOn');
   }
   if (mode === 'traffic') {
     if (!w.hasInfra(i, Infra.Road)) return null;

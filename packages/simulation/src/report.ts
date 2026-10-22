@@ -32,6 +32,10 @@ export interface MonthMetrics {
   monthsInDebt: number;
   bankrupt: boolean;
   activeFires: number;
+  /** Neon bandwidth. Absent in a classic report so the classic row stays the same shape. */
+  dataSupply?: number;
+  dataDemand?: number;
+  dataServed?: number;
   /** Wall-clock milliseconds spent simulating the month (filled by the caller). */
   msPerMonth?: number;
 }
@@ -78,5 +82,12 @@ export function collectMetrics(engine: SimulationEngine): MonthMetrics {
     monthsInDebt: s.monthsInDebt,
     bankrupt: s.bankrupt,
     activeFires: s.activeFires,
+    ...(s.neon
+      ? {
+          dataSupply: s.neon.data.supply,
+          dataDemand: s.neon.data.demand,
+          dataServed: round(s.neon.data.served),
+        }
+      : {}),
   };
 }

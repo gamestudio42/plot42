@@ -119,7 +119,7 @@ flowchart LR
 | Pause     | `ui/PauseOverlay.tsx` | Vignette and "Pausado" badge; does not block the map         |
 | Toolbar   | `ui/Toolbar.tsx`      | Tool groups with hotkeys and cost tooltips                   |
 | Minimap   | `ui/Minimap.tsx`      | Isometric diamond, current overlay, view rectangle, recentre |
-| Overlays  | `ui/OverlayPanel.tsx` | Twelve thematic maps with a legend                           |
+| Overlays  | `ui/OverlayPanel.tsx` | Twelve thematic maps, plus a data map in Neo Urbe            |
 | Budget    | `ui/BudgetPanel.tsx`  | Taxes, department funding, monthly ledger, debt warnings     |
 | Charts    | `ui/ChartsPanel.tsx`  | Population, money, demand and environment history            |
 | Inspector | `ui/Inspector.tsx`    | Tile facts and the "why is it (not) growing" problem list    |
@@ -156,9 +156,10 @@ The map is a square grid (`size × size`, 128 by default) stored as a structure 
 | `terrain`                                    | `Uint8Array` | `Terrain` enum (water, sand, grass, dirt, rock) |
 | `trees`                                      | `Uint8Array` | Vegetation density 0..3                         |
 | `zone`, `zoneDensity`                        | `Uint8Array` | Zone type and light/dense                       |
-| `infra`                                      | `Uint8Array` | Bit flags: road, power line, water pipe, rubble |
+| `infra`                                      | `Uint8Array` | Bit flags: road, power line, water pipe, rubble, fiber (16). Fiber stays unset in a classic city |
 | `buildingId`                                 | `Int32Array` | Building occupying the tile, `0` = none         |
 | `powered`, `watered`                         | `Uint8Array` | Utility service flags                           |
+| `linked`                                     | `Uint8Array` | Neon data service. Not a structure layer, and omitted from a classic snapshot |
 | `fire`                                       | `Uint8Array` | Fire intensity, `0` = not burning               |
 | `pollution`, `crime`, `landValue`            | `Uint8Array` | Influence maps, 0..255                          |
 | `traffic`, `jobAccess`                       | `Uint8Array` | Aggregated traffic load and job accessibility   |
@@ -176,7 +177,7 @@ footprint of `w × h` tiles.
 | Unit  | Value               | Systems                                                               |
 | ----- | ------------------- | --------------------------------------------------------------------- |
 | Tick  | 1/4 day             | Fires, active disasters, command application                          |
-| Day   | 4 ticks             | Network rebuilds (power, water) when dirty                            |
+| Day   | 4 ticks             | Network rebuilds (power, water, and neon data) when dirty             |
 | Month | 30 days = 120 ticks | Traffic, services, influence (last 3 ticks), then demand, growth, tax |
 | Year  | 12 months           | Yearly statistics, evaluation                                         |
 
@@ -188,7 +189,8 @@ real time and runs a whole number of ticks per frame, capped to avoid a spiral o
 Each `step()` runs, in order:
 
 1. Apply queued commands (recorded with their tick number for replay).
-2. At the start of a day, rebuild the power and water networks if they are dirty.
+2. At the start of a day, rebuild the power and water networks if they are dirty. A neon city
+   rebuilds the data network in the same pass, after water.
 3. Advance fires and disasters, then custom systems.
 4. Advance the tick counter and run the month stage of the new tick, if any: traffic and job
    accessibility (tick 117 of the month), service coverage (118), influence maps (119), and the
@@ -217,11 +219,14 @@ that opened it. The classic path is untouched: every neon branch is guarded by
 | Security | No intrusions | Hackers take services offline; firewalls block them |
 | Traffic | Ground network only | Drone ports add an aerial relief layer above it |
 | Zoning | Classic level caps | Dense level 7, light level 3, extrapolated capacity and demand |
+| Data | No data network | Fiber, datacenters and edge nodes. A lot without a link stops at level 2 |
 
-The five mechanics live in `packages/simulation/src/systems/neon/`; their constants are in
+The six mechanics live in `packages/simulation/src/systems/neon/` (the data pass itself stays in
+`systems/utilities.ts`, beside power and water); their constants are in
 `packages/shared/src/balance/neon.ts` and their formulas in [neon-spec.md](neon-spec.md).
 `CityStats.neon` carries the extra telemetry (stressed components, battery charge, firewall
-coverage, drone ports, corporations, skimmed cash) and is absent in a classic city.
+coverage, drone ports, corporations, skimmed cash, and data supply, demand and the served
+fraction) and is absent in a classic city.
 
 Themes are orthogonal to the ruleset: `@view/city` receives a `Theme` and never hardcodes a colour,
 so `apps/web` injects `@theme/urbe` and `apps/neon` injects `@theme/neon`. A third skin is a new

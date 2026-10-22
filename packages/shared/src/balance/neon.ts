@@ -89,6 +89,45 @@ export const NEON_DRONES = {
   altitude: 34,
 } as const;
 
+/**
+ * Data network: datacenters and edge nodes supply bandwidth, fiber conducts it.
+ * A lot without a link stops at `maxLevelWithoutData`, the same cap as a lot without water.
+ */
+export const NEON_DATA = {
+  datacenterCost: 2000,
+  datacenterUpkeep: 50,
+  /** Power the hall draws while online. */
+  datacenterPowerUse: 40,
+  /**
+   * Bandwidth while the hall is powered, online and watered (cooling).
+   * 500 left the reference town short (demand passed 580) and a second hall
+   * tripped the coal plant, so one hall is calibrated to 800.
+   */
+  datacenterSupply: 800,
+  /** Bandwidth while powered and online but dry. */
+  datacenterSupplyDry: 150,
+  /** Jobs, so an intrusion can take the hall offline and drop its supply. */
+  datacenterJobs: 20,
+  edgeNodeCost: 250,
+  edgeNodeUpkeep: 8,
+  edgeNodePowerUse: 4,
+  /** Bandwidth of one edge node. It does not need cooling water. */
+  edgeNodeSupply: 80,
+  fiberCost: 5,
+  /** Monthly upkeep of one fiber tile. Booked with power, only when fiber exists. */
+  fiberUpkeep: 0.05,
+  /** Demand at levels 0..5. Level 5 is the last row before the spires extrapolate. */
+  demand: {
+    residential: [0, 1, 2, 4, 8, 14],
+    commercial: [0, 3, 8, 16, 28, 48],
+    industrial: [0, 2, 5, 10, 16, 24],
+  },
+  /** Extra demand per level above the table. A level-7 shop exceeds one edge node. */
+  dataPerLevel: 1.4,
+  /** Highest level a neon lot reaches without a data link. */
+  maxLevelWithoutData: 2,
+} as const;
+
 /** Vertical density: how tall a neon lot may grow. */
 export const NEON_VERTICAL = {
   /** Level a dense zone can reach in the neon ruleset. */
@@ -109,6 +148,7 @@ export const NEON_BALANCE = {
   intrusion: NEON_INTRUSION,
   drones: NEON_DRONES,
   vertical: NEON_VERTICAL,
+  data: NEON_DATA,
 } as const;
 
 export type NeonBalance = typeof NEON_BALANCE;

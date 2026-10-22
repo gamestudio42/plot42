@@ -73,13 +73,14 @@ behaviour is ours.
 | --- | --- |
 | Attempt chance | `min(maxChance, baseChance + population/1000 * populationChance)` |
 | Base / per 1000 / cap | `0.35` / `0.12` / `0.8` |
-| Firewall coverage at a building | `max(1 - d / (radius + 1))` over powered, online nodes, capped at 1 |
+| Firewall coverage at a building | `max(1 - d / (radius + 1))` over powered, online, linked nodes, capped at 1 |
 | Block chance | `coverage * firewallMitigation` (0.75) |
 | Outage | `offlineTicks` (60) |
 | Theft | `min(theft, funds)`, `theft = 400` |
 
-Only services (non-zone buildings with jobs) can be targeted. Coverage needs a **powered** node
-within `firewallRadius` (6). `tickIntrusions` counts the outage down and clears `offline` when it
+Only services (non-zone buildings with jobs) can be targeted. Coverage needs a node that is
+**powered, online and on the data network** within `firewallRadius` (6). A firewall with no fiber
+to a live source covers nothing. `tickIntrusions` counts the outage down and clears `offline` when it
 expires; the utilities pass already treats `offline > 0` as unpowered. Every attempt and every
 target uses `engine.rng`, in building order after the firewall scan.
 
@@ -98,10 +99,13 @@ reports.
 | --- | --- |
 | Capacity | `onlinePorts * perPort` (4) |
 | Relief | `relief * min(1, capacity / max(1, roadTiles / 24))`, `relief = 0.15` |
-| Lane length | longest straight run of road tiles leaving one side of the port |
+| Lane length | longest straight run of road tiles touching the port, along that road or away from the building, capped at 14 |
 
-A port only counts while powered and online. Lanes are a derived read model rebuilt for the
-renderer (`droneLanes`), so the only serialized state is the port buildings themselves.
+A port only counts while powered, online and linked to a data source. The run is measured from every road tile beside the
+footprint, so a port on an avenue flies the avenue. Lanes are a derived read model rebuilt for the
+renderer (`droneLanes`), so the only serialized state is the port buildings themselves. The
+picture in the sky is separate: at most one drone per direction and three in the air, leaving and
+returning on the same cadence as marina boats.
 
 Provenance: **New**.
 
@@ -116,12 +120,58 @@ Provenance: **New**.
 | Capacity above the classic table | `classic[5] * capacityPerLevel^(level - 5)`, 1.35 |
 | Power above the classic table | `classic[5] * powerPerLevel^(level - 5)`, 1.2 |
 | Water above the classic table | `classic[5] * waterPerLevel^(level - 5)`, 1.15 |
+| Cap without water or without data | `min(cap, NEON_DATA.maxLevelWithoutData)` which is 2 |
 
 `neonCapacity`, `neonPower` and `neonWater` are exact at or below level 5, so the classic table
 stays authoritative and only the extra spires extrapolate. `growth.ts` and `utilities.ts` branch on
-`ruleset === 'neon'` and call these functions; the classic path is byte-identical.
+`ruleset === 'neon'` and call these functions; the classic path is byte-identical. A neon lot
+reaches the tall cap only when it has both water and a data link. Missing either one stops it at
+level 2. Attractiveness weights are unchanged.
 
 Provenance: **New** formulas over the `Observed` level caps.
+
+## 6. Data network
+
+`packages/simulation/src/systems/utilities.ts` (the third pass) and `NEON_DATA`. Internet is not a
+second network: a tile is online when the data pass marks it served.
+
+The pass runs only when `ruleset === 'neon'`, after power and then water, because a datacenter's
+output depends on both. It uses the same nearest-first search as water, including the hop over one
+plain road tile. Two road tiles in a row isolate the far side. Conductors are a building footprint
+or `Infra.Fiber` (bit 16). An empty zone does not conduct. An empty zoned tile orthogonally next to
+a served tile is marked served, the same spread water uses, so a lot can be linked before the first
+building appears.
+
+| Quantity | Formula |
+| --- | --- |
+| Datacenter supply | 800 if powered, online and watered; 150 if powered and online but dry; 0 otherwise |
+| Edge node supply | 80 if powered and online; 0 otherwise. No jobs, so it is not an intrusion target |
+| Demand at level ≤ 5 | `NEON_DATA.demand[kind][level]`. Level 5 is residential 14, commercial 48, industrial 24 |
+| Demand above level 5 | `demand[kind][5] * dataPerLevel^(level - 5)`, `dataPerLevel = 1.4` |
+| Level cap without a link | 2, the same ceiling as a lot without water |
+| Fiber cost / upkeep | 5 per tile, 0.05 per tile per month, booked on the power line of the budget |
+
+A level-7 shop asks for `round(48 * 1.4^2) = 94`, which is more than one edge node, so the first
+block can start on the cheap node and a spire still needs a datacenter. A cooled hall at 500
+could not cover the reference town (demand passed 580) and a second hall, at 40 power each,
+browned out the coal plant once the spires arrived. One hall calibrated to 800 covers that town
+and still draws 40 power and 20 jobs; an intrusion that takes it offline drops its supply to zero.
+The edge node draws 4 power and no water.
+
+Fiber is a path tool with the same placement rules as a pipe (it may share a tile with a road, a
+power line and a pipe, and it does not refuse a slope or open water). Underground demolish removes
+pipe and fiber as separate operations. A classic city rejects the `fiber` command, so the bit stays
+zero and the demolish plan never gains a fiber op.
+
+`World.linked` is a `Uint8Array` beside the structure layers. It is written into the snapshot only
+when the ruleset is neon, so a classic hash does not gain a layer. `SAVE_VERSION` stays 2: a neon
+file that predates the layer loads as zeros and sets `networksDirty`. `BuildingRecord.linked` is
+omitted in a classic city. `CityStats.neon.data` reports supply, demand and the served fraction.
+The inspector adds `NO_DATA` on a neon tile that is zoned but not linked, and on a firewall or
+drone port that is not linked.
+
+Provenance: **New**. The solver, the road hop and the empty-zone spread are `Code` reused from the
+water pass.
 
 ## Theme, audio and copy
 
@@ -139,5 +189,6 @@ Provenance: **New** formulas over the `Observed` level caps.
 
 - Classic Urbe: same unit, scenario and E2E suites, same hashes for the same seeds.
 - Neo Urbe: same seed plus the same command log produces the same `hashState`.
-- The five mechanics are playable through the UI and explained by the inspector.
+- The six mechanics are playable through the UI and explained by the inspector. Fiber is laid from
+  the toolbar (underground view) and the data map sits with the other overlays.
 - `pnpm check`, `pnpm test:e2e` and `pnpm build:site` (with `site/neon/`) are green.

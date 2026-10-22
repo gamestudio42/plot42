@@ -97,9 +97,13 @@ Everything below only runs with `ruleset: 'neon'`. Formulas live in
 | Corporations  | Corporate lots stamp extra land value around them              | New        | Reuses the influence layer; averaged by the normal pass.           |
 | Corporations  | Tax skim moves cash from the treasury to the corporation       | New        | Reported in `CityStats.neon.skimmed`.                              |
 | Security      | Monthly intrusion chance grows with population                 | New        | Capped at 0.8.                                                     |
-| Security      | Firewalls cut the chance and need power                        | New        | Coverage scaled by distance inside the radius.                     |
+| Security      | Firewalls cut the chance and need power and a data link           | New        | Coverage scaled by distance inside the radius. A dark or unlinked node covers nothing. |
 | Security      | A successful intrusion takes a service offline and steals cash | New        | Reuses the `offline` counter the utilities pass already respects.  |
-| Traffic       | Drone ports relieve congestion on a separate aerial layer      | New        | Additive: the ground `traffic` layer is never written.             |
+| Traffic       | Drone ports relieve congestion on a separate aerial layer      | New        | A port counts only while powered, online and linked. The ground `traffic` layer is never written. |
 | Traffic       | Aerial lanes derived from the road network beside each port    | New        | Read model rebuilt for the renderer; not serialized.               |
 | Zoning        | Dense lots reach level 7, light lots level 3                   | Observed   | SC2000 has light/dense; the neon caps are ours.                    |
 | Zoning        | Capacity, power and water extrapolate past the classic table   | New        | Exact at or below level 5, so the classic table stays the source.  |
+| Data          | Fiber conducts bandwidth from a datacenter or an edge node     | New        | Third pass of the utility solver, after power and water. One road tile does not cut it. |
+| Data          | Datacenter output needs power and cooling water                | New        | 800 cooled, 150 dry, 0 offline. An edge node supplies 80 on power alone. |
+| Data          | A lot without a link stops at level 2                          | New        | Same ceiling as a lot without water. Both are required to go higher. |
+| Data          | `linked` is optional in the save                               | New        | `SAVE_VERSION` stays 2. A neon file without the layer loads as zeros and rebuilds. |

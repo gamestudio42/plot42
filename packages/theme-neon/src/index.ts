@@ -4,10 +4,10 @@ import { urbe } from '@theme/urbe';
 /**
  * Neo Urbe: the cyberpunk art direction.
  *
- * The structure is the Urbe theme — same tokens, same palette counts — so the renderer draws the
- * same shapes. Only the colours change: a cold blue-black base, cyan and magenta signage, amber
- * service lights. Deriving from `urbe` keeps every token that has no cyberpunk equivalent (plane
- * liveries, marina wood) coherent instead of inventing one-off values.
+ * Colours live in this table. The renderer never hardcodes a hue. `style: 'cyber'` selects the
+ * armoured zone, civic and utility silhouettes; the classic shapes stay on the Urbe theme.
+ * Tokens without a cyberpunk override are graded from Urbe so planes and boats stay in the
+ * same family. The marina silhouette itself is chosen by `style: 'cyber'`.
  */
 
 /** Recolour a value towards `target` by `amount` (0..1). */
@@ -48,7 +48,10 @@ const NEON_OVERRIDES: Record<string, number> = {
   // Infrastructure glows.
   'infra.pipe': 0x1fd6ff,
   'infra.pipeDry': 0x39414f,
-  'infra.wire': 0x0e1018,
+  'infra.fiber': 0xff4ad8,
+  'infra.fiberDark': 0x5a2458,
+  // Sheath of a power conduit. The lit core is `infra.pipe`, drawn on top.
+  'infra.wire': 0x143848,
   'infra.wireCut': 0xff2d55,
   'infra.rubble': 0x2c2b33,
   'infra.flood': 0x1c6fa8,
@@ -56,6 +59,7 @@ const NEON_OVERRIDES: Record<string, number> = {
   // Overlays stay legible on dark ground.
   'overlay.powerOn': 0xffd21f,
   'overlay.waterOn': 0x2de2e6,
+  'overlay.dataOn': 0xd946ef,
   'overlay.unserved': 0xff2d55,
   'overlay.heatLow': 0x22e6a0,
   'overlay.heatMid': 0xffd21f,
@@ -116,6 +120,10 @@ const NEON_OVERRIDES: Record<string, number> = {
   'marina.clubRoof': 0x1d3a4a,
   'marina.clubWindow': 0x2de2e6,
   'marina.flagCloth': 0xff3ea5,
+
+  // Power poles: steel mast and bus, not the graded timber of the classic post.
+  'pole.post': 0x1a222c,
+  'pole.arm': 0x8f96a8,
   'boat.deck': 0x2a3140,
   'boat.sail': 0x2de2e6,
   'boat.sailShade': 0x1a9fa6,

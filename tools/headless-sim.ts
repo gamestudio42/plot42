@@ -31,6 +31,9 @@ interface SeedSummary {
   powered: number;
   watered: number;
   avgCongestion: number;
+  dataSupply?: number;
+  dataDemand?: number;
+  dataServed?: number;
   demand: MonthMetrics['demand'];
   coverage: MonthMetrics['coverage'];
   abandoned: number;
@@ -107,6 +110,13 @@ function simulate(seed: string): { rows: MonthRow[]; summary: SeedSummary } {
       powered: last.powered,
       watered: last.watered,
       avgCongestion: last.avgCongestion,
+      ...(last.dataServed === undefined
+        ? {}
+        : {
+            dataSupply: last.dataSupply,
+            dataDemand: last.dataDemand,
+            dataServed: last.dataServed,
+          }),
       demand: last.demand,
       coverage: last.coverage,
       abandoned: last.buildings.abandoned,
@@ -165,6 +175,7 @@ console.table(
     occ: s.occupancy,
     power: s.powered,
     water: s.watered,
+    data: s.dataServed,
     congestion: s.avgCongestion,
     R: s.demand.residential,
     C: s.demand.commercial,

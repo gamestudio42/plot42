@@ -3,6 +3,7 @@ import {
   DEPARTMENTS,
   EXPENSE_CATEGORIES,
   Infra,
+  NEON_DATA,
   PLACEABLE_SPECS,
   isZoneKind,
   type EconomyState,
@@ -81,6 +82,7 @@ export function computeMonthlyReport(
   let bridges = 0;
   let lines = 0;
   let pipes = 0;
+  let fibers = 0;
   for (let i = 0; i < w.tileCount; i++) {
     const infra = w.infra[i] as number;
     if (infra === 0) continue;
@@ -90,12 +92,16 @@ export function computeMonthlyReport(
     }
     if (infra & Infra.PowerLine) lines++;
     if (infra & Infra.Pipe) pipes++;
+    if (infra & Infra.Fiber) fibers++;
   }
   const f = econ.funding;
   const up = e.upkeep;
   const ex = report.expenses;
   ex.transport = (roads * up.road + bridges * up.bridge) * (f.transport / 100);
   ex.power = lines * up.powerLine;
+  // Fiber upkeep only exists in a neon city. A classic map never sets the bit, and adding zero
+  // would still be a no-op, but the branch keeps the classic assignment byte-identical.
+  if (engine.ruleset === 'neon' && fibers > 0) ex.power += fibers * NEON_DATA.fiberUpkeep;
   ex.water = pipes * up.pipe;
   for (const b of engine.buildings.values()) {
     if (isZoneKind(b.kind)) continue;
@@ -128,6 +134,10 @@ export function computeMonthlyReport(
       case 'marina':
       case 'airport':
         ex.transport += spec.upkeep;
+        break;
+      case 'datacenter':
+      case 'edgeNode':
+        ex.power += spec.upkeep;
         break;
     }
   }

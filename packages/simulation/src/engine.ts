@@ -129,7 +129,11 @@ export class SimulationEngine {
   lastGrid: GridResult | null = null;
   lastCorps: CorpResult | null = null;
   lastIntrusion: IntrusionResult | null = null;
-  private utilities: { power: UtilityResult; water: UtilityResult } | null = null;
+  private utilities: {
+    power: UtilityResult;
+    water: UtilityResult;
+    data?: UtilityResult;
+  } | null = null;
   private layerStats: LayerStats | null = null;
   private lastShortageMonth = -1;
 
@@ -172,7 +176,13 @@ export class SimulationEngine {
   static fromSnapshot(snapshot: EngineSnapshot): SimulationEngine {
     const world = new World(snapshot.size);
     world.heights.set(snapshot.heights);
+    let sawLink = false;
     for (const [name, data] of Object.entries(snapshot.layers)) {
+      if (name === 'linked') {
+        world.linked.set(data);
+        sawLink = true;
+        continue;
+      }
       const target =
         (world.structure as Record<string, Uint8Array>)[name] ??
         (world.influence as Record<string, Uint8Array>)[name];
@@ -194,7 +204,7 @@ export class SimulationEngine {
     engine.history = snapshot.history.map((h) => ({ ...h }));
     engine.disasters = snapshot.disasters.map((d) => ({ ...d }));
     engine.disastersEnabled = snapshot.disastersEnabled;
-    engine.networksDirty = snapshot.networksDirty;
+    engine.networksDirty = snapshot.networksDirty || (engine.ruleset === 'neon' && !sawLink);
     engine.lastMilestone = snapshot.lastMilestone;
     if (snapshot.neon) engine.neon = structuredCopy(snapshot.neon);
     else if (engine.ruleset === 'neon') engine.neon = defaultNeonState();
@@ -212,6 +222,7 @@ export class SimulationEngine {
     for (const [name, data] of Object.entries(this.world.influence)) {
       layers[name as keyof EngineSnapshot['layers']] = data.slice();
     }
+    if (this.ruleset === 'neon') layers.linked = this.world.linked.slice();
     return {
       name: this.name,
       ruleset: this.ruleset,
@@ -314,6 +325,7 @@ export class SimulationEngine {
       funds: this.economy.funds,
       bankrupt: this.economy.bankrupt,
       population: cityTotals(this).residents,
+      ruleset: this.ruleset,
     };
   }
 
@@ -425,6 +437,11 @@ export class SimulationEngine {
       dronePorts: portCount(this),
       corporations: { count: this.neon.corporations.length, holdings },
       skimmed: Math.round(this.neon.skimmed),
+      data: {
+        supply: this.utilities?.data?.supply ?? 0,
+        demand: this.utilities?.data?.demand ?? 0,
+        served: this.utilities?.data ? round4(this.utilities.data.served) : 1,
+      },
     };
   }
 

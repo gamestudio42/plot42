@@ -201,6 +201,7 @@ export class CityClient {
     for (const name of STRUCTURE_LAYERS) world.structure[name].set(state.structure[name]);
     for (const name of INFLUENCE_LAYERS) world.influence[name].set(state.influence[name]);
     world.buildingId.set(state.buildingId);
+    if (state.linked) world.linked.set(state.linked);
     world.takeDirty();
     this.world = world;
     this.name = state.name;
@@ -230,8 +231,11 @@ export class CityClient {
         const values = structure[name];
         for (let k = 0; k < indices.length; k++) target[indices[k] as number] = values[k] as number;
       }
-      for (let k = 0; k < indices.length; k++)
-        world.buildingId[indices[k] as number] = buildingId[k] as number;
+      for (let k = 0; k < indices.length; k++) {
+        const i = indices[k] as number;
+        world.buildingId[i] = buildingId[k] as number;
+        if (delta.tiles.linked) world.linked[i] = delta.tiles.linked[k] as number;
+      }
     }
     if (delta.influence) {
       for (const name of INFLUENCE_LAYERS) world.influence[name].set(delta.influence[name]);

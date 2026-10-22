@@ -1,4 +1,4 @@
-import { BALANCE, PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
+import { BALANCE, NEON_DATA, PLACEABLE_SPECS, type PlaceableKind } from '@city/shared';
 import { formatMoney, formatNumber, useStrings, type Locale, type Strings } from '../i18n';
 import type { GameSession } from '../state/session';
 import { useStore } from '../state/store';
@@ -15,6 +15,8 @@ function costLabel(tool: ToolDef, t: Strings, locale: Locale): string | null {
       return `${money(c.powerLine)}${t.ui.perTile}`;
     case 'pipe':
       return `${money(c.pipe)}${t.ui.perTile}`;
+    case 'fiber':
+      return `${money(NEON_DATA.fiberCost)}${t.ui.perTile}`;
     case 'zoneResLight':
     case 'zoneComLight':
     case 'zoneIndLight':
@@ -73,7 +75,7 @@ export function Toolbar({ session }: { session: GameSession }) {
                 data-testid={`tool-${tool.id}`}
                 onClick={() => session.setTool(tool.id)}
               >
-                <ToolIcon id={tool.id} />
+                <ToolIcon id={tool.id} style={session.renderer.theme.style} />
               </button>
             );
           })}

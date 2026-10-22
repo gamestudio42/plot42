@@ -32,8 +32,8 @@ theme, music and five extra mechanics. All five share the shell
    Urbe injects `@theme/urbe` and Neo Urbe injects `@theme/neon`. Adding a third
    skin means a new `packages/theme-*` package, not a fork of `@view/city`.
    A theme also picks an architecture style (`theme.style`): `classic` draws the
-   traditional civic and utility silhouettes, `cyber` draws the armoured neon
-   variants in `packages/view-city/src/cyberSprites.ts`. Colours and shapes are
+   traditional civic, utility and zone silhouettes, `cyber` draws the armoured neon
+   variants in `cyberSprites.ts` and `cyberZoneSprites.ts`. Colours and shapes are
    separate concerns, so a skin may recolour the classic shapes or swap in its
    own architecture.
 9. The classic ruleset must not change. New city mechanics go behind
@@ -101,8 +101,9 @@ packages/theme-urbe/  Today's Urbe palette, byte for byte
 packages/theme-neon/  Cyberpunk palette, CSS tokens and audio parameters
 packages/view-city/  Renderer, sprites and animation layer (theme injected)
   civicSprites.ts    Traditional police, fire, school and hospital silhouettes
-  cyberSprites.ts    Cyberpunk variants of the civic and utility buildings
-  utilitySprites.ts  Power plants, wind turbines, pumps and wells
+  cyberSprites.ts     Cyberpunk civic, utility, marina and power-pole silhouettes
+  cyberZoneSprites.ts Cyberpunk houses, shops and factories
+  utilitySprites.ts   Power plants, wind turbines, pumps and wells
 apps/lobby/        Plot 42 landing page (marks, LocaleSelect, five locales)
 apps/horta/        Horta web app (port 5174)
 apps/posto/        Posto web app (port 5175)

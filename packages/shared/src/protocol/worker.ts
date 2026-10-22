@@ -76,6 +76,8 @@ export interface FullState {
   structure: Record<StructureLayer, Uint8Array>;
   influence: Record<InfluenceLayer, Uint8Array>;
   buildingId: Int32Array;
+  /** Neon data service. Zeros in a classic city; not part of the simulation hash. */
+  linked: Uint8Array;
   buildings: BuildingRecord[];
   stats: CityStats;
   history: HistoryEntry[];
@@ -88,6 +90,8 @@ export interface Delta {
     indices: Int32Array;
     structure: Record<StructureLayer, Uint8Array>;
     buildingId: Int32Array;
+    /** Data-service flag for each dirty tile, parallel to `indices`. */
+    linked: Uint8Array;
   } | null;
   heights: Uint8Array | null;
   influence: Record<InfluenceLayer, Uint8Array> | null;

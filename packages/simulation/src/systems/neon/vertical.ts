@@ -1,4 +1,4 @@
-import { NEON_VERTICAL, ZONE_SPECS, type ZoneBuildingKind } from '@city/shared';
+import { NEON_DATA, NEON_VERTICAL, ZONE_SPECS, type ZoneBuildingKind } from '@city/shared';
 
 /**
  * Vertical density (neon ruleset).
@@ -20,10 +20,12 @@ export function neonMaxLevel(
   watered: boolean,
   neon: boolean,
   classicCap: number,
+  linked = true,
 ): number {
   if (!neon) return classicCap;
   const cap = density >= 2 ? NEON_VERTICAL.maxLevelDense : NEON_VERTICAL.maxLevelLight;
-  return watered ? cap : Math.min(cap, 2);
+  if (!watered || !linked) return Math.min(cap, NEON_DATA.maxLevelWithoutData);
+  return cap;
 }
 
 /** Capacity of a zone at a level, extrapolating past the classic table when needed. */
@@ -51,6 +53,15 @@ export function neonWater(kind: ZoneBuildingKind, level: number): number {
   const last = table[table.length - 1] as number;
   const extra = level - (table.length - 1);
   return Math.round(last * NEON_VERTICAL.waterPerLevel ** extra);
+}
+
+/** Data demand of a zone at a level. Exact on the neon table, extrapolated for spires. */
+export function neonData(kind: ZoneBuildingKind, level: number): number {
+  const table = NEON_DATA.demand[kind];
+  if (level < table.length) return table[level] as number;
+  const last = table[table.length - 1] as number;
+  const extra = level - (table.length - 1);
+  return Math.round(last * NEON_DATA.dataPerLevel ** extra);
 }
 
 /**

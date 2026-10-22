@@ -1,5 +1,6 @@
 import {
   Infra,
+  NEON_DATA,
   PLACEABLE_SPECS,
   ZONE_SPECS,
   ZoneType,
@@ -9,7 +10,7 @@ import {
   type UtilityStats,
 } from '@city/shared';
 import type { SimulationEngine } from '../engine';
-import { neonPower, neonWater } from './neon/vertical';
+import { neonData, neonPower, neonWater } from './neon/vertical';
 import type { World } from '../world/world';
 import { hubJobs } from './demand';
 
@@ -62,14 +63,34 @@ export function waterSupply(world: World, b: BuildingRecord): number {
   return pumpNearWater(world, b) ? spec.waterSupplyNearWater : spec.waterSupply;
 }
 
+/** Bandwidth a zone lot asks for. Placeables do not consume data; they only need to be reached. */
+export function dataDemand(b: BuildingRecord): number {
+  if (!isZoneKind(b.kind) || b.abandoned) return 0;
+  return neonData(b.kind, b.level);
+}
+
 /**
- * Recomputes power, then water (pumps need power). With `write` it updates the `powered` /
- * `watered` layers and building flags; without it only the summary is computed.
+ * Bandwidth a datacenter or edge node adds. The hall needs power and, for its full output,
+ * cooling water. An edge node only needs power. Offline buildings contribute nothing.
+ */
+export function dataSupply(b: BuildingRecord): number {
+  if (isZoneKind(b.kind) || b.offline > 0 || !b.powered) return 0;
+  if (b.kind === 'datacenter') {
+    return b.watered ? NEON_DATA.datacenterSupply : NEON_DATA.datacenterSupplyDry;
+  }
+  if (b.kind === 'edgeNode') return NEON_DATA.edgeNodeSupply;
+  return 0;
+}
+
+/**
+ * Recomputes power, then water (pumps need power), then the neon data network (halls need both).
+ * With `write` it updates the service layers and building flags; without it only the summary
+ * is computed. The data pass does not run in a classic city.
  */
 export function updateUtilities(
   engine: SimulationEngine,
   write = true,
-): { power: UtilityResult; water: UtilityResult } {
+): { power: UtilityResult; water: UtilityResult; data?: UtilityResult } {
   const w = engine.world;
   const infra = w.structure.infra;
   const zone = w.zone;
@@ -104,8 +125,31 @@ export function updateUtilities(
       postProcess: (next) => spreadWaterToEmptyZones(w, next),
     },
   );
+  let data: UtilityResult | undefined;
+  if (engine.ruleset === 'neon') {
+    const dataConductors = new Uint8Array(w.tileCount);
+    for (let i = 0; i < w.tileCount; i++) {
+      const built = (buildingId[i] as number) !== 0;
+      if (built || ((infra[i] as number) & Infra.Fiber) !== 0) dataConductors[i] = 1;
+    }
+    data = solve(
+      engine,
+      write,
+      'linked',
+      (b) => b.linked === true,
+      (b, on) => {
+        b.linked = on;
+      },
+      {
+        conductors: dataConductors,
+        supply: dataSupply,
+        demand: dataDemand,
+        postProcess: (next) => spreadWaterToEmptyZones(w, next),
+      },
+    );
+  }
   if (write) updateHubJobs(engine);
-  return { power, water };
+  return data ? { power, water, data } : { power, water };
 }
 
 /** One connected component of the power network, as the classic solver sees it. */
@@ -199,10 +243,16 @@ function updateHubJobs(engine: SimulationEngine): void {
   }
 }
 
+type ServiceLayer = 'powered' | 'watered' | 'linked';
+
+function serviceLayer(w: World, layer: ServiceLayer): Uint8Array {
+  return layer === 'linked' ? w.linked : w.structure[layer];
+}
+
 function solve(
   engine: SimulationEngine,
   write: boolean,
-  layer: 'powered' | 'watered',
+  layer: ServiceLayer,
   getServed: (b: BuildingRecord) => boolean,
   setServed: (b: BuildingRecord, on: boolean) => void,
   spec: NetworkSpec,
@@ -323,7 +373,7 @@ function solve(
   result.served = consumers === 0 ? 1 : servedConsumers / consumers;
   if (!write) return result;
   spec.postProcess?.(next);
-  const data = w.structure[layer];
+  const data = serviceLayer(w, layer);
   for (let i = 0; i < w.tileCount; i++) {
     const v = next[i] as number;
     if (data[i] !== v) {

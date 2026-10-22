@@ -15,6 +15,7 @@ export type ToolCommand =
   | ({ type: 'road' } & Area)
   | ({ type: 'powerLine' } & Area)
   | ({ type: 'pipe' } & Area)
+  | ({ type: 'fiber' } & Area)
   | ({ type: 'zone'; zone: ZoneType; density: ZoneDensity } & Area)
   | ({ type: 'demolish'; underground?: boolean } & Area)
   | ({ type: 'level' } & Area)
@@ -38,6 +39,7 @@ const TOOL_TYPES: ReadonlySet<string> = new Set<ToolType>([
   'road',
   'powerLine',
   'pipe',
+  'fiber',
   'zone',
   'demolish',
   'level',

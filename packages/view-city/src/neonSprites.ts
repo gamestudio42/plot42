@@ -288,6 +288,12 @@ export function drawCorpHQ(g: Graphics, theme: Theme): void {
 export const DRONE_SIZE = 0.62;
 
 /**
+ * Flying drones are half the previous flight scale: small craft above the street, not the size
+ * of the pad they leave.
+ */
+export const DRONE_FLIGHT_SCALE = 0.925;
+
+/**
  * Quadcopter seen from above, centred on `origin` and lifted by `z` pixels. `spin` is the rotor
  * angle in radians; `glow` scales the thruster light, so a parked drone can be dimmer.
  */

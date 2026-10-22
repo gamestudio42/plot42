@@ -43,9 +43,30 @@ test('reports the neon ruleset in the mirror stats', async ({ page }) => {
 
 test('offers the neon-only tools and hides them from classic Urbe', async ({ page }) => {
   await startNeonCity(page, 'neon-tools');
-  for (const id of ['tool-substation', 'tool-battery', 'tool-firewall', 'tool-dronePort', 'tool-corpHQ']) {
+  for (const id of [
+    'tool-substation',
+    'tool-battery',
+    'tool-firewall',
+    'tool-dronePort',
+    'tool-corpHQ',
+    'tool-fiber',
+    'tool-datacenter',
+    'tool-edgeNode',
+  ]) {
     await expect(page.getByTestId(id)).toBeAttached();
   }
+});
+
+test('fiber tool opens the underground view and the data overlay is listed', async ({ page }) => {
+  await startNeonCity(page, 'neon-fiber');
+  await page.getByTestId('tool-fiber').click();
+  await expect(page.getByTestId('tool-fiber')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('open-system').click();
+  await expect(page.getByTestId('underground-enabled')).toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('system-panel')).toBeHidden();
+  await page.getByTestId('open-overlays').click();
+  await expect(page.getByTestId('overlay-data')).toBeVisible();
 });
 
 test('places a substation, a battery and a firewall through the debug command API', async ({
@@ -94,11 +115,11 @@ test('drone ports put drones in the air above their lane', async ({ page }) => {
   expect(area).not.toBeNull();
   if (!area) return;
 
-  // A straight street east of the port, then the port and the grid that feeds it.
+  // Avenue along the north side of the port — how a player places it — then the grid that feeds it.
   const built = await page.evaluate(async (p) => {
     const d = window.__cityDebug;
     if (!d) return null;
-    await d.command({ type: 'road', x0: p.x + 9, y0: p.y + 7, x1: p.x + 17, y1: p.y + 7 });
+    await d.command({ type: 'road', x0: p.x + 7, y0: p.y + 6, x1: p.x + 17, y1: p.y + 6 });
     const ok: Record<string, boolean> = {};
     for (const [kind, dx] of [
       ['dronePort', 7],

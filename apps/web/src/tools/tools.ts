@@ -15,6 +15,7 @@ export type ToolId =
   | 'road'
   | 'powerLine'
   | 'pipe'
+  | 'fiber'
   | 'zoneResLight'
   | 'zoneResDense'
   | 'zoneComLight'
@@ -106,6 +107,11 @@ export const TOOLS: readonly ToolDef[] = [
     hotkey: 't',
     underground: true,
   }),
+  def('fiber', 'utilities', 'path', (a) => ({ type: 'fiber', ...a }), {
+    hotkey: 'y',
+    underground: true,
+    only: 'neon',
+  }),
   placeDef('waterPump', 'utilities'),
   placeDef('well', 'utilities'),
   placeDef('policeStation', 'services'),
@@ -119,6 +125,8 @@ export const TOOLS: readonly ToolDef[] = [
   placeDef('firewall', 'services'),
   placeDef('dronePort', 'transport'),
   placeDef('corpHQ', 'services'),
+  placeDef('datacenter', 'utilities'),
+  placeDef('edgeNode', 'utilities'),
   def('demolish', 'terrain', 'rect', (a) => ({ type: 'demolish', ...a }), { hotkey: 'b' }),
   def('level', 'terrain', 'rect', (a) => ({ type: 'level', ...a }), { hotkey: 'n' }),
   def('raise', 'terrain', 'rect', (a) => ({ type: 'raise', ...a }), { hotkey: 'h' }),
@@ -143,8 +151,8 @@ export function toolById(id: ToolId): ToolDef {
   return tool;
 }
 
-export function toolByHotkey(key: string): ToolDef | undefined {
-  return TOOLS.find((tool) => tool.hotkey === key);
+export function toolByHotkey(key: string, ruleset: 'classic' | 'neon' = 'classic'): ToolDef | undefined {
+  return toolsFor(ruleset).find((tool) => tool.hotkey === key);
 }
 
 /** Tools offered by a ruleset: `neon` sees every tool, `classic` hides the neon-only ones. */

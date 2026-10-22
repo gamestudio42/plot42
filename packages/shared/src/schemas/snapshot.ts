@@ -16,7 +16,11 @@ export interface EngineSnapshot {
   tick: number;
   rng: [number, number, number, number];
   heights: Uint8Array;
-  layers: Record<SnapshotLayer, Uint8Array>;
+  /**
+   * Structure and influence layers. `linked` is the neon data service and is absent in a classic
+   * snapshot, so classic hashes do not gain a layer.
+   */
+  layers: Record<SnapshotLayer, Uint8Array> & { linked?: Uint8Array };
   buildings: BuildingRecord[];
   nextBuildingId: number;
   economy: EconomyState;

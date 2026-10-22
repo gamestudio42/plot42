@@ -26,7 +26,7 @@ Presets (`packages/simulation/src/scenarios/presets.ts`) drive the city with a s
 | ------------ | --------------------------------------------------------------------- |
 | `balanced`   | Flat map, the scenario town with four services; adds plants and pumps |
 | `disasters`  | Same town with fires and disasters on; clears rubble and rebuilds     |
-| `neon-balanced` | The balanced town under the neon ruleset: substations, batteries, firewalls and drone ports |
+| `neon-balanced` | The balanced town under the neon ruleset, plus a fiber spine and a datacenter |
 | `no-power`   | Same town without any power plant                                     |
 | `high-taxes` | Same town with every tax at 15%                                       |
 | `grid`       | Flat 128×128 map filled with a street grid of dense zones (benchmark) |
@@ -45,17 +45,22 @@ Final month:
 
 ### Neo Urbe (`neon-balanced`, 64×64, 120 months, seeds 1–3)
 
-| Seed | Population | Funds  | Unemployment | Occupancy | Power | Water    | Congestion | Bankrupt |
-| ---- | ---------- | ------ | ------------ | --------- | ----- | -------- | ---------- | -------- |
-| 1    | 2 886      | 12 002 | 11.1%        | 82.9%     | 100%  | 95.1%    | 0.518      | no       |
-| 2    | 3 118      | 15 221 | 11.1%        | 83.6%     | 100%  | 99.3%    | 0.510      | no       |
-| 3    | 3 140      | 14 398 | 10.3%        | 82.6%     | 100%  | 91.5%    | 0.475      | no       |
+The preset is the balanced town plus fiber along the water pipes and one datacenter beside the
+coal plant. Supply is 800. A hall at 500 left demand (it peaks near 630) short, and a second hall
+browned the plant out once buildings grew, so the reference city keeps a single hall.
 
-The neon layer costs about 1–2 ms per month on a 64×64 city and keeps the town solvent: the
-substations and batteries absorb the extra demand of seven-storey spires, and the drone relief
-keeps congestion below the classic town's. The `grid` 128×128 benchmark still passes `--strict`
-(7.69 ms per month, every stage under its p95 budget), so the new systems do not threaten the tick
-budget.
+| Seed | Population | Funds  | Unemployment | Occupancy | Power | Water | Data  | Congestion | Bankrupt |
+| ---- | ---------- | ------ | ------------ | --------- | ----- | ----- | ----- | ---------- | -------- |
+| 1    | 2 488      | −3 869 | 14.5%        | 81.8%     | 95.7% | 90.4% | 90.4% | 0.477      | yes      |
+| 2    | 2 421      | −5 606 | 11.8%        | 81.2%     | 97.0% | 86.1% | 86.1% | 0.427      | yes      |
+| 3    | 2 297      | −5 763 | 18.6%        | 72.0%     | 93.2% | 92.3% | 92.3% | 0.359      | yes      |
+
+Every seed is still in debt at month 120. The hall costs 2 000 up front and 50 a month, on top of
+the town's usual early deficit. The cable follows the pipes, so the lots the pipes miss are also
+dark: about 10% of data demand is out of reach and those lots stop at level 2. Bandwidth itself is
+not the limit. The monthly balance turns positive in the second half of the run (seed 1 is about
++80 by month 120) and funds are climbing out of a trough near −8 000 to −9 000. The month stays
+near 2 ms.
 
 - **Balanced:** every seed grows for twenty years and ends with RCI demand near zero (the
   town is full). Seeds 1, 2 and 4 are in debt for 4 to 8 months between months 18 and 25 and

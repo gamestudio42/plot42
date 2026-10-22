@@ -55,6 +55,7 @@ function fullState(e: SimulationEngine): FullState {
     structure: copyLayers(w.structure, STRUCTURE_LAYERS),
     influence: copyLayers(w.influence, INFLUENCE_LAYERS),
     buildingId: w.buildingId.slice(),
+    linked: w.linked.slice(),
     buildings: e.buildings.list().map((b) => ({ ...b })),
     stats: e.stats(),
     history: e.history.map((h) => ({ ...h })),
@@ -84,9 +85,13 @@ function buildDelta(e: SimulationEngine): Delta {
       structure[name] = out;
     }
     const buildingId = new Int32Array(indices.length);
-    for (let k = 0; k < indices.length; k++)
-      buildingId[k] = w.buildingId[indices[k] as number] as number;
-    tiles = { indices, structure, buildingId };
+    const linked = new Uint8Array(indices.length);
+    for (let k = 0; k < indices.length; k++) {
+      const i = indices[k] as number;
+      buildingId[k] = w.buildingId[i] as number;
+      linked[k] = w.linked[i] as number;
+    }
+    tiles = { indices, structure, buildingId, linked };
   }
   let influence: Record<InfluenceLayer, Uint8Array> | null = null;
   if (w.influenceDirty) {

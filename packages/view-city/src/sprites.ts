@@ -3,7 +3,8 @@ import { color, shade, type Theme } from '@theme/core';
 import { Container, Graphics, type Renderer, type Texture } from 'pixi.js';
 import { footprint, lerp, up } from './chimneys';
 import { drawCivic } from './civicSprites';
-import { drawCyberCivic, drawCyberUtility } from './cyberSprites';
+import { drawCyberCivic, drawCyberMarina, drawCyberPole, drawCyberUtility } from './cyberSprites';
+import { drawCyberCommercial, drawCyberIndustrial, drawCyberResidential } from './cyberZoneSprites';
 import { drawUtility } from './utilitySprites';
 import {
   HEADINGS,
@@ -18,6 +19,7 @@ import { TILE_H, TILE_W, type Point } from './iso';
 import {
   drawBattery,
   drawCorpHQ,
+  DRONE_FLIGHT_SCALE,
   drawDrone,
   drawDronePort,
   drawDroneShadow,
@@ -88,6 +90,119 @@ function groundShadow(g: Graphics, axis: 'x' | 'y', length: number, width: numbe
   poly(g, groundRect(axis, length, width), 0x000000, 0.22);
 }
 
+/** Glass canopy drawn in the token colour, without shading the emissive faces. */
+function glassDeck(
+  g: Graphics,
+  axis: 'x' | 'y',
+  length: number,
+  width: number,
+  z0: number,
+  height: number,
+  fill: number,
+): void {
+  const [back, right, front, left] = groundRect(axis, length, width).map((p) => up(p, z0)) as [
+    Point,
+    Point,
+    Point,
+    Point,
+  ];
+  poly(g, [left, front, up(front, height), up(left, height)], fill);
+  poly(g, [front, right, up(right, height), up(front, height)], fill);
+  const roof = [up(back, height), up(right, height), up(front, height), up(left, height)];
+  poly(g, roof, fill);
+}
+
+/** Lit side trim and two headlights on the nose of a top face (back, right, front, left). */
+function emissiveTrim(g: Graphics, top: Point[], accent: number): void {
+  g.moveTo(top[0]!.x, top[0]!.y)
+    .lineTo(top[1]!.x, top[1]!.y)
+    .stroke({ width: 1.15, color: accent });
+  g.moveTo(top[3]!.x, top[3]!.y)
+    .lineTo(top[2]!.x, top[2]!.y)
+    .stroke({ width: 1.15, color: accent });
+  for (const t of [0.28, 0.72]) {
+    const lamp = lerp(top[1]!, top[2]!, t);
+    g.circle(lamp.x, lamp.y, 0.85).fill(accent);
+  }
+}
+
+/**
+ * Cosmetic traffic. Classic cars stay two painted boxes. A cyber theme draws a dark chassis
+ * with the palette colour only on the trim and the headlights, so the traffic matches the
+ * buildings. The footprint stays the same either way.
+ */
+export function drawVehicle(
+  g: Graphics,
+  theme: Theme,
+  kind: VehicleKind,
+  axis: 'x' | 'y',
+  carColor: number,
+  light = false,
+): void {
+  const length = kind === 'car' ? 0.32 : 0.42;
+  const width = kind === 'car' ? 0.17 : 0.19;
+  groundShadow(g, axis, length + 0.04, width + 0.04);
+  if (theme.style === 'cyber' && kind !== 'fireTruck') {
+    const shell = color(theme, 'vehicle.truckBody');
+    const glass = color(theme, 'road.mark');
+    const painted = theme.cars[carColor % theme.cars.length] as number;
+    // The steel swatch is the chassis itself, so that car takes the rail colour instead.
+    const accent =
+      kind === 'car'
+        ? painted === shell
+          ? color(theme, 'road.bridgeRail')
+          : painted
+        : color(theme, 'airport.yellow');
+    const body = groundBox(g, axis, length, width, 0, kind === 'car' ? 3.2 : 5.2, shell);
+    glassDeck(
+      g,
+      axis,
+      length * (kind === 'car' ? 0.42 : 0.3),
+      width * 0.72,
+      kind === 'car' ? 3.2 : 5.2,
+      kind === 'car' ? 1.5 : 1.3,
+      glass,
+    );
+    emissiveTrim(g, body, accent);
+    return;
+  }
+  if (kind === 'car') {
+    const body = theme.cars[carColor % theme.cars.length] as number;
+    groundBox(g, axis, length, width, 0, 3.5, body);
+    groundBox(g, axis, length * 0.5, width * 0.86, 3.5, 2.5, shade(body, 1.08), 0x2a3a4a);
+  } else if (kind === 'truck') {
+    groundBox(g, axis, length, width, 0, 6, color(theme, 'vehicle.truckBody'));
+  } else {
+    const [t, r, b, l] = groundBox(
+      g,
+      axis,
+      length,
+      width,
+      0,
+      5,
+      color(theme, 'vehicle.fireBody'),
+    ) as [Point, Point, Point, Point];
+    // Ladder along the travel axis.
+    const from = axis === 'x' ? lerp(t, l, 0.5) : lerp(t, r, 0.5);
+    const to = axis === 'x' ? lerp(r, b, 0.5) : lerp(l, b, 0.5);
+    const a = lerp(from, to, 0.15);
+    const e = lerp(from, to, 0.85);
+    g.moveTo(a.x, a.y)
+      .lineTo(e.x, e.y)
+      .stroke({ width: 1.2, color: color(theme, 'vehicle.fireLadder') });
+    groundBox(
+      g,
+      axis,
+      0.06,
+      width * 0.8,
+      5,
+      1.6,
+      color(theme, light ? 'vehicle.fireLightOn' : 'vehicle.fireLightOff'),
+      color(theme, light ? 'vehicle.fireLightGlow' : 'vehicle.fireLightDark'),
+    );
+  }
+}
+
 /** Box standing on the ground rectangle, lifted by `z0`; returns its top face. */
 function groundBox(
   g: Graphics,
@@ -129,10 +244,19 @@ export function drawBuilding(
   abandoned: boolean,
   side = 0,
 ): void {
-  if (kind === 'residential') drawResidential(g, theme, level, variant, abandoned);
-  else if (kind === 'commercial') drawCommercial(g, theme, level, variant, abandoned);
-  else if (kind === 'industrial') drawIndustrial(g, theme, level, variant, abandoned);
-  else if (kind === 'marina') drawMarina(g, theme, side);
+  if (kind === 'residential') {
+    if (theme.style === 'cyber') drawCyberResidential(g, theme, level, variant, abandoned);
+    else drawResidential(g, theme, level, variant, abandoned);
+  } else if (kind === 'commercial') {
+    if (theme.style === 'cyber') drawCyberCommercial(g, theme, level, variant, abandoned);
+    else drawCommercial(g, theme, level, variant, abandoned);
+  } else if (kind === 'industrial') {
+    if (theme.style === 'cyber') drawCyberIndustrial(g, theme, level, variant, abandoned);
+    else drawIndustrial(g, theme, level, variant, abandoned);
+  } else if (kind === 'marina') {
+    if (theme.style === 'cyber') drawCyberMarina(g, theme, side);
+    else drawMarina(g, theme, side);
+  }
   else if (kind === 'airport') drawAirport(g, theme);
   else if (kind === 'substation') drawSubstation(g, theme);
   else if (kind === 'battery') drawBattery(g, theme);
@@ -208,13 +332,16 @@ export class SpriteFactory {
 
   /** Drone centred on its position, rotors at `frame` (an animation step, not a heading). */
   drone(frame: number): SpriteTexture {
-    return this.get(`drone:${frame}`, (g) =>
-      drawDrone(g, this.theme, { x: 0, y: 0 }, (frame % 4) * 0.5),
+    const step = ((frame % 4) + 4) % 4;
+    return this.get(`drone:${step}`, (g) =>
+      drawDrone(g, this.theme, { x: 0, y: 0 }, step * 0.5, DRONE_FLIGHT_SCALE),
     );
   }
 
   droneShadow(): SpriteTexture {
-    return this.get('droneShadow', (g) => drawDroneShadow(g, this.theme, { x: 0, y: 0 }));
+    return this.get('droneShadow', (g) =>
+      drawDroneShadow(g, this.theme, { x: 0, y: 0 }, DRONE_FLIGHT_SCALE),
+    );
   }
 
   trees(density: number, variant: number): SpriteTexture {
@@ -234,7 +361,11 @@ export class SpriteFactory {
   }
 
   pole(): SpriteTexture {
-    return this.get('pole', (g) => {
+    return this.get(`pole:${this.theme.style}`, (g) => {
+      if (this.theme.style === 'cyber') {
+        drawCyberPole(g, this.theme);
+        return;
+      }
       g.rect(-1, -22, 2, 22).fill(color(this.theme, 'pole.post'));
       g.rect(-6, -21, 12, 2).fill(color(this.theme, 'pole.arm'));
     });
@@ -242,47 +373,8 @@ export class SpriteFactory {
 
   /** Vehicle seen from above, its ground centre at the origin; `axis` is its travel axis. */
   vehicle(kind: VehicleKind, axis: 'x' | 'y', carColor: number, light = false): SpriteTexture {
-    const key = `v:${kind}:${axis}:${kind === 'car' ? carColor % this.theme.cars.length : 0}:${light ? 1 : 0}`;
-    return this.get(key, (g) => {
-      const length = kind === 'car' ? 0.32 : 0.42;
-      const width = kind === 'car' ? 0.17 : 0.19;
-      groundShadow(g, axis, length + 0.04, width + 0.04);
-      if (kind === 'car') {
-        const body = this.theme.cars[carColor % this.theme.cars.length] as number;
-        groundBox(g, axis, length, width, 0, 3.5, body);
-        groundBox(g, axis, length * 0.5, width * 0.86, 3.5, 2.5, shade(body, 1.08), 0x2a3a4a);
-      } else if (kind === 'truck') {
-        groundBox(g, axis, length, width, 0, 6, color(this.theme, 'vehicle.truckBody'));
-      } else {
-        const [t, r, b, l] = groundBox(
-          g,
-          axis,
-          length,
-          width,
-          0,
-          5,
-          color(this.theme, 'vehicle.fireBody'),
-        ) as [Point, Point, Point, Point];
-        // Ladder along the travel axis.
-        const from = axis === 'x' ? lerp(t, l, 0.5) : lerp(t, r, 0.5);
-        const to = axis === 'x' ? lerp(r, b, 0.5) : lerp(l, b, 0.5);
-        const a = lerp(from, to, 0.15);
-        const e = lerp(from, to, 0.85);
-        g.moveTo(a.x, a.y)
-          .lineTo(e.x, e.y)
-          .stroke({ width: 1.2, color: color(this.theme, 'vehicle.fireLadder') });
-        groundBox(
-          g,
-          axis,
-          0.06,
-          width * 0.8,
-          5,
-          1.6,
-          color(this.theme, light ? 'vehicle.fireLightOn' : 'vehicle.fireLightOff'),
-          color(this.theme, light ? 'vehicle.fireLightGlow' : 'vehicle.fireLightDark'),
-        );
-      }
-    });
+    const key = `v:${this.theme.style}:${kind}:${axis}:${kind === 'car' ? carColor % this.theme.cars.length : 0}:${light ? 1 : 0}`;
+    return this.get(key, (g) => drawVehicle(g, this.theme, kind, axis, carColor, light));
   }
 
   smokePuff(): SpriteTexture {

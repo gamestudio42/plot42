@@ -10,11 +10,13 @@ import { isOperatingHub } from '../traffic';
  * touches the ground `traffic` layer. Consumers instead read `droneRelief`, which lowers the
  * congestion they feel while a port is online, so the ground rules stay exactly as they are.
  *
+ * A lane is the longest straight run of road touching the port, measured along the street as
+ * well as away from the building. A port set beside an avenue therefore flies that avenue.
  * The lanes are a derived read model, rebuilt on demand for the renderer; the only serialized
  * state is the drone port buildings themselves.
  */
 
-/** A rendered aerial corridor leaving one side of a port. */
+/** A rendered aerial corridor along the road that touches a port. */
 export interface DroneLane {
   portId: number;
   x: number;
@@ -29,7 +31,7 @@ export interface DroneLane {
 export function portCount(engine: SimulationEngine): number {
   let ports = 0;
   for (const b of engine.buildings.values()) {
-    if (b.kind === 'dronePort' && b.powered && b.offline === 0) ports++;
+    if (b.kind === 'dronePort' && b.powered && b.offline === 0 && b.linked === true) ports++;
   }
   return ports;
 }
@@ -55,47 +57,94 @@ export function droneRelief(engine: SimulationEngine, roadTiles: number): number
 export function droneLanes(engine: SimulationEngine): DroneLane[] {
   const lanes: DroneLane[] = [];
   for (const port of engine.buildings.values()) {
-    if (port.kind !== 'dronePort' || !isOperatingHub(port)) continue;
-    const lane = longestLane(engine.world, port);
+    if (port.kind !== 'dronePort' || !isOperatingHub(port) || port.linked !== true) continue;
+    const lane = longestDroneLane(engine.world, port);
     if (lane) lanes.push(lane);
   }
   return lanes;
 }
 
-const SIDES = [
+/** How far a drone follows one straight road before turning back. */
+export const DRONE_LANE_CAP = 14;
+
+const DIRECTIONS = [
   { dx: 1, dy: 0, heading: 0 },
   { dx: 0, dy: 1, heading: 1 },
   { dx: -1, dy: 0, heading: 2 },
   { dx: 0, dy: -1, heading: 3 },
 ] as const;
 
-/** Longest straight run of road tiles leaving one side of the footprint. */
-function longestLane(
-  w: World,
-  port: { id: number; x: number; y: number; w: number; h: number },
-): DroneLane | null {
-  let best: DroneLane | null = null;
-  const starts = [
-    { x: port.x + port.w, y: port.y },
-    { x: port.x, y: port.y + port.h },
-    { x: port.x - 1, y: port.y },
-    { x: port.x, y: port.y - 1 },
-  ];
-  for (let k = 0; k < SIDES.length; k++) {
-    const side = SIDES[k] as (typeof SIDES)[number];
-    const start = starts[k] as { x: number; y: number };
-    let x = start.x;
-    let y = start.y;
-    let length = 0;
-    while (w.inBounds(x, y) && w.hasInfra(w.index(x, y), Infra.Road)) {
-      length++;
-      x += side.dx;
-      y += side.dy;
-    }
-    if (length === 0) continue;
-    if (!best || length > best.length) {
-      best = { portId: port.id, x: start.x, y: start.y, length, heading: side.heading };
-    }
+function roadAt(w: World, x: number, y: number): boolean {
+  return w.inBounds(x, y) && w.hasInfra(w.index(x, y), Infra.Road);
+}
+
+/** Road tiles in a straight line from `(x, y)`, including the start, capped at `DRONE_LANE_CAP`. */
+function roadRun(w: World, x: number, y: number, dx: number, dy: number): number {
+  let length = 0;
+  let cx = x;
+  let cy = y;
+  while (length < DRONE_LANE_CAP && roadAt(w, cx, cy)) {
+    length++;
+    cx += dx;
+    cy += dy;
   }
-  return best;
+  return length;
+}
+
+interface PortFootprint {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Every straight run of road touching the port, one per heading.
+ *
+ * The run starts on every road tile orthogonally beside the footprint and is measured both
+ * away from the building and along the street. Walking only outward from one corner stops on
+ * the first tile of a normal avenue, which is too short for a drone to launch.
+ */
+function scanPort(w: World, port: PortFootprint): {
+  best: DroneLane | null;
+  byHeading: Map<number, DroneLane>;
+} {
+  let best: DroneLane | null = null;
+  const byHeading = new Map<number, DroneLane>();
+  const offer = (x: number, y: number, dx: number, dy: number, heading: number): void => {
+    const length = roadRun(w, x, y, dx, dy);
+    if (length === 0) return;
+    const lane = { portId: port.id, x, y, length, heading };
+    const prev = byHeading.get(heading);
+    if (!prev || length > prev.length) byHeading.set(heading, lane);
+    if (!best || length > best.length) best = lane;
+  };
+  // `inward` steps from the adjacent tile back into the footprint, which is never a road.
+  const touch = (x: number, y: number, inwardX: number, inwardY: number): void => {
+    if (!roadAt(w, x, y)) return;
+    for (const dir of DIRECTIONS) {
+      if (dir.dx === inwardX && dir.dy === inwardY) continue;
+      offer(x, y, dir.dx, dir.dy, dir.heading);
+    }
+  };
+  for (let x = port.x; x < port.x + port.w; x++) {
+    touch(x, port.y - 1, 0, 1);
+    touch(x, port.y + port.h, 0, -1);
+  }
+  for (let y = port.y; y < port.y + port.h; y++) {
+    touch(port.x - 1, y, 1, 0);
+    touch(port.x + port.w, y, -1, 0);
+  }
+  return { best, byHeading };
+}
+
+/** One corridor per compass heading that has road beside the port, longest run of that heading. */
+export function droneRoadLanes(w: World, port: PortFootprint): DroneLane[] {
+  return [...scanPort(w, port).byHeading.values()].sort((a, b) => a.heading - b.heading);
+}
+
+/** Longest of `droneRoadLanes`. The simulated read model keeps a single corridor. */
+export function longestDroneLane(w: World, port: PortFootprint): DroneLane | null {
+  return scanPort(w, port).best;
 }

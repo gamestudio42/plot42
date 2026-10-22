@@ -1,9 +1,11 @@
 import type { Graphics } from 'pixi.js';
 import { color, shade, type Theme } from '@theme/core';
-import { Frame, poly } from './isoFrame';
+import { HEADINGS, drawBoat } from './hubSprites';
+import { TILE_H, type Point } from './iso';
+import { Frame, poly, type Rect } from './isoFrame';
 
 /**
- * Cyberpunk variants of the civic and utility buildings.
+ * Cyberpunk variants of the civic and utility buildings, the marina and the power poles.
  *
  * The classic silhouettes answer "what is this place?". These answer "what is this place, in a
  * city that runs on neon?" — armoured dark shells, glowing conduits, holographic signage and
@@ -48,6 +50,25 @@ function rightFace(
 function lamp(g: Graphics, x: number, y: number, tint: number, radius = 2): void {
   g.circle(x, y, radius * 2.2).fill({ color: tint, alpha: 0.22 });
   g.circle(x, y, radius).fill(tint);
+}
+
+/**
+ * Power pole for a cyber city. The sprite origin is the ground point and the cable clamps
+ * 20px above it, which is where `poleTop` ties the wire.
+ */
+export function drawCyberPole(g: Graphics, theme: Theme): void {
+  const mast = color(theme, 'pole.post');
+  const steel = color(theme, 'pole.arm');
+  const glow = color(theme, 'infra.pipe');
+
+  g.rect(-3.2, -1.6, 6.4, 2).fill(shade(mast, 0.75));
+  g.rect(-1.15, -24, 2.3, 24).fill(mast);
+  g.rect(-0.35, -24, 0.7, 24).fill(shade(mast, 1.35));
+  g.rect(-5.2, -21.2, 10.4, 2.2).fill(steel);
+  g.rect(-5.2, -20.5, 10.4, 0.7).fill(glow);
+  lamp(g, -4.4, -20, glow, 1.05);
+  lamp(g, 4.4, -20, glow, 1.05);
+  lamp(g, 0, -24.5, glow, 1.15);
 }
 
 /** Police: an armoured precinct with a magenta rim, a holo badge and a scanner pylon. */
@@ -353,8 +374,8 @@ export function drawCyberHospital(g: Graphics, theme: Theme): void {
   g.rect(c.x - 7, c.y - 2.2, 14, 1.1).fill(shade(cross, 1.35));
   g.rect(c.x - 2.2, c.y - 7, 1.1, 14).fill(shade(cross, 1.35));
 
-  // Helipad: a lit deck ring with a glowing H.
-  const pad = f.p(0.95, 1.3, 36);
+  // Helipad sits on the middle of the ward roof, clear of the service core behind it.
+  const pad = f.p(0.64, 1.04, 36);
   g.ellipse(pad.x, pad.y, 15, 7.5).fill(shade(roof, 0.72));
   g.ellipse(pad.x, pad.y, 12.5, 6.2).fill(shade(roof, 0.86));
   g.ellipse(pad.x, pad.y, 10.5, 5.2).fill({ color: glow, alpha: 0.22 });
@@ -550,47 +571,52 @@ export function drawCyberGasPlant(g: Graphics, theme: Theme): void {
   lamp(g, boom.x, boom.y - 5, glow, 1.4);
 }
 
-/** Wind turbine: a lit mast with a glowing hub and a service ring at the foot. */
+/**
+ * Wind turbine: a lit mast with a glowing hub and a service ring at the foot.
+ *
+ * The sprite origin is the south corner of the lot. The ring sits on the centre of the diamond.
+ */
 export function drawCyberWindTurbine(g: Graphics, theme: Theme): void {
   const tower = color(theme, 'wind.tower');
   const blade = color(theme, 'wind.blade');
   const hubColor = color(theme, 'wind.hub');
   const glow = color(theme, 'wind.glow');
   const foot = color(theme, 'ground.bareLot');
+  const ground = -TILE_H / 2;
 
   // Service ring instead of a plain concrete pad.
-  g.ellipse(0, 0, 17, 8).fill(foot);
-  g.ellipse(0, 0, 13, 6).fill({ color: glow, alpha: 0.14 });
-  g.ellipse(0, 0, 13, 6).stroke({ width: 1.2, color: glow, alpha: 0.75 });
+  g.ellipse(0, ground, 17, 8).fill(foot);
+  g.ellipse(0, ground, 13, 6).fill({ color: glow, alpha: 0.14 });
+  g.ellipse(0, ground, 13, 6).stroke({ width: 1.2, color: glow, alpha: 0.75 });
 
   // Tapered mast with a lit spine down the leading edge.
   poly(
     g,
     [
-      { x: -7, y: 0 },
-      { x: 7, y: 0 },
-      { x: 3, y: -74 },
-      { x: -3, y: -74 },
+      { x: -7, y: ground },
+      { x: 7, y: ground },
+      { x: 3, y: ground - 74 },
+      { x: -3, y: ground - 74 },
     ],
     tower,
   );
   poly(
     g,
     [
-      { x: 0, y: 0 },
-      { x: 7, y: 0 },
-      { x: 3, y: -74 },
-      { x: 0, y: -74 },
+      { x: 0, y: ground },
+      { x: 7, y: ground },
+      { x: 3, y: ground - 74 },
+      { x: 0, y: ground - 74 },
     ],
     shade(tower, 0.8),
   );
-  g.rect(-0.6, -70, 1.6, 68).fill({ color: glow, alpha: 0.7 });
-  g.rect(-3, -11, 6, 11).fill(shade(tower, 0.68));
+  g.rect(-0.6, ground - 70, 1.6, 68).fill({ color: glow, alpha: 0.7 });
+  g.rect(-3, ground - 11, 6, 11).fill(shade(tower, 0.68));
 
-  // Nacelle, hub and the three blades.
-  const hub = { x: 0, y: -78 };
-  g.roundRect(hub.x - 9, hub.y - 5, 24, 10, 4).fill(shade(tower, 1.1));
-  g.rect(hub.x - 8, hub.y + 1, 22, 1.4).fill({ color: glow, alpha: 0.8 });
+  // Nacelle, hub and the three blades. The nacelle is centred on the mast.
+  const hub = { x: 0, y: ground - 78 };
+  g.roundRect(hub.x - 12, hub.y - 5, 24, 10, 4).fill(shade(tower, 1.1));
+  g.rect(hub.x - 11, hub.y + 1, 22, 1.4).fill({ color: glow, alpha: 0.8 });
   g.circle(hub.x, hub.y, 5.2).fill(hubColor);
   g.circle(hub.x - 1, hub.y - 1, 3).fill(shade(hubColor, 1.2));
   for (const [dx, dy] of [
@@ -649,39 +675,41 @@ export function drawCyberWaterPump(g: Graphics, theme: Theme): void {
   g.ellipse(filter.x, filter.y - 40, 6, 2.6).fill(tankTop);
   g.ellipse(filter.x, filter.y - 40, 3.6, 1.5).fill({ color: glow, alpha: 0.85 });
 
-  // Rising main from the pumphouse to the tank, lit as a conduit.
-  const riser = f.p(1.0, 1.24, 0);
-  g.rect(riser.x - 2.4, riser.y - 40, 4.8, 40).fill(pipe);
-  g.rect(riser.x - 1, riser.y - 38, 1.4, 36).fill({ color: glow, alpha: 0.8 });
-  g.rect(riser.x - 3.4, riser.y - 22, 6.8, 2.4).fill(shade(pipe, 0.75));
+  // Short rising main on the west edge of the tower's own tile, not a second column.
+  const riser = f.p(1.02, 1.5, 0);
+  g.rect(riser.x - 2.2, riser.y - 20, 4.4, 20).fill(pipe);
+  g.rect(riser.x - 0.9, riser.y - 18, 1.3, 16).fill({ color: glow, alpha: 0.8 });
+  g.rect(riser.x - 3.2, riser.y - 10, 6.4, 2.2).fill(shade(pipe, 0.75));
 
-  // Elevated tank on a braced frame, with a lit level column.
-  const centre = f.p(1.5, 1.26, 0);
-  const legTop = centre.y - 40;
-  for (const dx of [-13, -5, 5, 13]) {
-    g.rect(centre.x + dx - 1.6, legTop, 3.2, -legTop).fill(shade(frame, 0.86));
+  // Elevated tank on the centre of the front-east tile (u 1–2, v 1–2).
+  // Feet end at that ground point: a rect down to y = 0 would leave the tile.
+  const centre = f.p(1.5, 1.5, 0);
+  const legRise = 32;
+  const legTop = centre.y - legRise;
+  for (const dx of [-8, -3, 3, 8]) {
+    g.rect(centre.x + dx - 1.3, legTop, 2.6, legRise).fill(shade(frame, 0.86));
   }
-  g.moveTo(centre.x - 13, legTop)
-    .lineTo(centre.x + 13, centre.y - 4)
-    .stroke({ width: 1.6, color: shade(frame, 0.9) });
-  g.moveTo(centre.x + 13, legTop)
-    .lineTo(centre.x - 13, centre.y - 4)
-    .stroke({ width: 1.6, color: shade(frame, 0.9) });
-  g.rect(centre.x - 14, centre.y - 6, 28, 2.4).fill(shade(frame, 0.95));
+  g.moveTo(centre.x - 8, legTop)
+    .lineTo(centre.x + 8, centre.y - 2)
+    .stroke({ width: 1.5, color: shade(frame, 0.9) });
+  g.moveTo(centre.x + 8, legTop)
+    .lineTo(centre.x - 8, centre.y - 2)
+    .stroke({ width: 1.5, color: shade(frame, 0.9) });
+  g.rect(centre.x - 9, centre.y - 4, 18, 2).fill(shade(frame, 0.95));
 
-  g.rect(centre.x - 17, centre.y - 66, 34, 26).fill(shade(tank, 0.74));
-  g.rect(centre.x - 11, centre.y - 66, 22, 26).fill(tank);
-  g.rect(centre.x - 17, centre.y - 56, 34, 2.6).fill(shade(tank, 1.22));
-  g.rect(centre.x - 17, centre.y - 46, 34, 2.2).fill(shade(tank, 0.88));
-  g.ellipse(centre.x, centre.y - 66, 17, 6.5).fill(tankTop);
-  g.ellipse(centre.x - 3, centre.y - 67.5, 9, 3).fill(shade(tankTop, 1.18));
+  g.rect(centre.x - 10, centre.y - 52, 20, 20).fill(shade(tank, 0.74));
+  g.rect(centre.x - 6.5, centre.y - 52, 13, 20).fill(tank);
+  g.rect(centre.x - 10, centre.y - 45, 20, 2).fill(shade(tank, 1.22));
+  g.rect(centre.x - 10, centre.y - 38, 20, 1.6).fill(shade(tank, 0.88));
+  g.ellipse(centre.x, centre.y - 52, 10, 4).fill(tankTop);
+  g.ellipse(centre.x - 1.6, centre.y - 53, 5, 1.8).fill(shade(tankTop, 1.18));
   // Reservoir level: a bright column on the face of the drum.
-  g.rect(centre.x + 6, centre.y - 62, 3, 18).fill({ color: glow, alpha: 0.85 });
-  g.rect(centre.x + 6, centre.y - 62, 1.2, 18).fill(shade(glow, 1.4));
-  g.rect(centre.x - 3, centre.y - 72, 6, 5).fill(shade(frame, 0.9));
-  g.moveTo(centre.x + 12, centre.y - 4)
-    .lineTo(centre.x + 12, centre.y - 40)
-    .stroke({ width: 1.3, color: shade(frame, 1.05) });
+  g.rect(centre.x + 3.2, centre.y - 49, 2.2, 13).fill({ color: glow, alpha: 0.85 });
+  g.rect(centre.x + 3.2, centre.y - 49, 0.9, 13).fill(shade(glow, 1.4));
+  g.rect(centre.x - 2, centre.y - 57, 4, 4).fill(shade(frame, 0.9));
+  g.moveTo(centre.x + 7, centre.y - 2)
+    .lineTo(centre.x + 7, centre.y - 32)
+    .stroke({ width: 1.2, color: shade(frame, 1.05) });
 }
 
 /** Well: a water node — a lit borehole casing with a pump arm and a glowing sump. */
@@ -726,6 +754,126 @@ export function drawCyberWell(g: Graphics, theme: Theme): void {
   g.ellipse(head.x + 14.5, head.y - 10, 2.4, 1.1).fill({ color: glow, alpha: 0.5 });
 }
 
+/**
+ * Marina on a 3×3 lot. `side` is where the water is, matching `drawMarina`: 0 = +y, 1 = +x,
+ * 2 = -y, 3 = -x. The quay stays on that edge so the piers still meet it; the clubhouse, shed
+ * and flag are replaced by the same dark slabs and edge lights as the rest of the city.
+ */
+export function drawCyberMarina(g: Graphics, theme: Theme, side: number): void {
+  const f = new Frame(3);
+  const toGrid = (a: number, b: number): [number, number] => {
+    switch (side) {
+      case 1:
+        return [b, 3 - a];
+      case 2:
+        return [3 - a, 3 - b];
+      case 3:
+        return [3 - b, a];
+      default:
+        return [a, b];
+    }
+  };
+  const P = (a: number, b: number, z = 0): Point => {
+    const [u, v] = toGrid(a, b);
+    return f.p(u, v, z);
+  };
+  const R = (a0: number, b0: number, a1: number, b1: number): Rect => {
+    const [ua, va] = toGrid(a0, b0);
+    const [ub, vb] = toGrid(a1, b1);
+    return [Math.min(ua, ub), Math.min(va, vb), Math.max(ua, ub), Math.max(va, vb)];
+  };
+  const apron = color(theme, 'airport.apron');
+  const deck = color(theme, 'marina.pierWood');
+  const wall = color(theme, 'airport.terminalWall');
+  const roof = color(theme, 'airport.terminalRoof');
+  const glass = color(theme, 'marina.clubWindow');
+  const trim = color(theme, 'marina.flagCloth');
+  const steel = color(theme, 'substation.coil');
+  const towardWater = HEADINGS[[2, 0, 6, 4][side] ?? 2] as Point;
+
+  f.quad(g, 0.04, 0.04, 2.96, 2.96, apron);
+  f.quad(g, ...R(0.16, 1.55, 1.14, 2.24), color(theme, 'road.surface'));
+  for (const a of [0.34, 0.56, 0.78]) {
+    const from = P(a, 1.64);
+    const to = P(a, 2.08);
+    g.moveTo(from.x, from.y).lineTo(to.x, to.y).stroke({ width: 0.8, color: glass, alpha: 0.65 });
+  }
+
+  // Metal quay along the water, with a lit lip instead of timber planks.
+  f.quad(g, ...R(0, 2.38, 3, 3), deck);
+  f.trimAt(g, P(0.04, 2.96), P(2.96, 2.96), 1.4, 1.5, glass, 0.9);
+  const quay = P(0.04, 2.4);
+  const quayEnd = P(2.96, 2.4);
+  g.moveTo(quay.x, quay.y).lineTo(quayEnd.x, quayEnd.y).stroke({ width: 1.2, color: color(theme, 'marina.woodEdge') });
+
+  for (const a of [0.4, 1.5, 2.6]) {
+    const base = P(a, 2.68);
+    g.rect(base.x - 0.7, base.y - 7, 1.4, 7).fill(steel);
+    lamp(g, base.x, base.y - 7.4, glass, 1.05);
+  }
+
+  const items: { depth: number; draw: () => void }[] = [];
+  const add = (r: Rect, draw: () => void) => items.push({ depth: r[2] + r[3], draw });
+
+  const terminal = R(0.16, 0.18, 1.58, 1.28);
+  add(terminal, () => {
+    f.box(g, terminal, 0, 15, wall, roof, { color: glass, rows: 1 });
+    f.trimAt(g, f.p(terminal[0], terminal[3]), f.p(terminal[2], terminal[3]), 15, 1.6, trim, 0.95);
+    f.trimAt(g, f.p(terminal[2], terminal[3]), f.p(terminal[2], terminal[1]), 15, 1.6, trim, 0.95);
+    const tip = f.post(g, terminal[0] + 0.14, terminal[1] + 0.14, 16, steel, 1.15, 15);
+    lamp(g, tip.x, tip.y, glass, 1.25);
+  });
+
+  const hangar = R(1.78, 0.16, 2.84, 1.42);
+  add(hangar, () => {
+    f.box(g, hangar, 0, 12, shade(wall, 0.9), roof, { color: glass, rows: 1 });
+    f.trimAt(g, f.p(hangar[0], hangar[3]), f.p(hangar[2], hangar[3]), 12, 1.5, glass, 0.9);
+    f.trimAt(g, f.p(hangar[2], hangar[3]), f.p(hangar[2], hangar[1]), 12, 1.5, glass, 0.9);
+    // Lit bay on the face toward the water.
+    poly(
+      g,
+      [P(1.96, 1.42, 1), P(2.66, 1.42, 1), P(2.66, 1.42, 8), P(1.96, 1.42, 8)],
+      glass,
+      0.55,
+    );
+  });
+
+  const gantry = R(2.1, 1.68, 2.82, 2.28);
+  add(gantry, () => {
+    for (const [u, v] of [
+      [gantry[0], gantry[1]],
+      [gantry[2], gantry[1]],
+      [gantry[0], gantry[3]],
+      [gantry[2], gantry[3]],
+    ] as const) {
+      f.post(g, u, v, 12, steel, 1.3);
+    }
+    f.trimAt(g, f.p(gantry[0], gantry[3]), f.p(gantry[2], gantry[3]), 12, 1.4, glass, 0.9);
+    drawBoat(g, theme, P(2.46, 1.98, 5), towardWater, 'motor', theme.boats[0] as number, false, 0.85);
+  });
+
+  const rack = R(1.12, 1.68, 1.92, 2.26);
+  add(rack, () => {
+    for (const a of [1.32, 1.72]) {
+      const cradle = P(a, 2.0);
+      g.rect(cradle.x - 5, cradle.y - 1.2, 10, 1.4).fill(steel);
+      drawBoat(
+        g,
+        theme,
+        P(a, 2.0, 3),
+        towardWater,
+        a < 1.5 ? 'motor' : 'sail',
+        theme.boats[a < 1.5 ? 1 : 2] as number,
+        false,
+        0.8,
+      );
+    }
+  });
+
+  items.sort((a, b) => a.depth - b.depth);
+  for (const item of items) item.draw();
+}
+
 /** Dispatches a civic building to its cyberpunk drawing. */
 export function drawCyberCivic(g: Graphics, theme: Theme, kind: string): boolean {
   switch (kind) {
@@ -746,6 +894,50 @@ export function drawCyberCivic(g: Graphics, theme: Theme, kind: string): boolean
   }
 }
 
+/**
+ * Datacenter: a low hall, not a tower. Light strips run the length of the roof and a cooling
+ * block sits on the back corner. The classic renderer never asks for this silhouette.
+ */
+export function drawCyberDatacenter(g: Graphics, theme: Theme): void {
+  const f = new Frame(2);
+  const wall = color(theme, 'substation.wall');
+  const roof = color(theme, 'substation.roof');
+  const fiber = color(theme, 'infra.fiber');
+  const dark = color(theme, 'infra.fiberDark');
+
+  f.box(g, [0.12, 0.35, 1.88, 1.82], 0, 14, wall, roof);
+  f.trimAt(g, f.p(0.2, 1.82), f.p(1.8, 1.82), 6, 1.4, fiber, 0.95);
+  f.trimAt(g, f.p(0.2, 1.82), f.p(1.8, 1.82), 10, 1.1, fiber, 0.7);
+  f.trimAt(g, f.p(1.88, 0.5), f.p(1.88, 1.7), 8, 1.2, fiber, 0.85);
+
+  // Cooling block on the back of the hall, banded so it reads as plant rather than a tower.
+  f.box(g, [0.28, 0.42, 0.85, 0.95], 14, 8, shade(wall, 0.85), shade(roof, 1.1));
+  for (let k = 0; k < 3; k++) {
+    const u = 0.38 + k * 0.16;
+    f.line(g, f.p(u, 0.95), f.p(u, 0.98), 1.2, dark, 16, 0.9);
+  }
+  const vent = f.p(0.55, 0.68, 22);
+  g.circle(vent.x, vent.y, 3.2).fill({ color: fiber, alpha: 0.35 });
+  g.circle(vent.x, vent.y, 1.5).fill(fiber);
+
+  // Door lamp, so the hall has a front at a glance.
+  const door = f.p(1.35, 1.82, 4);
+  lamp(g, door.x, door.y, fiber, 1.2);
+}
+
+/** Edge node: a street cabinet with one lit spine. The classic renderer never draws it. */
+export function drawCyberEdgeNode(g: Graphics, theme: Theme): void {
+  const f = new Frame(1);
+  const wall = color(theme, 'substation.wall');
+  const roof = color(theme, 'substation.roof');
+  const fiber = color(theme, 'infra.fiber');
+
+  f.box(g, [0.28, 0.32, 0.72, 0.78], 0, 18, wall, roof);
+  f.trimAt(g, f.p(0.72, 0.4), f.p(0.72, 0.7), 8, 1.5, fiber, 0.95);
+  const tip = f.post(g, 0.5, 0.4, 8, shade(wall, 1.1), 1.4, 18);
+  lamp(g, tip.x, tip.y, fiber, 1.3);
+}
+
 /** Dispatches a utility building to its cyberpunk drawing. */
 export function drawCyberUtility(g: Graphics, theme: Theme, kind: string, _size: number): boolean {
   switch (kind) {
@@ -763,6 +955,12 @@ export function drawCyberUtility(g: Graphics, theme: Theme, kind: string, _size:
       return true;
     case 'well':
       drawCyberWell(g, theme);
+      return true;
+    case 'datacenter':
+      drawCyberDatacenter(g, theme);
+      return true;
+    case 'edgeNode':
+      drawCyberEdgeNode(g, theme);
       return true;
     default:
       return false;

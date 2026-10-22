@@ -23,6 +23,11 @@ export class World {
   readonly structure: Record<StructureLayer, Uint8Array>;
   readonly influence: Record<InfluenceLayer, Uint8Array>;
   readonly buildingId: Int32Array;
+  /**
+   * Neon data service, 0/1. Allocated for every city so the mirror can draw it, but omitted from
+   * classic snapshots so the classic hash does not grow a layer.
+   */
+  readonly linked: Uint8Array;
 
   private readonly dirtyFlags: Uint8Array;
   private dirtyList: number[] = [];
@@ -45,6 +50,7 @@ export class World {
       INFLUENCE_LAYERS.map((name) => [name, new Uint8Array(this.tileCount)]),
     ) as Record<InfluenceLayer, Uint8Array>;
     this.buildingId = new Int32Array(this.tileCount);
+    this.linked = new Uint8Array(this.tileCount);
     this.dirtyFlags = new Uint8Array(this.tileCount);
   }
 
@@ -209,9 +215,11 @@ export class World {
       road: (infra & Infra.Road) !== 0,
       powerLine: (infra & Infra.PowerLine) !== 0,
       waterPipe: (infra & Infra.Pipe) !== 0,
+      fiber: (infra & Infra.Fiber) !== 0,
       rubble: (infra & Infra.Rubble) !== 0,
       powered: s.powered[i] === 1,
       watered: s.watered[i] === 1,
+      linked: this.linked[i] === 1,
       fire: s.fire[i] as number,
       flood: s.flood[i] as number,
       pollution: inf.pollution[i] as number,

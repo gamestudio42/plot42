@@ -53,6 +53,8 @@ export const COLOR_TOKENS = [
   'infra.rubble',
   'infra.pipe',
   'infra.pipeDry',
+  'infra.fiber',
+  'infra.fiberDark',
   'infra.roadShadow',
   'infra.wire',
   'infra.wireCut',
@@ -61,6 +63,7 @@ export const COLOR_TOKENS = [
   // Thematic overlays.
   'overlay.powerOn',
   'overlay.waterOn',
+  'overlay.dataOn',
   'overlay.unserved',
   'overlay.heatLow',
   'overlay.heatMid',

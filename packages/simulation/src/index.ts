@@ -59,14 +59,18 @@ export {
   type IntrusionResult,
 } from './systems/neon/intrusion';
 export {
+  DRONE_LANE_CAP,
   droneCapacity,
   droneLanes,
   droneRelief,
+  droneRoadLanes,
+  longestDroneLane,
   portCount,
   type DroneLane,
 } from './systems/neon/airTraffic';
 export {
   neonCapacity,
+  neonData,
   neonMaxLevel,
   neonPower,
   neonWater,
@@ -86,6 +90,8 @@ export {
   type TrafficResult,
 } from './systems/traffic';
 export {
+  dataDemand,
+  dataSupply,
   powerDemand,
   powerSupply,
   pumpNearWater,

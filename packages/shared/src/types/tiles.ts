@@ -28,6 +28,8 @@ export const Infra = {
   PowerLine: 2,
   Pipe: 4,
   Rubble: 8,
+  /** Neon data network. Stays unset in a classic city, so the infra bytes do not change. */
+  Fiber: 16,
 } as const;
 export type InfraFlag = (typeof Infra)[keyof typeof Infra];
 
@@ -74,9 +76,13 @@ export interface Tile {
   road: boolean;
   powerLine: boolean;
   waterPipe: boolean;
+  /** Neon fiber tile. False in a classic city. */
+  fiber: boolean;
   rubble: boolean;
   powered: boolean;
   watered: boolean;
+  /** Neon data service. False in a classic city. */
+  linked: boolean;
   fire: number;
   flood: number;
   pollution: number;

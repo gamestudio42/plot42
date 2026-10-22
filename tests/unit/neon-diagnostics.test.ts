@@ -89,9 +89,20 @@ describe('neon diagnostics', () => {
   it('adds nothing when the neon hints are calm', () => {
     const e = neonTown();
     const found = codes(e, 20, 20, calm);
-    for (const code of ['HACKED', 'GRID_OVERLOAD', 'CORP_OWNED', 'NO_FIREWALL']) {
+    for (const code of ['HACKED', 'GRID_OVERLOAD', 'CORP_OWNED', 'NO_FIREWALL', 'NO_DATA']) {
       expect(found).not.toContain(code);
     }
+  });
+
+  it('reports a zoned lot that is not on the data network', () => {
+    const e = neonTown();
+    // Residential block north of the avenue. The town has water pipes and no fiber yet.
+    const found = codes(e, 10, 16, calm);
+    expect(found).toContain('NO_DATA');
+    const service = serviceOf(e);
+    expect(service).toBeDefined();
+    if (!service) return;
+    expect(codes(e, service.x, service.y, calm)).not.toContain('NO_DATA');
   });
 
   it('keeps the classic diagnostics free of neon codes', () => {
@@ -115,7 +126,7 @@ describe('neon diagnostics', () => {
       20,
       20,
     ).map((p) => p.code);
-    for (const code of ['HACKED', 'GRID_OVERLOAD', 'CORP_OWNED', 'NO_FIREWALL', 'DRONE_PORT']) {
+    for (const code of ['HACKED', 'GRID_OVERLOAD', 'CORP_OWNED', 'NO_FIREWALL', 'DRONE_PORT', 'NO_DATA']) {
       expect(found).not.toContain(code);
     }
   });

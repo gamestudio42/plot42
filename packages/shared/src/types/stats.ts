@@ -104,6 +104,8 @@ export interface CityStats {
     corporations: { count: number; holdings: number };
     /** Cash corporations moved out of the treasury. */
     skimmed: number;
+    /** Data network: bandwidth supply, demand and the share of consumers served. */
+    data: { supply: number; demand: number; served: number };
   };
 }
 
@@ -168,7 +170,8 @@ export type ProblemCode =
   | 'CORP_OWNED'
   | 'HACKED'
   | 'NO_FIREWALL'
-  | 'DRONE_PORT';
+  | 'DRONE_PORT'
+  | 'NO_DATA';
 
 export interface Problem {
   code: ProblemCode;

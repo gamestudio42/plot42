@@ -56,7 +56,8 @@ export interface SaveMeta {
 /** JSON form of `EngineSnapshot`: byte layers are base64 strings. */
 export type SaveState = Omit<EngineSnapshot, 'heights' | 'layers'> & {
   heights: string;
-  layers: Record<SnapshotLayer, string>;
+  /** `linked` is optional: classic cities omit it, and older neon saves load without it. */
+  layers: Record<SnapshotLayer, string> & { linked?: string };
 };
 
 export type SaveFile = SaveEnvelope<typeof SAVE_FORMAT, SaveMeta, SaveState>;
@@ -96,8 +97,9 @@ export function encodeSave(
   extra: Pick<SaveMeta, 'population' | 'funds' | 'savedAt'>,
   options: { format?: string } = {},
 ): SaveEnvelope<string, SaveMeta, SaveState> {
-  const layers = {} as Record<SnapshotLayer, string>;
+  const layers = {} as SaveState['layers'];
   for (const name of SNAPSHOT_LAYERS) layers[name] = bytesToBase64(snapshot.layers[name]);
+  if (snapshot.layers.linked) layers.linked = bytesToBase64(snapshot.layers.linked);
   const state: SaveState = {
     name: snapshot.name,
     ruleset: snapshot.ruleset ?? 'classic',
@@ -277,11 +279,15 @@ class Validator {
     if (rngState.every((x) => x === 0)) this.error('state.rng', 'all-zero generator state');
 
     const layersRaw = this.record(s.layers, 'state.layers');
-    const layers = {} as Record<SnapshotLayer, Uint8Array>;
+    const layers = {} as EngineSnapshot['layers'];
     for (const name of SNAPSHOT_LAYERS) {
       layers[name] = this.bytes(layersRaw[name], `state.layers.${name}`, tiles);
     }
+    if (layersRaw.linked !== undefined) {
+      layers.linked = this.bytes(layersRaw.linked, 'state.layers.linked', tiles);
+    }
     for (const name of Object.keys(layersRaw)) {
+      if (name === 'linked') continue;
       if (!(SNAPSHOT_LAYERS as readonly string[]).includes(name)) {
         this.error(`state.layers.${name}`, 'unknown layer');
       }
@@ -441,6 +447,7 @@ class Validator {
         variant: this.int(b.variant, `${path}.variant`, 0),
         powered: this.bool(b.powered, `${path}.powered`),
         watered: this.bool(b.watered, `${path}.watered`),
+        ...(b.linked === undefined ? {} : { linked: this.bool(b.linked, `${path}.linked`) }),
         offline: this.int(b.offline, `${path}.offline`, 0),
         attractiveness: this.num(b.attractiveness, `${path}.attractiveness`, 0, 1),
         ...(b.owner === undefined

@@ -31,6 +31,24 @@ function hackTown(seed = 'neon-hack'): SimulationEngine {
   return e;
 }
 
+/**
+ * An edge node beside a firewall. The node only counts once it is on the data network,
+ * so coverage tests place this after the node and before they expect a radius.
+ */
+function linkFirewall(e: SimulationEngine, x: number, y: number): void {
+  const spots: Array<[number, number]> = [
+    [x + 1, y],
+    [x - 1, y],
+    [x, y + 1],
+    [x, y - 1],
+  ];
+  for (const [sx, sy] of spots) {
+    if (sx < 0 || sy < 0) continue;
+    if (e.execute({ type: 'place', kind: 'edgeNode', x: sx, y: sy }).ok) return;
+  }
+  throw new Error(`no tile for an edge node beside the firewall at ${x},${y}`);
+}
+
 /** The corporate HQ, the service the intrusion pass can target. */
 function serviceOf(e: SimulationEngine): BuildingRecord | undefined {
   return [...e.buildings.values()].find(
@@ -86,6 +104,9 @@ describe('neon intrusions', () => {
       true,
     );
     e.refreshUtilities();
+    expect(firewallCoverage(e, service)).toBe(0);
+    linkFirewall(e, service.x, service.y + 3);
+    e.refreshUtilities();
     expect(firewallCoverage(e, service)).toBeGreaterThan(0);
     expect(firewallCoverage(e, service)).toBeLessThanOrEqual(1);
   });
@@ -96,6 +117,7 @@ describe('neon intrusions', () => {
     expect(service).toBeDefined();
     if (!service) return;
     e.execute({ type: 'place', kind: 'firewall', x: service.x, y: service.y + 3 });
+    linkFirewall(e, service.x, service.y + 3);
     e.refreshUtilities();
     const node = e.buildings.ofKind('firewall')[0];
     expect(node).toBeDefined();
@@ -114,6 +136,7 @@ describe('neon intrusions', () => {
     expect(e.execute({ type: 'place', kind: 'firewall', x: service.x + far, y: service.y }).ok).toBe(
       true,
     );
+    linkFirewall(e, service.x + far, service.y);
     e.refreshUtilities();
     expect(firewallCoverage(e, service)).toBe(0);
   });

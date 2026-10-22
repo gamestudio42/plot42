@@ -95,11 +95,16 @@ export function attractiveness(
   );
 }
 
-export function maxLevel(density: number, watered: boolean, neon = false): number {
+export function maxLevel(
+  density: number,
+  watered: boolean,
+  neon = false,
+  linked = true,
+): number {
   const z = BALANCE.zones;
   const cap = density === ZoneDensity.Dense ? z.maxLevelDense : z.maxLevelLight;
   const classic = watered ? cap : Math.min(cap, z.maxLevelWithoutWater);
-  return neon ? neonMaxLevel(density, watered, true, classic) : classic;
+  return neon ? neonMaxLevel(density, watered, true, classic, linked) : classic;
 }
 
 export interface GrowthContext {
@@ -171,6 +176,7 @@ export function updateGrowth(engine: SimulationEngine, ctx: GrowthContext): Grow
       variant: tileVariant(x, y),
       powered: true,
       watered: w.watered[i] === 1,
+      ...(neon ? { linked: w.linked[i] === 1 } : {}),
       offline: 0,
       attractiveness: Math.round(a * 1000) / 1000,
     });
@@ -238,7 +244,12 @@ function updateBuilding(
   );
 
   const neon = engine.ruleset === 'neon';
-  const cap = maxLevel(w.zoneDensity[i] as number, w.watered[i] === 1, neon);
+  const cap = maxLevel(
+    w.zoneDensity[i] as number,
+    w.watered[i] === 1,
+    neon,
+    neon && w.linked[i] === 1,
+  );
   const threshold = g.upgradeThresholds[b.level] ?? g.upgradeThresholds[g.upgradeThresholds.length - 1];
   if (
     b.level < cap &&

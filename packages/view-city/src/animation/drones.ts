@@ -1,16 +1,16 @@
-import { Infra, type BuildingRecord } from '@city/shared';
-import type { World } from '@city/simulation';
+import type { BuildingRecord } from '@city/shared';
+import { droneRoadLanes, longestDroneLane, type World } from '@city/simulation';
 import { headingIndex } from '../hubSprites';
 import type { Random } from './random';
 
 /**
- * Cosmetic aerial traffic: drones leaving online drone ports, following a corridor above the
- * road network and returning to land. The lane is derived from the road tiles beside the port,
- * exactly like the simulated relief, but nothing here feeds back into the simulation.
+ * Cosmetic aerial traffic: drones leaving online drone ports, each along its own road, and
+ * coming back to land. Departures use the marina cadence — a few craft, a pause at the far
+ * end — and nothing here feeds back into the simulation.
  */
 
-/** Drone cruising speed in tiles per game second. */
-export const DRONE_SPEED = 2.1;
+/** Drone cruising speed in tiles per game second, close to a marina boat's unhurried trip. */
+export const DRONE_SPEED = 1.1;
 
 /** Flight altitude above the street, in pixels. */
 export const DRONE_ALTITUDE = 34;
@@ -19,10 +19,11 @@ export const DRONE_ALTITUDE = 34;
 export const DRONE_MIN_ZOOM = 0.35;
 
 const CLIMB_SPEED = 26;
-const SPAWN_DELAY = { min: 0.55, max: 2.2 } as const;
-const TURN_DELAY = { min: 0.6, max: 2.2 } as const;
-const MAX_DRONES_PER_PORT = 4;
-const MAX_LANE = 14;
+/** Same gaps as marina boats: a departure every few seconds, then a pause before the return. */
+const SPAWN_DELAY = { min: 1.5, max: 5 } as const;
+const TURN_DELAY = { min: 1.5, max: 4 } as const;
+/** One drone per direction, and never more than a marina keeps boats alongside. */
+const MAX_DRONES_PER_PORT = 3;
 
 /** Most drones a single port keeps in the air; exported so tests track the real budget. */
 export const DRONES_PER_PORT = MAX_DRONES_PER_PORT;
@@ -51,6 +52,8 @@ export interface Drone {
   id: number;
   /** Port the drone belongs to; lanes are looked up by port, never by array index. */
   portId: number;
+  /** 0 east, 1 south, 2 west, 3 north. Two drones of one port never share a heading. */
+  heading: number;
   /** Tiles from the port along the lane. */
   t: number;
   phase: DronePhase;
@@ -75,32 +78,9 @@ export const SIDES = [
   { dx: 0, dy: -1 },
 ] as const;
 
-/** Longest straight run of road tiles leaving one side of the footprint, capped at `MAX_LANE`. */
+/** Straight road corridor a port's drones fly. Same run `longestDroneLane` reports. */
 export function laneOf(world: World, port: DronePort): DroneLane | null {
-  const starts = [
-    { x: port.x + port.w, y: port.y },
-    { x: port.x, y: port.y + port.h },
-    { x: port.x - 1, y: port.y },
-    { x: port.x, y: port.y - 1 },
-  ];
-  let best: DroneLane | null = null;
-  for (let k = 0; k < SIDES.length; k++) {
-    const side = SIDES[k] as (typeof SIDES)[number];
-    const start = starts[k] as { x: number; y: number };
-    let x = start.x;
-    let y = start.y;
-    let length = 0;
-    while (length < MAX_LANE && world.inBounds(x, y) && world.hasInfra(world.index(x, y), Infra.Road)) {
-      length++;
-      x += side.dx;
-      y += side.dy;
-    }
-    if (length === 0) continue;
-    if (!best || length > best.length) {
-      best = { portId: port.id, x: start.x, y: start.y, length, heading: k };
-    }
-  }
-  return best;
+  return longestDroneLane(world, port);
 }
 
 /**
@@ -133,9 +113,11 @@ export function dronePose(
 export class DroneTraffic {
   readonly drones: Drone[] = [];
   private ports: DronePort[] = [];
-  private lanes = new Map<number, DroneLane>();
+  /** Corridors long enough to fly, one per heading. */
+  private lanes = new Map<number, DroneLane[]>();
   private readonly timers = new Map<number, number>();
   private terrainVersion = -1;
+  private roadVersion = -1;
   private nextId = 1;
 
   constructor(private readonly random: Random) {}
@@ -148,24 +130,34 @@ export class DroneTraffic {
       if (!b.powered || b.offline > 0) continue;
       ports.push({ id: b.id, x: b.x, y: b.y, w: b.w, h: b.h });
     }
-    if (world.terrainVersion !== this.terrainVersion) {
+    // Roads bump `roadVersion`, not `terrainVersion`. A street extended after the port opens
+    // has to grow the corridor, or the drones keep flying the first stub they saw.
+    if (world.terrainVersion !== this.terrainVersion || world.roadVersion !== this.roadVersion) {
       this.terrainVersion = world.terrainVersion;
+      this.roadVersion = world.roadVersion;
       this.lanes.clear();
     }
     const live = new Set(ports.map((p) => p.id));
     for (const id of [...this.lanes.keys()]) if (!live.has(id)) this.lanes.delete(id);
     for (const port of ports) {
       if (this.lanes.has(port.id)) continue;
-      const lane = laneOf(world, port);
-      if (lane) this.lanes.set(port.id, lane);
+      const lanes = droneRoadLanes(world, port).filter((lane) => lane.length >= 2);
+      if (lanes.length > 0) this.lanes.set(port.id, lanes);
     }
     for (const id of [...this.timers.keys()]) if (!live.has(id)) this.timers.delete(id);
     this.ports = ports;
-    removeWhere(this.drones, (d) => !this.lanes.has(d.portId));
+    removeWhere(this.drones, (d) => !this.laneOf(d.portId, d.heading));
   }
 
-  laneOf(portId: number): DroneLane | undefined {
-    return this.lanes.get(portId);
+  /**
+   * A port's corridor. Without a heading, the longest run (the simulated lane). With one, the
+   * direction that drone is flying.
+   */
+  laneOf(portId: number, heading?: number): DroneLane | undefined {
+    const lanes = this.lanes.get(portId);
+    if (!lanes || lanes.length === 0) return undefined;
+    if (heading === undefined) return lanes.reduce((a, b) => (b.length > a.length ? b : a));
+    return lanes.find((lane) => lane.heading === heading);
   }
 
   portCount(): number {
@@ -177,16 +169,22 @@ export class DroneTraffic {
     for (const drone of this.drones) this.advance(drone, dt);
     removeWhere(this.drones, (d) => d.phase === 'land' && d.altitude <= 0);
 
-    for (const [portId, lane] of this.lanes) {
-      const active = this.drones.filter((d) => d.portId === portId && d.phase !== 'land').length;
-      if (active >= MAX_DRONES_PER_PORT || lane.length < 2) continue;
+    for (const [portId, lanes] of this.lanes) {
       const left = (this.timers.get(portId) ?? between(this.random, SPAWN_DELAY)) - dt;
       this.timers.set(portId, left);
       if (left > 0) continue;
       this.timers.set(portId, between(this.random, SPAWN_DELAY));
+      const busy = new Set(
+        this.drones.filter((d) => d.portId === portId).map((d) => d.heading),
+      );
+      if (busy.size >= MAX_DRONES_PER_PORT) continue;
+      const free = lanes.filter((lane) => !busy.has(lane.heading));
+      const lane = free[Math.floor(this.random() * free.length)];
+      if (!lane) continue;
       this.drones.push({
         id: this.nextId++,
         portId,
+        heading: lane.heading,
         t: 0,
         phase: 'climb',
         timer: 0,
@@ -196,7 +194,7 @@ export class DroneTraffic {
   }
 
   private advance(drone: Drone, dt: number): void {
-    const lane = this.laneOf(drone.portId);
+    const lane = this.laneOf(drone.portId, drone.heading);
     if (!lane) {
       drone.phase = 'land';
       drone.altitude = 0;

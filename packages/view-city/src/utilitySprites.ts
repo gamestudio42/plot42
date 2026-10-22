@@ -1,5 +1,6 @@
 import type { Graphics } from 'pixi.js';
 import { color, shade, type Theme } from '@theme/core';
+import { TILE_H } from './iso';
 import { Frame, poly } from './isoFrame';
 
 /**
@@ -153,42 +154,48 @@ export function drawGasPlant(g: Graphics, theme: Theme, size: number): void {
   void size;
 }
 
-/** Wind turbine (1×1): a tapered tower with a nacelle and three blades. */
+/**
+ * Wind turbine (1×1): a tapered tower with a nacelle and three blades.
+ *
+ * Building sprites are anchored on the south corner of the footprint. The mast stands on the
+ * centre of that diamond, half a tile up-screen from the corner.
+ */
 export function drawWindTurbine(g: Graphics, theme: Theme): void {
   const tower = color(theme, 'wind.tower');
   const blade = color(theme, 'wind.blade');
   const hubColor = color(theme, 'wind.hub');
   const foot = color(theme, 'ground.bareLot');
+  const ground = -TILE_H / 2;
 
   // Concrete pad.
-  g.ellipse(0, 0, 17, 8).fill(foot);
+  g.ellipse(0, ground, 17, 8).fill(foot);
   // Tapered tower, drawn as a trapezoid so it does not read as a lamppost.
   poly(
     g,
     [
-      { x: -7, y: 0 },
-      { x: 7, y: 0 },
-      { x: 3, y: -74 },
-      { x: -3, y: -74 },
+      { x: -7, y: ground },
+      { x: 7, y: ground },
+      { x: 3, y: ground - 74 },
+      { x: -3, y: ground - 74 },
     ],
     tower,
   );
   poly(
     g,
     [
-      { x: 0, y: 0 },
-      { x: 7, y: 0 },
-      { x: 3, y: -74 },
-      { x: 0, y: -74 },
+      { x: 0, y: ground },
+      { x: 7, y: ground },
+      { x: 3, y: ground - 74 },
+      { x: 0, y: ground - 74 },
     ],
     shade(tower, 0.8),
   );
   // Service door at the base.
-  g.rect(-3, -11, 6, 11).fill(shade(tower, 0.68));
+  g.rect(-3, ground - 11, 6, 11).fill(shade(tower, 0.68));
 
-  // Nacelle, hub and the three blades.
-  const hub = { x: 0, y: -78 };
-  g.roundRect(hub.x - 9, hub.y - 5, 24, 10, 4).fill(shade(tower, 1.1));
+  // Nacelle, hub and the three blades. The nacelle is centred on the mast.
+  const hub = { x: 0, y: ground - 78 };
+  g.roundRect(hub.x - 12, hub.y - 5, 24, 10, 4).fill(shade(tower, 1.1));
   g.circle(hub.x, hub.y, 5.2).fill(hubColor);
   g.circle(hub.x - 1, hub.y - 1, 3).fill(shade(hubColor, 1.2));
   for (const [dx, dy] of [

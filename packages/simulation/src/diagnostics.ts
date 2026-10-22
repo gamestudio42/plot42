@@ -1,6 +1,7 @@
 import {
   BALANCE,
   Infra,
+  NEON_DATA,
   PLACEABLE_SPECS,
   ZoneDensity,
   ZoneType,
@@ -85,6 +86,9 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
     const spec = PLACEABLE_SPECS[building.kind];
     const needsPower = spec.powerUse > 0;
     if (needsPower && !building.powered) add(powerProblem(ctx), 3);
+    if (neon && (building.kind === 'firewall' || building.kind === 'dronePort') && w.linked[i] !== 1) {
+      add('NO_DATA', 2);
+    }
     if (spec.requiresRoad) {
       const roads = ctx.roads ?? new RoadNetwork(w);
       roads.update();
@@ -121,9 +125,15 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
 
   const density = w.zoneDensity[i] as number;
   const watered = w.watered[i] === 1;
+  const neonCity = neon !== undefined;
+  const linked = w.linked[i] === 1;
   if (!watered && density === ZoneDensity.Dense) {
     const capped = building ? building.level >= BALANCE.zones.maxLevelWithoutWater : false;
     add('NO_WATER_FOR_LEVEL', capped ? 2 : 1);
+  }
+  if (neonCity && !linked) {
+    const capped = building ? building.level >= NEON_DATA.maxLevelWithoutData : false;
+    add('NO_DATA', capped ? 2 : 1);
   }
 
   const inf = w.influence;
@@ -144,7 +154,11 @@ export function diagnoseTile(ctx: DiagnoseContext, x: number, y: number): Proble
     else if (traffic >= THRESHOLDS.congestion.minor) add('CONGESTION', 1);
   }
 
-  if (building && !building.abandoned && building.level >= maxLevel(density, watered)) {
+  if (
+    building &&
+    !building.abandoned &&
+    building.level >= maxLevel(density, watered, neonCity, linked)
+  ) {
     add('MAX_LEVEL', 0);
   }
   if (!problems.some((p) => p.severity >= 2)) add('GROWING', 0);

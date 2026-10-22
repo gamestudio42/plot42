@@ -551,17 +551,11 @@ describe('hub traffic', () => {
 });
 
 describe('drone traffic', () => {
-  /** A flat engine with a road running east of a 2×2 drone port, ready to spawn a lane. */
-  function airportEngine() {
-    const e = flatEngine(32);
-    const w = e.world;
-    for (let x = 12; x <= 23; x++) {
-      w.infra[w.index(x, 11)] = (w.infra[w.index(x, 11)] as number) | Infra.Road;
-    }
-    const port = e.buildings.add({
+  function placeDronePort(e: ReturnType<typeof flatEngine>, x: number, y: number) {
+    return e.buildings.add({
       kind: 'dronePort',
-      x: 10,
-      y: 11,
+      x,
+      y,
       w: 2,
       h: 2,
       level: 1,
@@ -577,6 +571,16 @@ describe('drone traffic', () => {
       offline: 0,
       attractiveness: 0,
     });
+  }
+
+  /** A flat engine with a road running east of a 2×2 drone port, ready to spawn a lane. */
+  function airportEngine() {
+    const e = flatEngine(32);
+    const w = e.world;
+    for (let x = 12; x <= 23; x++) {
+      w.infra[w.index(x, 11)] = (w.infra[w.index(x, 11)] as number) | Infra.Road;
+    }
+    const port = placeDronePort(e, 10, 11);
     return { e, portId: port.id };
   }
 
@@ -608,7 +612,7 @@ describe('drone traffic', () => {
       for (const drone of traffic.drones) {
         seen.add(drone.phase);
         expect(drone.altitude).toBeLessThanOrEqual(DRONE_ALTITUDE);
-        const lane = traffic.laneOf(drone.portId);
+        const lane = traffic.laneOf(drone.portId, drone.heading);
         if (!lane) continue;
         const pose = dronePose(drone, lane);
         expect(pose.x).toBeGreaterThanOrEqual(10);
@@ -628,7 +632,13 @@ describe('drone traffic', () => {
     expect(lane).toBeDefined();
 
     const at = 4;
-    const base = { id: 1, portId: lane!.portId, timer: 0, altitude: DRONE_ALTITUDE };
+    const base = {
+      id: 1,
+      portId: lane!.portId,
+      heading: lane!.heading,
+      timer: 0,
+      altitude: DRONE_ALTITUDE,
+    };
     const out = dronePose({ ...base, t: at, phase: 'outbound' }, lane!);
     // Inbound measures `t` from the far end, so this is the same distance along the corridor.
     const back = dronePose({ ...base, t: lane!.length - at, phase: 'inbound' }, lane!);
@@ -638,6 +648,70 @@ describe('drone traffic', () => {
     const side = SIDES[lane!.heading]!;
     expect((out.x + back.x) / 2).toBeCloseTo(lane!.x + side.dx * at + 0.5, 6);
     expect((out.y + back.y) / 2).toBeCloseTo(lane!.y + side.dy * at + 0.5, 6);
+  });
+
+  it('flies the avenue beside the port instead of stepping one tile off it', () => {
+    const e = flatEngine(32);
+    const w = e.world;
+    for (let x = 4; x <= 28; x++) w.setInfra(w.index(x, 10), Infra.Road, true);
+    const port = placeDronePort(e, 14, 11);
+    // The street runs east-west along the north side. The old corner step walked north, off
+    // the avenue, and stopped after a single tile — too short to launch.
+    expect(laneOf(w, { id: port.id, x: 14, y: 11, w: 2, h: 2 })).toEqual({
+      portId: port.id,
+      x: 14,
+      y: 10,
+      length: 14,
+      heading: 0,
+    });
+
+    const traffic = new DroneTraffic(createRandom(4));
+    traffic.setPorts(w, e.buildings.values());
+    for (let k = 0; k < 100; k++) traffic.step(0.1);
+    expect(traffic.drones.length).toBeGreaterThan(0);
+    // East and west are both open, and only one drone takes each of them.
+    const headings = traffic.drones.map((d) => d.heading);
+    expect(new Set(headings).size).toBe(headings.length);
+  });
+
+  it('launches on a two-tile street and lengthens the lane when that street grows', () => {
+    const e = flatEngine(32);
+    const w = e.world;
+    w.setInfra(w.index(12, 10), Infra.Road, true);
+    w.setInfra(w.index(13, 10), Infra.Road, true);
+    const port = placeDronePort(e, 12, 11);
+    const traffic = new DroneTraffic(createRandom(2));
+    traffic.setPorts(w, e.buildings.values());
+    expect(traffic.laneOf(port.id)).toEqual({ portId: port.id, x: 12, y: 10, length: 2, heading: 0 });
+    for (let k = 0; k < 100; k++) traffic.step(0.1);
+    expect(traffic.drones.length).toBeGreaterThan(0);
+
+    for (let x = 14; x <= 22; x++) w.setInfra(w.index(x, 10), Infra.Road, true);
+    traffic.setPorts(w, e.buildings.values());
+    expect(traffic.laneOf(port.id)?.length).toBe(11);
+  });
+
+  it('sends each drone a different way and keeps at most three in the air', () => {
+    const e = flatEngine(32);
+    const w = e.world;
+    for (let x = 8; x <= 24; x++) w.setInfra(w.index(x, 10), Infra.Road, true);
+    for (let y = 4; y <= 20; y++) w.setInfra(w.index(10, y), Infra.Road, true);
+    placeDronePort(e, 11, 11);
+    const traffic = new DroneTraffic(createRandom(5));
+    traffic.setPorts(w, e.buildings.values());
+    const seen = new Set<number>();
+    let maxActive = 0;
+    for (let k = 0; k < 400; k++) {
+      traffic.step(0.1);
+      const active = traffic.drones.filter((d) => d.phase !== 'land');
+      maxActive = Math.max(maxActive, active.length);
+      const live = new Set(active.map((d) => d.heading));
+      expect(live.size).toBe(active.length);
+      for (const drone of active) seen.add(drone.heading);
+    }
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(DRONES_PER_PORT);
+    expect(seen.size).toBeGreaterThan(1);
   });
 
   it('drops drones of a port that goes offline', () => {

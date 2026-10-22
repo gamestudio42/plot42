@@ -6,8 +6,10 @@ export function hashSnapshot(snapshot: EngineSnapshot): string {
   const h = new Fnv1a();
   h.bytes(snapshot.heights);
   for (const name of Object.keys(snapshot.layers).sort()) {
+    const layer = snapshot.layers[name as keyof EngineSnapshot['layers']];
+    if (!layer) continue;
     h.string(name);
-    h.bytes(snapshot.layers[name as keyof EngineSnapshot['layers']]);
+    h.bytes(layer);
   }
   const { heights: _h, layers: _l, ...rest } = snapshot;
   // Key order is not state: a decoded save may build its objects in a different order.

@@ -22,6 +22,14 @@ type Copy = {
   hacked: string;
   corpOwned: string;
   droneLane: string;
+  fiber: string;
+  datacenter: string;
+  edgeNode: string;
+  fiberHint: string;
+  datacenterHint: string;
+  edgeNodeHint: string;
+  dataMap: string;
+  noData: string;
 };
 
 const EN: Copy = {
@@ -40,6 +48,14 @@ const EN: Copy = {
   hacked: 'Hacked',
   corpOwned: 'Corporate lot',
   droneLane: 'Drone lane',
+  fiber: 'Fiber trunk',
+  datacenter: 'Datacenter',
+  edgeNode: 'Edge node',
+  fiberHint: 'Drag a trunk, the way you lay a pipe. The underground view comes on.',
+  datacenterHint: 'Feeds the data network. Full output needs power and cooling water.',
+  edgeNodeHint: 'A small feed for the first block. Needs power, not water.',
+  dataMap: 'Data',
+  noData: 'No data link: growth stops at level 2.',
 };
 
 const PT: Copy = {
@@ -58,6 +74,14 @@ const PT: Copy = {
   hacked: 'Invadido',
   corpOwned: 'Lote corporativo',
   droneLane: 'Rota de drones',
+  fiber: 'Tronco de fibra',
+  datacenter: 'Datacenter',
+  edgeNode: 'Nó de borda',
+  fiberHint: 'Arraste o tronco como um cano. A vista subterrânea liga.',
+  datacenterHint: 'Alimenta a rede de dados. A capacidade cheia precisa de energia e de água para resfriar.',
+  edgeNodeHint: 'Uma fonte pequena para o primeiro quarteirão. Precisa de energia, não de água.',
+  dataMap: 'Dados',
+  noData: 'Sem link de dados: o crescimento para no nível 2.',
 };
 
 const ES: Copy = {
@@ -76,6 +100,14 @@ const ES: Copy = {
   hacked: 'Hackeado',
   corpOwned: 'Solar corporativo',
   droneLane: 'Ruta de drones',
+  fiber: 'Troncal de fibra',
+  datacenter: 'Centro de datos',
+  edgeNode: 'Nodo de borde',
+  fiberHint: 'Arrastra la troncal como una tubería. La vista subterránea se activa.',
+  datacenterHint: 'Alimenta la red de datos. La capacidad plena necesita energía y agua para enfriar.',
+  edgeNodeHint: 'Una fuente pequeña para la primera manzana. Necesita energía, no agua.',
+  dataMap: 'Datos',
+  noData: 'Sin enlace de datos: el crecimiento se detiene en el nivel 2.',
 };
 
 const FR: Copy = {
@@ -94,6 +126,14 @@ const FR: Copy = {
   hacked: 'Piraté',
   corpOwned: 'Lot corporatif',
   droneLane: 'Couloir de drones',
+  fiber: 'Tronc de fibre',
+  datacenter: 'Centre de données',
+  edgeNode: 'Nœud de bord',
+  fiberHint: 'Tracez le tronc comme une canalisation. La vue souterraine s’active.',
+  datacenterHint: 'Alimente le réseau de données. Le plein débit a besoin d’énergie et d’eau pour le refroidissement.',
+  edgeNodeHint: 'Une petite source pour le premier pâté. A besoin d’énergie, pas d’eau.',
+  dataMap: 'Données',
+  noData: 'Pas de lien de données : la croissance s’arrête au niveau 2.',
 };
 
 const DE: Copy = {
@@ -112,6 +152,14 @@ const DE: Copy = {
   hacked: 'Gehackt',
   corpOwned: 'Konzerngrundstück',
   droneLane: 'Drohnenroute',
+  fiber: 'Glasfaserstamm',
+  datacenter: 'Rechenzentrum',
+  edgeNode: 'Randknoten',
+  fiberHint: 'Ziehen Sie den Stamm wie eine Leitung. Die Untergrundansicht geht an.',
+  datacenterHint: 'Speist das Datennetz. Volle Leistung braucht Strom und Kühlwasser.',
+  edgeNodeHint: 'Eine kleine Quelle für das erste Viertel. Braucht Strom, kein Wasser.',
+  dataMap: 'Daten',
+  noData: 'Keine Datenverbindung: Wachstum stoppt bei Stufe 2.',
 };
 
 const COPY: Record<Locale, Copy> = {
@@ -132,6 +180,18 @@ export function applyNeonCopy(locale: Locale): void {
       subtitle: copy.subtitle,
       defaultCityName: copy.defaultCityName,
     },
+    tools: {
+      fiber: copy.fiber,
+      datacenter: copy.datacenter,
+      edgeNode: copy.edgeNode,
+    },
+    toolHints: {
+      fiber: copy.fiberHint,
+      datacenter: copy.datacenterHint,
+      edgeNode: copy.edgeNodeHint,
+    },
+    overlays: { data: copy.dataMap },
+    problems: { NO_DATA: copy.noData },
   });
 }
 

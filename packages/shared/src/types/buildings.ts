@@ -20,6 +20,8 @@ export const PLACEABLE_KINDS = [
   'firewall',
   'dronePort',
   'corpHQ',
+  'datacenter',
+  'edgeNode',
 ] as const;
 export type PlaceableKind = (typeof PLACEABLE_KINDS)[number];
 
@@ -30,6 +32,8 @@ export const NEON_PLACEABLE_KINDS = [
   'firewall',
   'dronePort',
   'corpHQ',
+  'datacenter',
+  'edgeNode',
 ] as const;
 export type NeonPlaceableKind = (typeof NEON_PLACEABLE_KINDS)[number];
 
@@ -60,6 +64,11 @@ export interface BuildingRecord {
   variant: number;
   powered: boolean;
   watered: boolean;
+  /**
+   * On the neon data network. Absent in a classic city so the serialized building does not
+   * gain a key the classic hash has never contained.
+   */
+  linked?: boolean;
   /** Ticks remaining while a plant is offline (blackout event). */
   offline: number;
   /** Last computed attractiveness 0..1, for diagnostics. */

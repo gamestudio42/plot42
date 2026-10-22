@@ -91,7 +91,7 @@ interface WaterGlints {
 }
 
 /**
- * Cosmetic animation: cars, fire engines, chimney smoke, water glints, boats and planes. Reads
+ * Cosmetic animation: cars, fire engines, chimney smoke, water glints, boats, planes and drones. Reads
  * the mirror world and never changes it; motion runs on game time, so it stops while paused.
  */
 export class AnimationLayer {
@@ -511,15 +511,13 @@ export class AnimationLayer {
   private syncDrones(world: World, show: boolean, alpha: number): void {
     const live = new Set<number>();
     for (const drone of this.aerial.drones) {
-      const lane = this.aerial.laneOf(drone.portId);
+      const lane = this.aerial.laneOf(drone.portId, drone.heading);
       if (!lane) continue;
       live.add(drone.id);
       const pose = dronePose(drone, lane);
-      const ground = vertexToScreen(
-        pose.x,
-        pose.y,
-        world.elevation(Math.floor(pose.x), Math.floor(pose.y)),
-      );
+      const tx = Math.min(world.size - 1, Math.max(0, Math.floor(pose.x)));
+      const ty = Math.min(world.size - 1, Math.max(0, Math.floor(pose.y)));
+      const ground = vertexToScreen(pose.x, pose.y, world.elevation(tx, ty));
       let s = this.droneSprites.get(drone.id);
       if (!s) {
         const tex = this.factory.drone(0);

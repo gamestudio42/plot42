@@ -86,6 +86,26 @@ describe('neon save envelope', () => {
     if (!decoded.ok) return;
     expect(decoded.snapshot.ruleset).toBe('classic');
     expect(decoded.snapshot.neon).toBeUndefined();
+    expect(decoded.snapshot.layers.linked).toBeUndefined();
+    for (const b of decoded.snapshot.buildings) expect('linked' in b).toBe(false);
+  });
+
+  it('loads a neon file that predates the data layer', () => {
+    const e = neonCity();
+    e.execute({ type: 'fiber', x0: 4, y0: 14, x1: 12, y1: 14 });
+    e.refreshUtilities();
+    const snap = e.serialize();
+    expect(snap.layers.linked).toBeDefined();
+    delete snap.layers.linked;
+    snap.networksDirty = false;
+    const file = encodeSave(snap, meta, neonOptions);
+    const decoded = decodeSave(stringifySave(file), neonOptions);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.snapshot.layers.linked).toBeUndefined();
+    const restored = SimulationEngine.fromSnapshot(decoded.snapshot);
+    expect(restored.networksDirty).toBe(true);
+    expect(restored.world.linked[restored.world.index(8, 14)]).toBe(0);
   });
 
   it('restores an identical city after a save and load cycle', () => {

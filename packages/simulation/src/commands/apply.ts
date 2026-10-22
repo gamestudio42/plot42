@@ -34,6 +34,9 @@ export function applyToolPlan(
     case 'pipe':
       for (const i of plan.valid) w.setInfra(i, Infra.Pipe, true);
       break;
+    case 'fiber':
+      for (const i of plan.valid) w.setInfra(i, Infra.Fiber, true);
+      break;
     case 'zone':
       for (const i of plan.valid) {
         w.setLayer('zone', i, command.zone);
@@ -65,6 +68,9 @@ export function applyToolPlan(
           case DemolishOp.Pipe:
             w.setInfra(i, Infra.Pipe, false);
             break;
+          case DemolishOp.Fiber:
+            w.setInfra(i, Infra.Fiber, false);
+            break;
           default:
             break;
         }
@@ -89,6 +95,7 @@ export function applyToolPlan(
         variant: tileVariant(command.x, command.y),
         powered: false,
         watered: false,
+        ...(engine.ruleset === 'neon' ? { linked: false } : {}),
         offline: 0,
         attractiveness: 0,
       });
