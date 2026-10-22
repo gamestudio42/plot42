@@ -35,7 +35,8 @@ export default defineConfig({
     },
     {
       // The lobby spec runs against the assembled static site, not the Urbe dev build.
-      command: `pnpm build:site && pnpm exec vite preview --outDir site --port 4180 --strictPort`,
+      // Vite lives in the app packages, not at the workspace root, so call it from one of them.
+      command: `pnpm build:site && pnpm --filter @plot42/lobby exec vite preview --outDir ../../site --port 4180 --strictPort`,
       port: 4180,
       reuseExistingServer: !process.env.CI,
       timeout: 300_000,

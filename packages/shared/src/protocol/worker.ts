@@ -44,16 +44,29 @@ export type ToWorkerMessage =
   | { type: 'hash'; id: number }
   /** Encodes the current city as a save file (the host supplies the timestamp). */
   | { type: 'exportSave'; id: number; savedAt: string }
-  /** Decodes and validates a save; on success it replaces the current city. */
-  | { type: 'importSave'; id: number; text: string }
+  /**
+   * Decodes and validates a save; on success it replaces the current city. The envelope format
+   * travels with the message because the import can happen before any city exists, when the worker
+   * has not learned the ruleset yet.
+   */
+  | { type: 'importSave'; id: number; text: string; saveFormat?: string }
   /**
    * Builds the scripted city shown behind the main menu, simulating `months` months up front
-   * (reports `demoProgress`, then `init`), and keeps it running at normal speed.
+   * (reports `demoProgress`, then `init`), and keeps it running at normal speed. The ruleset and
+   * the envelope format travel with the message, because this city can be exported before any
+   * `newCity` call teaches the worker which format the app uses.
    */
-  | { type: 'demoCity'; seed: string; size: number; months: number };
+  | { type: 'demoCity'; seed: string; size: number; months: number; ruleset?: 'classic' | 'neon'; saveFormat?: string };
 
 export type LoadResult =
-  { ok: true; meta: SaveMeta; migratedFrom: number | null } | { ok: false; errors: SaveError[] };
+  | {
+      ok: true;
+      meta: SaveMeta;
+      migratedFrom: number | null;
+      /** Rules the loaded city runs under, taken from the file itself. */
+      ruleset: 'classic' | 'neon';
+    }
+  | { ok: false; errors: SaveError[] };
 
 export interface FullState {
   size: number;

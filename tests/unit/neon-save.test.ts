@@ -53,14 +53,23 @@ describe('neon save envelope', () => {
     expect(decoded.snapshot.neon?.corporations).toEqual(corps);
   });
 
-  it('refuses a classic envelope when asked for the neon format', () => {
+  it('opens a classic city in Neo Urbe and keeps it classic', () => {
     const e = createEngine({
       seed: 'classic',
       size: 48,
       terrain: { flat: true, water: 0, hills: 0, forest: 0, rivers: 0 },
     });
     const file = encodeSave(e.serialize(), meta);
+    // The decoder accepts the known Plot 42 formats, so the file opens...
     const decoded = decodeSave(stringifySave(file), neonOptions);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    // ...and the file's own ruleset decides how the city runs, not the app that opened it.
+    expect(decoded.snapshot.ruleset).toBe('classic');
+  });
+
+  it('rejects a file that is not a Plot 42 save', () => {
+    const decoded = decodeSave(stringifySave({ format: 'something-else', state: {} }), neonOptions);
     expect(decoded.ok).toBe(false);
   });
 

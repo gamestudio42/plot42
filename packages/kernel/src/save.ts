@@ -31,6 +31,11 @@ export interface DecodeEnvelopeOptions {
   format: string;
   currentVersion: number;
   migrations?: Readonly<Record<number, SaveMigration>>;
+  /**
+   * Additional envelope formats the decoder accepts. A file whose format is in this list is
+   * decoded even when it differs from `format`, so one game can open the other's saves.
+   */
+  acceptFormats?: readonly string[];
 }
 
 export type DecodeEnvelopeResult =
@@ -92,7 +97,11 @@ export function decodeEnvelope(text: string, options: DecodeEnvelopeOptions): De
   } catch (error) {
     return saveFail('NOT_JSON', error instanceof Error ? error.message : undefined);
   }
-  if (!isRecord(raw) || raw.format !== options.format || !isRecord(raw.state)) {
+  if (!isRecord(raw) || !isRecord(raw.state)) {
+    return saveFail('NOT_A_SAVE');
+  }
+  const accepted = options.acceptFormats ?? [];
+  if (raw.format !== options.format && !accepted.includes(raw.format as string)) {
     return saveFail('NOT_A_SAVE');
   }
   const version = raw.version;

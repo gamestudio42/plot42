@@ -185,11 +185,17 @@ scope.onmessage = (event) => {
         break;
       }
       case 'importSave': {
-        const decoded = decodeSave(message.text, { format: saveFormat });
+        // The host may know the ruleset before any city exists, so the format can arrive with the
+        // message. The decoder accepts every known Plot 42 format and the file's own `ruleset`
+        // decides which rules the loaded city runs under.
+        const decoded = decodeSave(message.text, { format: message.saveFormat ?? saveFormat });
         if (!decoded.ok) {
           post({ type: 'loadResult', id: message.id, result: decoded });
           break;
         }
+        // From now on this app writes in the same format the file used.
+        saveFormat =
+          decoded.snapshot.ruleset === 'neon' ? NEON_SAVE_FORMAT : SAVE_FORMAT;
         engine = SimulationEngine.fromSnapshot(decoded.snapshot);
         // Loaded cities start paused so the restored state is exactly the saved one.
         clock.setSpeed(0);
@@ -198,7 +204,12 @@ scope.onmessage = (event) => {
         post({
           type: 'loadResult',
           id: message.id,
-          result: { ok: true, meta: decoded.meta, migratedFrom: decoded.migratedFrom },
+          result: {
+            ok: true,
+            meta: decoded.meta,
+            migratedFrom: decoded.migratedFrom,
+            ruleset: engine.ruleset,
+          },
         });
         break;
       }
@@ -214,6 +225,8 @@ scope.onmessage = (event) => {
           }
         }
         engine = run.engine;
+        // The menu city belongs to the app's ruleset, so its save carries the matching format.
+        saveFormat = message.saveFormat ?? formatFor(message.ruleset);
         clock.setSpeed(1);
         clock.reset();
         post({ type: 'init', state: fullState(engine) });

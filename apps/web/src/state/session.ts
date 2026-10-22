@@ -1,6 +1,8 @@
 import {
+  NEON_SAVE_FORMAT,
   PLACEABLE_KINDS,
   PLACEABLE_SPECS,
+  SAVE_FORMAT,
   type CityStats,
   type Command,
   type CommandResult,
@@ -201,8 +203,16 @@ export class GameSession {
 
   /** Seed of the scripted city behind the main menu. */
   readonly menuSeed: string;
-  /** Rules every city created by this app runs; the save file still decides when loading. */
-  readonly ruleset: 'classic' | 'neon';
+  /**
+   * Rules the current city runs under. It starts as the app's own ruleset and follows the file
+   * when a save is loaded, so opening a classic city in Neo Urbe shows classic panels.
+   */
+  ruleset: 'classic' | 'neon';
+
+  /** Envelope format this app reads and writes; Neo Urbe and Urbe never share a file. */
+  saveFormat(): string {
+    return this.ruleset === 'neon' ? NEON_SAVE_FORMAT : SAVE_FORMAT;
+  }
 
   /**
    * Starts the renderer, wires input and builds the live city behind the main menu. The boot
@@ -227,7 +237,13 @@ export class GameSession {
       this.setBoot('city', GRAPHICS_SHARE);
       try {
         await this.client.demoCity(
-          { seed: this.menuSeed, size: MENU_CITY.size, months: MENU_CITY.months },
+          {
+            seed: this.menuSeed,
+            size: MENU_CITY.size,
+            months: MENU_CITY.months,
+            ruleset: this.ruleset,
+            saveFormat: this.saveFormat(),
+          },
           (done, total) =>
             this.setBoot('city', GRAPHICS_SHARE + ((1 - GRAPHICS_SHARE) * done) / total),
         );
@@ -434,7 +450,9 @@ export class GameSession {
   async importText(text: string): Promise<LoadResult> {
     this.ui.set({ busy: true });
     try {
-      const result = await this.client.importSave(text);
+      // The format travels with the import: a file can be opened before any city exists, when the
+      // worker has not learned the ruleset yet.
+      const result = await this.client.importSave(text, this.saveFormat());
       if (!result.ok) {
         const first = result.errors[0];
         console.warn('[saves] invalid save', result.errors);
@@ -445,6 +463,8 @@ export class GameSession {
         return result;
       }
       this.enterGame({ tutorial: false, paused: true });
+      // The file decides the rules, not the app: a classic city opened in Neo Urbe plays classic.
+      this.ruleset = result.ruleset;
       this.toast('info', this.strings().save.loaded(result.meta.name));
       if (result.migratedFrom !== null)
         this.toast('info', this.strings().save.migrated(result.migratedFrom));

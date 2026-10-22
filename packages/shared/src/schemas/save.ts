@@ -38,6 +38,9 @@ export const SAVE_FILE_EXTENSION = '.city.json';
 export const NEON_SAVE_FORMAT = 'neon-city-save';
 export const NEON_SAVE_FILE_EXTENSION = '.neon.json';
 
+/** Every envelope format Plot 42 writes. A file is accepted if its format is in this list. */
+export const KNOWN_SAVE_FORMATS: readonly string[] = [SAVE_FORMAT, NEON_SAVE_FORMAT];
+
 /** Summary stored next to the state so save lists do not need to decode the whole file. */
 export interface SaveMeta {
   name: string;
@@ -79,6 +82,11 @@ export interface DecodeOptions {
   currentVersion?: number;
   /** Envelope format. Neo Urbe passes `NEON_SAVE_FORMAT` so the two games never mix files. */
   format?: string;
+  /**
+   * Formats the decoder accepts. Defaults to every known Plot 42 format, so a classic city opens
+   * in Neo Urbe and vice versa; the `ruleset` inside the file decides the rules it runs under.
+   */
+  acceptFormats?: readonly string[];
 }
 
 export const SNAPSHOT_LAYERS: readonly SnapshotLayer[] = [...STRUCTURE_LAYERS, ...INFLUENCE_LAYERS];
@@ -119,12 +127,20 @@ export function encodeSave(
   }, state);
 }
 
-/** Parses, verifies, migrates and validates a save. A failed decode never throws. */
+/**
+ * Parses, verifies, migrates and validates a save. A failed decode never throws.
+ *
+ * The envelope format is checked against `options.format` only when the caller demands a strict
+ * match. By default any known Plot 42 format is accepted, because a classic city is a perfectly
+ * valid city to open in Neo Urbe: the `ruleset` stored inside the file decides which rules it runs
+ * under, not the app that happens to open it.
+ */
 export function decodeSave(text: string, options: DecodeOptions = {}): DecodeResult {
   const decoded = decodeEnvelope(text, {
     format: options.format ?? SAVE_FORMAT,
     currentVersion: options.currentVersion ?? SAVE_VERSION,
     migrations: options.migrations ?? SAVE_MIGRATIONS,
+    acceptFormats: options.acceptFormats ?? KNOWN_SAVE_FORMATS,
   });
   if (!decoded.ok) return decoded;
   const v = new Validator();

@@ -37,6 +37,9 @@ export interface DemoCityOptions {
   seed: string;
   size: number;
   months: number;
+  /** Rules the menu city runs under; it decides the envelope format of its save. */
+  ruleset?: 'classic' | 'neon';
+  saveFormat?: string;
 }
 
 interface PendingDemo {
@@ -145,9 +148,9 @@ export class CityClient {
   }
 
   /** Loads a save in the worker; on success the mirror world is rebuilt before this resolves. */
-  importSave(text: string): Promise<LoadResult> {
+  importSave(text: string, saveFormat?: string): Promise<LoadResult> {
     return this.rpc.request(
-      (id) => this.send({ type: 'importSave', id, text }),
+      (id) => this.send({ type: 'importSave', id, text, saveFormat }),
       (m) => (m.type === 'loadResult' ? m.result : undefined),
     );
   }
