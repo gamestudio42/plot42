@@ -31,6 +31,11 @@ theme, music and five extra mechanics. All five share the shell
 8. A game never contains colours. The renderer reads a `Theme` from `@theme/core`;
    Urbe injects `@theme/urbe` and Neo Urbe injects `@theme/neon`. Adding a third
    skin means a new `packages/theme-*` package, not a fork of `@view/city`.
+   A theme also picks an architecture style (`theme.style`): `classic` draws the
+   traditional civic and utility silhouettes, `cyber` draws the armoured neon
+   variants in `packages/view-city/src/cyberSprites.ts`. Colours and shapes are
+   separate concerns, so a skin may recolour the classic shapes or swap in its
+   own architecture.
 9. The classic ruleset must not change. New city mechanics go behind
    `ruleset === 'neon'` and are covered by `tests/unit/neon-*.test.ts`.
    English is the type source. The first visit follows the browser language (or English).
@@ -95,6 +100,9 @@ packages/theme/    Colourless Theme interface shared by every skin
 packages/theme-urbe/  Today's Urbe palette, byte for byte
 packages/theme-neon/  Cyberpunk palette, CSS tokens and audio parameters
 packages/view-city/  Renderer, sprites and animation layer (theme injected)
+  civicSprites.ts    Traditional police, fire, school and hospital silhouettes
+  cyberSprites.ts    Cyberpunk variants of the civic and utility buildings
+  utilitySprites.ts  Power plants, wind turbines, pumps and wells
 apps/lobby/        Plot 42 landing page (marks, LocaleSelect, five locales)
 apps/horta/        Horta web app (port 5174)
 apps/posto/        Posto web app (port 5175)
