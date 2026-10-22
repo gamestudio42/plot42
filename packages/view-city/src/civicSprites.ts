@@ -77,27 +77,71 @@ export function drawSchool(g: Graphics, theme: Theme): void {
   const pole = color(theme, 'school.pole');
   const flag = color(theme, 'school.flag');
 
-  f.box(g, [0.12, 0.16, 1.88, 0.92], 0, 18, wall, roof, { color: glass, rows: 3 });
-  // Gym: lower block with a light barrel roof and a clerestory band.
-  f.box(g, [0.16, 1.0, 1.1, 1.86], 0, 12, shade(wall, 1.06), shade(roof, 1.1), { color: glass, rows: 1 });
-  const gymTop = f.box(g, [0.24, 1.08, 1.02, 1.78], 12, 5, shade(roof, 1.2), shade(roof, 1.3));
-  poly(
-    g,
-    [
-      f.p(0.24, 1.08, 17),
-      f.p(0.63, 1.08, 20),
-      f.p(1.02, 1.08, 17),
-      f.p(1.02, 1.78, 17),
-      f.p(0.63, 1.78, 20),
-      f.p(0.24, 1.78, 17),
-    ],
-    shade(roof, 1.16),
-  );
-  void gymTop;
+  // Classroom wing: three floors with a window band on each.
+  f.box(g, [0.12, 0.14, 1.88, 0.9], 0, 20, wall, roof, { color: glass, rows: 3 });
+  // Entrance canopy over the door at the front of the wing.
+  f.quad(g, 0.5, 0.9, 1.0, 0.9, shade(roof, 1.22), 10);
+  f.post(g, 0.54, 0.9, 10, shade(wall, 0.85), 1.8);
+  f.post(g, 0.96, 0.9, 10, shade(wall, 0.85), 1.8);
+
+  // Gym: a lower block whose barrel roof runs across the footprint.
+  f.box(g, [0.16, 1.02, 1.12, 1.88], 0, 13, shade(wall, 1.06), shade(roof, 1.1), { color: glass, rows: 1 });
+  // Barrel roof: a half-cylinder, drawn as a band of segments so it reads as curved.
+  const gymRoof = 13;
+  const u0 = 0.16;
+  const u1 = 1.12;
+  const segs = 7;
+  for (let i = 0; i < segs; i++) {
+    const a = u0 + ((u1 - u0) * i) / segs;
+    const b = u0 + ((u1 - u0) * (i + 1)) / segs;
+    const lift = (t: number) => Math.sin(t * Math.PI) * 8;
+    const ta = i / segs;
+    const tb = (i + 1) / segs;
+    // Front face of the vault.
+    poly(
+      g,
+      [
+        f.p(a, 1.88, gymRoof),
+        f.p(b, 1.88, gymRoof),
+        f.p(b, 1.88, gymRoof + lift(tb)),
+        f.p(a, 1.88, gymRoof + lift(ta)),
+      ],
+      shade(roof, 1.24),
+    );
+    // Ridge highlight so the curve reads.
+    poly(
+      g,
+      [
+        f.p(a, 1.88, gymRoof + lift(ta)),
+        f.p(b, 1.88, gymRoof + lift(tb)),
+        f.p(b, 1.88, gymRoof + lift(tb) - 1.4),
+        f.p(a, 1.88, gymRoof + lift(ta) - 1.4),
+      ],
+      shade(roof, 1.42),
+    );
+  }
+  // The back half of the vault, so the roof is not a flat cut.
+  for (let i = 0; i < segs; i++) {
+    const a = u0 + ((u1 - u0) * i) / segs;
+    const b = u0 + ((u1 - u0) * (i + 1)) / segs;
+    const lift = (t: number) => Math.sin(t * Math.PI) * 8;
+    const ta = i / segs;
+    const tb = (i + 1) / segs;
+    poly(
+      g,
+      [
+        f.p(a, 1.02, gymRoof + lift(ta)),
+        f.p(b, 1.02, gymRoof + lift(tb)),
+        f.p(b, 1.88, gymRoof + lift(tb)),
+        f.p(a, 1.88, gymRoof + lift(ta)),
+      ],
+      shade(roof, 1.16),
+    );
+  }
 
   // Yard: paved apron with the flagpole.
-  f.quad(g, 1.2, 1.06, 1.86, 1.86, color(theme, 'park.ground'), 0.6);
-  const poleTip = f.post(g, 1.5, 1.5, 30, pole, 1.3, 1);
+  f.quad(g, 1.22, 1.04, 1.88, 1.88, color(theme, 'park.ground'), 0.6);
+  const poleTip = f.post(g, 1.52, 1.5, 30, pole, 1.3, 1);
   g.moveTo(poleTip.x, poleTip.y)
     .lineTo(poleTip.x + 13, poleTip.y + 4)
     .lineTo(poleTip.x + 13, poleTip.y + 10)
@@ -106,7 +150,7 @@ export function drawSchool(g: Graphics, theme: Theme): void {
     .fill(flag);
 }
 
-/** Hospital: a tall ward block with a helipad and a lit red cross. */
+/** Hospital: a tall ward block with a rooftop helipad and a lit red cross on the facade. */
 export function drawHospital(g: Graphics, theme: Theme): void {
   const f = new Frame(2);
   const wall = color(theme, 'hospital.wall');
@@ -114,18 +158,41 @@ export function drawHospital(g: Graphics, theme: Theme): void {
   const glass = color(theme, 'hospital.window');
   const cross = color(theme, 'hospital.cross');
 
-  f.box(g, [0.14, 0.2, 1.2, 1.88], 0, 34, wall, roof, { color: glass, rows: 5 });
-  // Podium in front, with the ambulance bay.
-  f.box(g, [1.16, 0.86, 1.88, 1.86], 0, 12, shade(wall, 0.96), shade(roof, 0.95), { color: glass, rows: 1 });
-  f.quad(g, 1.24, 1.86, 1.78, 1.86, shade(roof, 0.6), 9);
-  // Helipad marker on the ward roof.
-  const pad = f.p(0.67, 1.04, 34);
-  g.ellipse(pad.x, pad.y, 13, 6.5).fill(shade(roof, 0.8));
-  g.ellipse(pad.x, pad.y, 9, 4.4).fill({ color: glass, alpha: 0.45 });
-  // Red cross on the podium roof, readable from the isometric angle.
-  const c = f.p(1.52, 1.36, 12);
-  g.rect(c.x - 8, c.y - 2.4, 16, 4.8).fill(cross);
-  g.rect(c.x - 2.4, c.y - 8, 4.8, 16).fill(cross);
+  // Ward block: the tall part, with a vertical window band and a service core on top.
+  f.box(g, [0.14, 0.2, 1.16, 1.88], 0, 36, wall, roof, { color: glass, rows: 6 });
+  f.box(g, [0.3, 0.34, 0.74, 0.7], 36, 7, shade(wall, 0.94), shade(roof, 0.94));
+  // Plant room on the roof, set to one side so it does not sit on the helipad.
+  f.box(g, [0.22, 0.28, 0.5, 0.62], 43, 9, shade(wall, 1.04), shade(roof, 1.06));
+  g.rect(f.p(0.36, 0.45, 52).x - 4, f.p(0.36, 0.45, 52).y - 8, 8, 8).fill(shade(roof, 0.8));
+
+  // Helipad: a flat marked pad, not a dome. The circle is the pad, the H is the marking.
+  const pad = f.p(0.95, 1.28, 36);
+  g.ellipse(pad.x, pad.y, 15, 7.5).fill(shade(roof, 0.72));
+  g.ellipse(pad.x, pad.y, 12.5, 6.2).fill(shade(roof, 0.86));
+  g.ellipse(pad.x, pad.y, 10.5, 5.2).fill({ color: glass, alpha: 0.5 });
+  // The H painted on the pad.
+  g.rect(pad.x - 4.2, pad.y - 3.4, 1.8, 6.8).fill(shade(roof, 0.45));
+  g.rect(pad.x + 2.4, pad.y - 3.4, 1.8, 6.8).fill(shade(roof, 0.45));
+  g.rect(pad.x - 4.2, pad.y - 0.8, 8.4, 1.6).fill(shade(roof, 0.45));
+  // Perimeter lights around the pad.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    g.circle(pad.x + Math.cos(a) * 13.5, pad.y + Math.sin(a) * 6.6, 1.3).fill({
+      color: glass,
+      alpha: 0.8,
+    });
+  }
+
+  // Podium in front, with the ambulance bay under a canopy.
+  f.box(g, [1.16, 0.86, 1.88, 1.88], 0, 13, shade(wall, 0.96), shade(roof, 0.95), { color: glass, rows: 1 });
+  f.quad(g, 1.24, 1.88, 1.8, 1.88, shade(roof, 0.55), 9);
+  // Red cross mounted on the front wall of the ward block, drawn as a flat billboard so it stays
+  // upright instead of lying on the ground plane.
+  const c = f.p(0.66, 1.9, 27);
+  g.rect(c.x - 7, c.y - 2.2, 14, 4.4).fill(cross);
+  g.rect(c.x - 2.2, c.y - 7, 4.4, 14).fill(cross);
+  g.rect(c.x - 7, c.y - 2.2, 14, 1.1).fill(shade(cross, 1.3));
+  g.rect(c.x - 2.2, c.y - 7, 1.1, 14).fill(shade(cross, 1.3));
 }
 
 /** Dispatches a civic building to its own drawing; the caller knows the kind. */
