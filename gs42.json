@@ -1,14 +1,14 @@
 {
-  "title": "Urbe",
+  "title": "Plot 42",
   "tagline": {
-    "en": "You set the conditions. The city decides the rest.",
-    "pt": "Você cria as condições. A cidade decide o resto.",
-    "es": "Tú pones las condiciones. La ciudad decide el resto.",
-    "fr": "Vous posez les conditions. La ville décide du reste.",
-    "de": "Du setzt die Bedingungen. Die Stadt entscheidet den Rest."
+    "en": "Five games. One studio lot.",
+    "pt": "Cinco jogos. Um lote do estúdio.",
+    "es": "Cinco juegos. Un lote del estudio.",
+    "fr": "Cinq jeux. Un lot d'atelier.",
+    "de": "Fünf Spiele. Ein Studio-Grundstück."
   },
   "cover": "docs/screenshots/menu.jpg",
-  "genre": "city-builder",
+  "genre": "collection",
   "tech": ["TypeScript", "PixiJS", "Web Worker"],
-  "order": 1
+  "order": 0
 }

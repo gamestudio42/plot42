@@ -4,11 +4,15 @@
 
 <h1 align="center">Plot 42</h1>
 
-<p align="center"><strong>Four browser games on one studio lot.</strong></p>
+<p align="center"><strong>Five browser games on one studio lot.</strong></p>
 
 <p align="center">
-  A static platform: a lobby and four titles that share a deterministic TypeScript
+  A static platform: a lobby and five titles that share a deterministic TypeScript
   shell. No install, no server. Saves stay in the browser or in exported files.
+</p>
+
+<p align="center">
+  Play it at <a href="https://gamestudio42.github.io/plot42/">gamestudio42.github.io/plot42</a>.
 </p>
 
 ## Games
@@ -70,7 +74,7 @@ Or with Docker: `docker compose up` serves Urbe on port 5173.
 
 `pnpm build:site` reads `BASE_PATH` (default `/`). GitHub Pages uses
 `/<repository>/`. The assembled tree is `site/index.html` plus `urbe/`, `horta/`,
-`posto/` and `mata/`.
+`posto/`, `mata/` and `neon/`.
 
 Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [neon spec](docs/neon-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
 

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Plot 42 \u2014 a static browser game platform: Urbe, Horta, Posto and Mata.",
+  "description": "Plot 42 \u2014 a static browser game platform: Urbe, Horta, Posto, Mata and Neo Urbe.",
   "license": "MIT",
   "packageManager": "pnpm@10.27.0",
   "engines": {
