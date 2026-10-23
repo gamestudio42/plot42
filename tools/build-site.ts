@@ -1,13 +1,12 @@
 /**
  * Assemble the static Plot 42 site:
  *   /           lobby
- *   /urbe/      city builder
  *   /horta/     harvest grid
  *   /posto/     tactics
  *   /mata/      living grove
- *   /neon/      cyberpunk city builder
  *
- * BASE_PATH is the site root (e.g. /plot42/). Each game is built under that prefix.
+ * Urbe and Neo Urbe are not built here. The lobby links to their own Pages sites.
+ * BASE_PATH is the site root (e.g. /plot42/). Each hosted game is built under that prefix.
  */
 import { execSync } from 'node:child_process';
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
@@ -36,9 +35,6 @@ mkdirSync(site, { recursive: true });
 run('@plot42/lobby', baseRoot);
 cpSync(join(root, 'apps/lobby/dist-site'), site, { recursive: true });
 
-run('@city/web', `${baseRoot}urbe/`);
-cpSync(join(root, 'apps/web/dist-site'), join(site, 'urbe'), { recursive: true });
-
 run('@horta/web', `${baseRoot}horta/`);
 cpSync(join(root, 'apps/horta/dist-site'), join(site, 'horta'), { recursive: true });
 
@@ -47,8 +43,5 @@ cpSync(join(root, 'apps/posto/dist-site'), join(site, 'posto'), { recursive: tru
 
 run('@mata/web', `${baseRoot}mata/`);
 cpSync(join(root, 'apps/mata/dist-site'), join(site, 'mata'), { recursive: true });
-
-run('@neon/web', `${baseRoot}neon/`);
-cpSync(join(root, 'apps/neon/dist-site'), join(site, 'neon'), { recursive: true });
 
 console.log(`Assembled site/ with BASE_PATH=${baseRoot}`);

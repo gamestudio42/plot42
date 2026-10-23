@@ -1,5 +1,5 @@
 /**
- * Serve the assembled `site/` folder so the four Plot 42 addresses can be checked together.
+ * Serve the assembled `site/` folder: lobby, Horta, Posto and Mata.
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';

@@ -37,17 +37,17 @@ and `tsx` compile them on the fly, so there is no package build step.
 
 ## Static site
 
-`pnpm build:site` (`tools/build-site.ts`) builds the lobby plus the five games with
-`BASE_PATH` prefixes and copies them into `site/`:
+`pnpm build:site` (`tools/build-site.ts`) builds the lobby plus Horta, Posto and Mata with
+`BASE_PATH` prefixes and copies them into `site/`. The lobby sends Urbe and Neo Urbe to
+the Pages sites of their own repositories (`gamestudio42.github.io/urbe` and
+`gamestudio42.github.io/neo-urbe`).
 
 | Path        | App            |
 | ----------- | -------------- |
 | `/`         | `apps/lobby`   |
-| `/urbe/`    | `apps/web`     |
 | `/horta/`   | `apps/horta`   |
 | `/posto/`   | `apps/posto`   |
 | `/mata/`    | `apps/mata`    |
-| `/neon/`    | `apps/neon`    |
 
 Development uses one Vite port per app (`5173` Urbe, `5174` Horta, `5175` Posto, `5176`
 lobby, `5177` Mata, `5178` Neo Urbe) with `base: '/'`. `pnpm preview:site` serves the assembled folder.

@@ -191,4 +191,4 @@ water pass.
 - Neo Urbe: same seed plus the same command log produces the same `hashState`.
 - The six mechanics are playable through the UI and explained by the inspector. Fiber is laid from
   the toolbar (underground view) and the data map sits with the other overlays.
-- `pnpm check`, `pnpm test:e2e` and `pnpm build:site` (with `site/neon/`) are green.
+- `pnpm check` and `pnpm test:e2e` are green. The Plot 42 site links to the published Neo Urbe instead of building `site/neon/`.

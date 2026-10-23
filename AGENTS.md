@@ -56,7 +56,7 @@ pnpm test             # unit + integration tests (Vitest)
 pnpm test:simulation  # long scenario tests (Vitest)
 pnpm test:e2e         # Playwright (builds and serves Urbe)
 pnpm build            # production build of apps/web (Urbe)
-pnpm build:site       # lobby + four games into site/
+pnpm build:site       # lobby + Horta, Posto and Mata into site/
 pnpm preview:site     # serve site/ on http://localhost:4173
 pnpm sim --preset balanced --months 120 --seeds 1,2,3   # headless JSON reports
 pnpm sim --list       # simulation presets

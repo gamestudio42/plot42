@@ -13,16 +13,23 @@ import {
 const MARK_BASE = `${import.meta.env.BASE_URL}marks`;
 const LOBBY_MARK = `${import.meta.env.BASE_URL}favicon.svg`;
 
+/** Urbe and Neo Urbe ship from their own repositories. The lot only links to them. */
+const PUBLISHED = {
+  urbe: 'https://gamestudio42.github.io/urbe/',
+  neon: 'https://gamestudio42.github.io/neo-urbe/',
+} as const;
+
 const GAMES = [
-  { slug: 'urbe', port: 5173, kind: 'urbe', title: 'urbeTitle', blurb: 'urbeBlurb' },
+  { slug: 'urbe', kind: 'urbe', title: 'urbeTitle', blurb: 'urbeBlurb', href: PUBLISHED.urbe },
   { slug: 'horta', port: 5174, kind: 'horta', title: 'hortaTitle', blurb: 'hortaBlurb' },
   { slug: 'posto', port: 5175, kind: 'posto', title: 'postoTitle', blurb: 'postoBlurb' },
   { slug: 'mata', port: 5177, kind: 'mata', title: 'mataTitle', blurb: 'mataBlurb' },
-  { slug: 'neon', port: 5178, kind: 'neon', title: 'neonTitle', blurb: 'neonBlurb' },
+  { slug: 'neon', kind: 'neon', title: 'neonTitle', blurb: 'neonBlurb', href: PUBLISHED.neon },
 ] as const;
 
-function gameHref(slug: string, port: number): string {
-  return import.meta.env.DEV ? `http://localhost:${port}/` : `${slug}/`;
+function gameHref(game: (typeof GAMES)[number]): string {
+  if ('href' in game) return game.href;
+  return import.meta.env.DEV ? `http://localhost:${game.port}/` : `${game.slug}/`;
 }
 
 export function App() {
@@ -64,7 +71,7 @@ export function App() {
           <li key={game.slug}>
             <a
               className={`card card-${game.kind}`}
-              href={gameHref(game.slug, game.port)}
+              href={gameHref(game)}
               data-testid={`lobby-${game.slug}`}
             >
               <span className="card-mark">
