@@ -5,5 +5,5 @@
     "jsx": "react-jsx",
     "types": ["node"]
   },
-  "include": ["tests/**/*.ts", "tools/**/*.ts", "*.config.ts", "apps/web/vite.config.ts"]
+  "include": ["tests/**/*.ts", "tools/**/*.ts", "*.config.ts"]
 }

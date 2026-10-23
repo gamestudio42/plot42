@@ -8,12 +8,6 @@ importers:
 
   .:
     devDependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:packages/shared
-      '@city/simulation':
-        specifier: workspace:*
-        version: link:packages/simulation
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.13.0)
@@ -165,58 +159,6 @@ importers:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
 
-  apps/neon:
-    dependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@city/simulation':
-        specifier: workspace:*
-        version: link:../../packages/simulation
-      '@shell/bridge':
-        specifier: workspace:*
-        version: link:../../packages/bridge
-      '@shell/chrome':
-        specifier: workspace:*
-        version: link:../../packages/chrome
-      '@shell/view-iso':
-        specifier: workspace:*
-        version: link:../../packages/view-iso
-      '@theme/core':
-        specifier: workspace:*
-        version: link:../../packages/theme
-      '@theme/neon':
-        specifier: workspace:*
-        version: link:../../packages/theme-neon
-      '@theme/urbe':
-        specifier: workspace:*
-        version: link:../../packages/theme-urbe
-      '@view/city':
-        specifier: workspace:*
-        version: link:../../packages/view-city
-      pixi.js:
-        specifier: ^8.22.0
-        version: 8.22.0
-      react:
-        specifier: ^19.3.1
-        version: 19.3.1
-      react-dom:
-        specifier: ^19.3.1
-        version: 19.3.1(react@19.3.1)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.3.0
-        version: 19.3.0(@types/react@19.3.0)
-      '@vitejs/plugin-react':
-        specifier: ^6.1.2
-        version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
-      vite:
-        specifier: ^8.3.4
-        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
-
   apps/posto:
     dependencies:
       '@posto/sim':
@@ -234,55 +176,6 @@ importers:
       '@shell/view-iso':
         specifier: workspace:*
         version: link:../../packages/view-iso
-      pixi.js:
-        specifier: ^8.22.0
-        version: 8.22.0
-      react:
-        specifier: ^19.3.1
-        version: 19.3.1
-      react-dom:
-        specifier: ^19.3.1
-        version: 19.3.1(react@19.3.1)
-    devDependencies:
-      '@types/react':
-        specifier: ^19.3.0
-        version: 19.3.0
-      '@types/react-dom':
-        specifier: ^19.3.0
-        version: 19.3.0(@types/react@19.3.0)
-      '@vitejs/plugin-react':
-        specifier: ^6.1.2
-        version: 6.1.2(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15))
-      vite:
-        specifier: ^8.3.4
-        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)
-
-  apps/web:
-    dependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@city/simulation':
-        specifier: workspace:*
-        version: link:../../packages/simulation
-      '@shell/bridge':
-        specifier: workspace:*
-        version: link:../../packages/bridge
-      '@shell/chrome':
-        specifier: workspace:*
-        version: link:../../packages/chrome
-      '@shell/view-iso':
-        specifier: workspace:*
-        version: link:../../packages/view-iso
-      '@theme/core':
-        specifier: workspace:*
-        version: link:../../packages/theme
-      '@theme/urbe':
-        specifier: workspace:*
-        version: link:../../packages/theme-urbe
-      '@view/city':
-        specifier: workspace:*
-        version: link:../../packages/view-city
       pixi.js:
         specifier: ^8.22.0
         version: 8.22.0
@@ -343,63 +236,6 @@ importers:
       '@shell/kernel':
         specifier: workspace:*
         version: link:../kernel
-
-  packages/shared:
-    dependencies:
-      '@shell/kernel':
-        specifier: workspace:*
-        version: link:../kernel
-
-  packages/simulation:
-    dependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@shell/kernel':
-        specifier: workspace:*
-        version: link:../kernel
-
-  packages/theme:
-    dependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:../shared
-
-  packages/theme-neon:
-    dependencies:
-      '@theme/core':
-        specifier: workspace:*
-        version: link:../theme
-      '@theme/urbe':
-        specifier: workspace:*
-        version: link:../theme-urbe
-
-  packages/theme-urbe:
-    dependencies:
-      '@theme/core':
-        specifier: workspace:*
-        version: link:../theme
-
-  packages/view-city:
-    dependencies:
-      '@city/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@city/simulation':
-        specifier: workspace:*
-        version: link:../simulation
-      '@shell/chrome':
-        specifier: workspace:*
-        version: link:../chrome
-      '@shell/view-iso':
-        specifier: workspace:*
-        version: link:../view-iso
-      '@theme/core':
-        specifier: workspace:*
-        version: link:../theme
-      pixi.js:
-        specifier: ^8.22.0
-        version: 8.22.0
 
   packages/view-iso:
     dependencies:

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/web/public/favicon.svg" width="88" alt="Plot 42">
+  <img src="apps/lobby/public/favicon.svg" width="88" alt="Plot 42">
 </p>
 
 <h1 align="center">Plot 42</h1>
@@ -27,56 +27,36 @@
 
 The lobby (`pnpm lobby`, [localhost:5176](http://localhost:5176)) lists the five. Urbe and Neo Urbe leave this site and open the addresses above. Horta, Posto and Mata are built into it.
 
-All titles ship the five interface languages (English, Portuguese, Spanish, French,
-German). Saves: `.city.json`, `.neon.json`, `.horta.json`, `.posto.json`, `.mata.json`.
+Horta, Posto and Mata ship the five interface languages (English, Portuguese,
+Spanish, French, German). Saves: `.horta.json`, `.posto.json`, `.mata.json`.
 
-## Urbe
-
-<p align="center"><strong>You set the conditions. The city decides the rest.</strong></p>
-
-<p align="center">
-  <img src="docs/screenshots/menu.jpg" alt="Urbe main menu over a living city" width="920">
-</p>
-
-- **Play in the browser.** Found a city. Nothing to download.
-- **You create the conditions.** Roads, zones, plants and pumps. The simulator grows — or abandons — the lots.
-- **A living city.** Cars follow traffic, chimneys smoke, water shimmers, fire engines roll out.
-- **A mayor's desk.** Taxes, department funding, charts, thematic maps and a tile inspector that tells you *why* a lot is not growing.
-- **Original soundtrack.** Calm lo-fi, synthesized on the fly.
-- **Your city stays with you.** Autosave in the browser, plus export and import of `.city.json` files.
-
-Urbe and Neo Urbe are published from their own repositories. This site links to them and does not build or overwrite those Pages deployments. `pnpm dev` and `pnpm neon` still run the copies in this tree.
-
-Hotkeys in the city: `R` road · `1–6` zones · `E` power · `T` water · `P` pause · `M` sound.
+Urbe and Neo Urbe are published from their own repositories. This site links to
+them and does not contain their source.
 
 ## Develop
 
 ```sh
 pnpm install
-pnpm lobby      # http://localhost:5176
-pnpm dev        # Urbe, http://localhost:5173
+pnpm dev        # lobby, http://localhost:5176
 pnpm horta      # http://localhost:5174
 pnpm posto      # http://localhost:5175
 pnpm mata       # http://localhost:5177
-pnpm neon       # Neo Urbe, http://localhost:5178
 ```
 
-Or with Docker: `docker compose up` serves Urbe on port 5173.
+Or with Docker: `docker compose up` serves the lobby on port 5176.
 
-| Command            | Description                                                 |
-| ------------------ | ----------------------------------------------------------- |
-| `pnpm check`       | Lint, type check, unit/integration/scenario tests and Urbe build |
-| `pnpm test:e2e`    | Playwright end-to-end tests (Urbe and Neo Urbe)             |
-| `pnpm sim`         | Headless city simulation over presets and seeds             |
-| `pnpm bench`       | Tick timing benchmark (`--strict` for CI)                   |
-| `pnpm build:site`  | Lobby + Horta, Posto and Mata into `site/`                  |
-| `pnpm preview:site`| Serve `site/` on http://localhost:4173                      |
+| Command            | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `pnpm check`       | Lint, type check, unit tests and the site build |
+| `pnpm test:e2e`    | Playwright test for the lobby                    |
+| `pnpm build:site`  | Lobby + Horta, Posto and Mata into `site/`       |
+| `pnpm preview:site`| Serve `site/` on http://localhost:4173           |
 
 `pnpm build:site` reads `BASE_PATH` (default `/`). GitHub Pages uses
 `/<repository>/`. The assembled tree is `site/index.html` plus `horta/`, `posto/`
 and `mata/`.
 
-Docs: [architecture](docs/architecture.md) · [simulation spec](docs/simulation-spec.md) · [neon spec](docs/neon-spec.md) · [balancing](docs/balancing.md) · [mechanics](docs/mechanics-matrix.md) · [roadmap](docs/roadmap.md) · [testing](docs/testing-strategy.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
+Docs: [architecture](docs/architecture.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)
 
 ## Licence
 

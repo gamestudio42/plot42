@@ -34,8 +34,6 @@ export default defineConfig(
   },
   {
     files: [
-      'packages/simulation/src/**/*.ts',
-      'packages/shared/src/**/*.ts',
       'packages/kernel/src/**/*.ts',
       'packages/horta/src/**/*.ts',
       'packages/posto/src/**/*.ts',
@@ -61,7 +59,6 @@ export default defineConfig(
   },
   {
     files: [
-      'apps/web/src/**/*.{ts,tsx}',
       'apps/horta/src/**/*.{ts,tsx}',
       'apps/posto/src/**/*.{ts,tsx}',
       'apps/mata/src/**/*.{ts,tsx}',
@@ -76,7 +73,6 @@ export default defineConfig(
       'tools/**/*.ts',
       'tests/**/*.ts',
       '*.config.{js,ts}',
-      'apps/web/vite.config.ts',
       'apps/horta/vite.config.ts',
       'apps/posto/vite.config.ts',
       'apps/mata/vite.config.ts',

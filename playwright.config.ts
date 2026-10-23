@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = 4180;
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -26,27 +26,11 @@ export default defineConfig({
       },
     },
   ],
-  webServer: [
-    {
-      command: `pnpm build && pnpm --filter @city/web preview --port ${PORT} --strictPort`,
-      port: PORT,
-      reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
-    },
-    {
-      // The lobby spec runs against the assembled static site, not the Urbe dev build.
-      // Vite lives in the app packages, not at the workspace root, so call it from one of them.
-      command: `pnpm build:site && pnpm --filter @plot42/lobby exec vite preview --outDir ../../site --port 4180 --strictPort`,
-      port: 4180,
-      reuseExistingServer: !process.env.CI,
-      timeout: 300_000,
-    },
-    {
-      // Neo Urbe runs on its own port so the shared Urbe server stays untouched.
-      command: `pnpm --filter @neon/web build && pnpm --filter @neon/web preview --port 5179 --strictPort`,
-      port: 5179,
-      reuseExistingServer: !process.env.CI,
-      timeout: 180_000,
-    },
-  ],
+  webServer: {
+    // Vite lives in the app packages, not at the workspace root, so call it from the lobby.
+    command: `pnpm build:site && pnpm --filter @plot42/lobby exec vite preview --outDir ../../site --port ${PORT} --strictPort`,
+    port: PORT,
+    reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+  },
 });
