@@ -69,9 +69,11 @@ half adult output: their food feeds the family but can never be sold as surplus.
 A child aged 6 or older may instead study at a completed school. Four study
 periods educate the child; education persists. At the end of each year every
 person ages one year; a 16-year-old becomes an adult and any idle or study
-routine becomes yard work. A family is created when its house is placed. At the
-end of each season a new family may arrive if a house is empty and reputation is
-at least 3.
+routine becomes yard work. A family is created when its house is placed. An empty
+colono house can receive an invited family for 4 coins; invited families are
+unrelated to the existing families, so siblings never marry each other. At the
+end of each season a new family may also arrive if a house is empty and
+reputation is at least 3.
 
 The week is the only clock: validate routines, resolve morning and afternoon,
 apply construction, study and production, mature or harvest coffee, apply the
@@ -104,13 +106,20 @@ medium at base and good for one more; a venda adds one more. Harvested stock is
 kept in the three grade piles and sold separately; the terreiro and tulha
 capacity applies to the total.
 
+A new coffee lot is a 4×2 order that needs 16 seedlings, bought as four-seedling
+bundles for one coin. The order consumes two adult periods, four cells each,
+before becoming a muda lot. Weekly history records coins, income, expenses and
+harvest/stock by grade, and the Reports page draws the financial and production
+lines. The interface uses a bottom book navigation with Families, Works, Coffee,
+Market and Reports pages.
+
 Roads are visually planned with the Road tool and saved as a queue. An adult
 assigned to Road builds up to four queued tiles per week, regardless of whether
 the adult is assigned in one or both periods. Roads cost no coins or wood and
 do not gate construction. The school currently educates without a teacher or
 staff; staffed institutions are the next stage. The game ends at week 48: the
 farm wins if it has six families, a chapel, a school, a shop and morale of at
-least 2; otherwise it ends. Saves use `sitio-save` v20 (`.sitio.json`); v19 and
+least 2; otherwise it ends. Saves use `sitio-save` v21 (`.sitio.json`); v20 and
 earlier must start a new farm.
 
 ## Mata

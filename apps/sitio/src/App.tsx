@@ -2,12 +2,17 @@ import {
   BUILDING_SPECS,
   BUILDING_VENDA,
   COFFEE_GRADES,
+  COFFEE_LOT_SEEDLINGS,
   EDUCATION_PERIODS,
+  FAMILY_INVITE_COST,
   INPUT_PRICES,
+  SEEDLING_BUNDLE_PRICE,
+  SEEDLING_BUNDLE_SIZE,
   STARTER_FOOTPRINTS,
   WOOD_BUY_PRICE,
   type BuildingKind,
   type CoffeeGrade,
+  type CoffeePlantOrder,
   type Family,
   type InputKind,
   type Period,
@@ -26,7 +31,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LOCALES, LOCALE_LABELS, useStrings, type Strings } from './i18n';
 import { lobbyHref } from './platform';
-import { SitioSession } from './session';
+import { SitioSession, type Panel } from './session';
 
 const MARK = `${import.meta.env.BASE_URL}favicon.svg`;
 
@@ -202,6 +207,7 @@ function Game({ session }: { session: SitioSession }) {
   const t = useStrings(session.ui);
   const state = useStore(session.ui, (ui) => ui.state);
   const tool = useStore(session.ui, (ui) => ui.tool);
+  const activePanel = useStore(session.ui, (ui) => ui.activePanel);
   const pendingLand = useStore(session.ui, (ui) => ui.pendingLand);
   const reportOpen = useStore(session.ui, (ui) => ui.reportOpen);
   const endingOpen = useStore(session.ui, (ui) => ui.endingOpen);
@@ -265,11 +271,22 @@ function Game({ session }: { session: SitioSession }) {
         </div>
       </header>
 
-      <aside className="side-panel">
+      <aside
+        className={`side-panel book-panel ${activePanel ? 'open' : ''} ${
+          state.setup ? 'setup' : ''
+        }`}
+        data-panel={activePanel ?? 'none'}
+      >
         {state.setup ? (
           <SetupPanel session={session} state={state} t={t} />
         ) : (
           <>
+            <div className="book-page-head">
+              <strong>{activePanel ? t.panel[activePanel] : t.title}</strong>
+              <button type="button" className="button small" onClick={() => session.setPanel(null)}>
+                {t.close}
+              </button>
+            </div>
             {state.yearEvent === 'frost' || state.yearEvent === 'drought' ? (
               <p className={`forecast forecast-${state.yearEvent}`}>
                 {t.forecast[state.yearEvent]}
@@ -285,9 +302,14 @@ function Game({ session }: { session: SitioSession }) {
               </p>
             ) : null}
 
-            <MarketPanel session={session} state={state} t={t} salePrice={salePrice} />
-            <InputMarket session={session} state={state} t={t} />
-            <WoodMarket session={session} state={state} t={t} />
+            <div className="panel-section panel-market">
+              <MarketPanel session={session} state={state} t={t} salePrice={salePrice} />
+              <InputMarket session={session} state={state} t={t} />
+              <WoodMarket session={session} state={state} t={t} />
+            </div>
+
+            <div className="panel-section panel-families">
+            <FamilyGrowth session={session} state={state} t={t} />
 
             <section>
               <h2>
@@ -300,6 +322,7 @@ function Game({ session }: { session: SitioSession }) {
                     family={family}
                     people={state.people.filter((person) => person.familyId === family.id)}
                     sites={state.sites}
+                    plantOrders={state.plantOrders}
                     hasSchool={state.structures.some((structure) => structure.kind === 'escola')}
                     fertilizer={state.inputStock.fertilizer}
                     limestone={state.inputStock.limestone}
@@ -316,9 +339,14 @@ function Game({ session }: { session: SitioSession }) {
                 {state.families.length === 0 ? <p className="muted">{t.noFamilies}</p> : null}
               </div>
             </section>
+            </div>
 
+            <div className="panel-section panel-works">
             <section>
-              <h2>{t.tools.title}</h2>
+              <h2>
+                <Icon name="canteiro" />
+                {t.tools.title}
+              </h2>
               <div className="tool-grid">
                 <button
                   type="button"
@@ -380,11 +408,16 @@ function Game({ session }: { session: SitioSession }) {
                   );
                 })}
               </div>
-              <p className="hint">{tool === 'select' ? t.hint : t.hintBuild}</p>
+              <p className="hint">
+                {tool === 'select' ? t.hint : tool === 'road' ? t.hintRoad : t.hintBuild}
+              </p>
             </section>
 
             <section>
-              <h2>{t.sites.title}</h2>
+              <h2>
+                <Icon name="canteiro" />
+                {t.sites.title}
+              </h2>
               {state.sites.length === 0 ? (
                 <p className="muted">{t.sites.none}</p>
               ) : (
@@ -392,7 +425,9 @@ function Game({ session }: { session: SitioSession }) {
                   {state.sites.map((site) => (
                     <li key={site.id}>
                       <div>
-                        <strong>{t.tools[site.kind]}</strong>
+                        <strong>
+                          {t.canteiro}: {t.tools[site.kind]}
+                        </strong>
                         <span className="muted">
                           {site.progress}/{site.required} {t.sites.progress}
                         </span>
@@ -402,18 +437,17 @@ function Game({ session }: { session: SitioSession }) {
                 </ul>
               )}
             </section>
+            </div>
 
-            <button
-              type="button"
-              className="button primary end-season"
-              disabled={state.status !== 'playing'}
-              onClick={() => void session.endWeek()}
-            >
-              {t.endSeason}
-            </button>
+            <CoffeePage session={session} state={state} t={t} />
+            <ReportsPage state={state} t={t} />
           </>
         )}
       </aside>
+
+      {!state.setup ? (
+        <BookNav session={session} state={state} t={t} activePanel={activePanel} />
+      ) : null}
 
       {reportOpen ? (
         <ReportModal session={session} state={state} t={t} />
@@ -424,22 +458,235 @@ function Game({ session }: { session: SitioSession }) {
   );
 }
 
+function CoffeePage({
+  session,
+  state,
+  t,
+}: {
+  session: SitioSession;
+  state: SitioFullState;
+  t: Strings;
+}) {
+  const canPlant = state.seedlings >= COFFEE_LOT_SEEDLINGS;
+  return (
+    <div className="panel-section panel-coffee">
+      <section>
+        <h2>
+          <Icon name="stock" />
+          {t.task.coffee}
+        </h2>
+        <p className="muted small">
+          {t.seedlings}: {state.seedlings}/{COFFEE_LOT_SEEDLINGS}
+        </p>
+        <button
+          type="button"
+          className="button primary"
+          disabled={!canPlant}
+          onClick={() => session.setTool('coffee')}
+        >
+          {t.task.plantLot}
+        </button>
+        <p className="hint">{t.plantCoffeeHint}</p>
+      </section>
+      <section>
+        <h2>{t.plantingOrders}</h2>
+        {state.plantOrders.length === 0 ? (
+          <p className="muted">{t.noPlantingOrders}</p>
+        ) : (
+          <ul className="site-list">
+            {state.plantOrders.map((order) => (
+              <li key={order.id}>
+                <div>
+                  <strong>
+                    {order.w}×{order.h} · {order.x},{order.y}
+                  </strong>
+                  <span className="muted">
+                    {order.progress}/{order.required} {t.sites.progress}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section>
+        <h2>{t.coffeeLots}</h2>
+        {state.coffeeLots.length === 0 ? (
+          <p className="muted">{t.noCoffeeLots}</p>
+        ) : (
+          <ul className="site-list">
+            {state.coffeeLots.map((lot) => (
+              <li key={lot.id}>
+                <div>
+                  <strong>
+                    {lot.w}×{lot.h} · {lot.x},{lot.y}
+                  </strong>
+                  <span className="muted">
+                    {lot.fertilized ? t.fertilizer : ''} {lot.limed ? t.limestone : ''}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ReportsPage({ state, t }: { state: SitioFullState; t: Strings }) {
+  const history = state.history;
+  return (
+    <div className="panel-section panel-reports">
+      <section>
+        <h2>
+          <Icon name="chart" />
+          {t.finance}
+        </h2>
+        {history.length === 0 ? (
+          <p className="muted">{t.noHistory}</p>
+        ) : (
+          <LineChart
+            labels={[t.balance, t.income, t.expenses]}
+            colors={['#e0a84a', '#8fbf6a', '#c85a44']}
+            series={[
+              history.map((point) => point.coins),
+              history.map((point) => point.income),
+              history.map((point) => point.expenses),
+            ]}
+            weekLabel={t.week}
+          />
+        )}
+      </section>
+      <section>
+        <h2>
+          <Icon name="chart" />
+          {t.production}
+        </h2>
+        {history.length === 0 ? (
+          <p className="muted">{t.noHistory}</p>
+        ) : (
+          <LineChart
+            labels={[t.grade.bad, t.grade.medium, t.grade.good]}
+            colors={['#c85a44', '#d8b36a', '#8fbf6a']}
+            series={[
+              history.map((point) => point.harvest.bad),
+              history.map((point) => point.harvest.medium),
+              history.map((point) => point.harvest.good),
+            ]}
+            weekLabel={t.week}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function LineChart({
+  labels,
+  colors,
+  series,
+  weekLabel,
+}: {
+  labels: string[];
+  colors: string[];
+  series: number[][];
+  weekLabel: string;
+}) {
+  const count = Math.max(1, series[0]?.length ?? 0);
+  const maximum = Math.max(1, ...series.flat());
+  const x = (index: number) => 12 + (index * 296) / Math.max(1, count - 1);
+  const y = (value: number) => 132 - (value / maximum) * 112;
+  return (
+    <div className="line-chart">
+      <svg viewBox="0 0 320 160" role="img" aria-label={labels.join(', ')}>
+        <line x1="12" y1="132" x2="308" y2="132" stroke="#5a4330" />
+        <line x1="12" y1="20" x2="12" y2="132" stroke="#5a4330" />
+        {series.map((values, index) => (
+          <polyline
+            key={labels[index]}
+            fill="none"
+            stroke={colors[index]}
+            strokeWidth="2"
+            points={values.map((value, point) => `${x(point)},${y(value)}`).join(' ')}
+          />
+        ))}
+      </svg>
+      <p className="muted small">
+        {weekLabel} 1–{count} · {maximum}
+      </p>
+      <div className="chart-legend">
+        {labels.map((label, index) => (
+          <span key={label}>
+            <i style={{ background: colors[index] }} />
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BookNav({
+  session,
+  state,
+  t,
+  activePanel,
+}: {
+  session: SitioSession;
+  state: SitioFullState;
+  t: Strings;
+  activePanel: Panel | null;
+}) {
+  const tabs: { key: Panel; label: string; icon: IconName }[] = [
+    { key: 'families', label: t.families, icon: 'families' },
+    { key: 'works', label: t.tools.title, icon: 'canteiro' },
+    { key: 'coffee', label: t.task.coffee, icon: 'stock' },
+    { key: 'market', label: t.market, icon: 'market' },
+    { key: 'reports', label: t.reports, icon: 'chart' },
+  ];
+  return (
+    <nav className="book-nav" aria-label={t.title}>
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          className={activePanel === tab.key ? 'active' : ''}
+          aria-pressed={activePanel === tab.key}
+          onClick={() => session.setPanel(tab.key)}
+        >
+          <Icon name={tab.icon} />
+          <span>{tab.label}</span>
+        </button>
+      ))}
+      <button
+        type="button"
+        className="book-end"
+        disabled={state.status !== 'playing'}
+        onClick={() => void session.endWeek()}
+      >
+        {t.endSeason}
+      </button>
+    </nav>
+  );
+}
+
 function Resource({
   icon,
   label,
   value,
 }: {
-  icon: IconName;
+  icon: PixelIconName;
   label: string;
   value: number | string;
 }) {
   return (
     <div className="resource">
-      <span className="resource-label">
-        <Icon name={icon} />
-        {label}
+      <span className="resource-label">{label}</span>
+      <span className="resource-value">
+        <PixelIcon name={icon} />
+        <strong>{value}</strong>
       </span>
-      <strong>{value}</strong>
     </div>
   );
 }
@@ -457,6 +704,7 @@ type IconName =
   | 'price'
   | 'reputation'
   | 'market'
+  | 'chart'
   | 'house'
   | 'terreiro'
   | 'tulha'
@@ -537,6 +785,12 @@ const ICON_PATHS: Record<Exclude<IconName, 'chevron'>, ReactNode> = {
       <path d="M4 10c0 1.5 1 2.5 2.3 2.5S9 11.5 9 10c0 1.5 1 2.5 2.3 2.5s2.4-1 2.4-2.5c0 1.5 1 2.5 2.3 2.5S18 11.5 18 10c0 1.5 1 2.5 2 2.5" />
     </>
   ),
+  chart: (
+    <>
+      <path d="M4 20V4M4 20h16" />
+      <path d="m7 15 4-5 3 3 5-7" />
+    </>
+  ),
   house: (
     <>
       <path d="m3 11 9-7 9 7" />
@@ -585,6 +839,102 @@ function Icon({ name }: { name: IconName }) {
       ) : (
         ICON_PATHS[name]
       )}
+    </svg>
+  );
+}
+
+type PixelIconName =
+  | 'families'
+  | 'coins'
+  | 'food'
+  | 'wood'
+  | 'fertilizer'
+  | 'limestone'
+  | 'stock'
+  | 'price'
+  | 'reputation';
+
+const PIXEL_ICONS: Record<PixelIconName, ReactNode> = {
+  families: (
+    <>
+      <rect x="3" y="2" width="4" height="4" />
+      <rect x="9" y="2" width="4" height="4" />
+      <rect x="2" y="7" width="6" height="2" />
+      <rect x="8" y="7" width="6" height="2" />
+      <rect x="2" y="9" width="2" height="5" />
+      <rect x="6" y="9" width="2" height="5" />
+      <rect x="8" y="9" width="2" height="5" />
+      <rect x="12" y="9" width="2" height="5" />
+    </>
+  ),
+  coins: (
+    <>
+      <path d="M6 1h4v1h2v1h1v1h1v2h1v4h-1v2h-1v1h-1v1h-2v1H6v-1H4v-1H3v-1H2v-2H1V6h1V4h1V3h1V2h2Z" opacity=".28" />
+      <path d="M7 2h2v1h1v1h1v1h1v2h1v2h-1v2h-1v1h-1v1h-1v1H7v-1H5v-1H4v-1H3v-2H2V7h1V5h1V4h1V3h2Z" />
+      <rect x="7" y="7" width="2" height="2" />
+      <rect x="5" y="9" width="6" height="2" />
+    </>
+  ),
+  food: (
+    <>
+      <rect x="7" y="2" width="2" height="13" />
+      <rect x="4" y="4" width="3" height="2" />
+      <rect x="9" y="6" width="3" height="2" />
+      <rect x="5" y="8" width="3" height="2" />
+      <rect x="9" y="10" width="3" height="2" />
+      <rect x="5" y="14" width="6" height="2" />
+    </>
+  ),
+  wood: (
+    <>
+      <path d="M2 8h12l2 4-2 4H2Z" opacity=".35" />
+      <path d="M3 9h10l1 3-1 3H3Z" />
+      <rect x="6" y="9" width="2" height="6" opacity=".35" />
+      <rect x="10" y="9" width="2" height="6" opacity=".35" />
+      <rect x="13" y="10" width="2" height="4" />
+    </>
+  ),
+  fertilizer: (
+    <>
+      <path d="M5 5h8l1 3v7H4V8Z" />
+      <rect x="7" y="2" width="4" height="3" />
+      <rect x="7" y="9" width="4" height="2" opacity=".35" />
+      <rect x="8" y="12" width="2" height="2" opacity=".35" />
+    </>
+  ),
+  limestone: (
+    <>
+      <path d="m3 8 4-5h6l4 5-3 6H6Z" />
+      <path d="M7 3 9 8l-3 6M13 3l-2 5 3 6" opacity=".35" />
+    </>
+  ),
+  stock: (
+    <>
+      <path d="M7 2h4l3 3v9l-3 2H7l-3-3V5Z" />
+      <path d="M7 5c3 1 5 4 5 7" opacity=".35" />
+      <rect x="7" y="6" width="2" height="3" opacity=".35" />
+    </>
+  ),
+  price: (
+    <>
+      <path d="M2 7V2h6l7 7-5 5-7-7Z" />
+      <rect x="4" y="4" width="2" height="2" opacity=".35" />
+    </>
+  ),
+  reputation: (
+    <path d="m8 1 2 4 4 1-3 3 1 5-4-2-4 2 1-5-3-3 4-1Z" />
+  ),
+};
+
+function PixelIcon({ name }: { name: PixelIconName }) {
+  return (
+    <svg
+      className="pixel-icon"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      shapeRendering="crispEdges"
+    >
+      {PIXEL_ICONS[name]}
     </svg>
   );
 }
@@ -684,6 +1034,23 @@ function InputMarket({
       <ul className="input-list">
         {inputRow('fertilizer')}
         {inputRow('limestone')}
+        <li>
+          <span>
+            <Icon name="stock" /> {t.seedlings}
+          </span>
+          <span className="muted small">
+            {state.seedlings} · {SEEDLING_BUNDLE_PRICE} {t.coins.toLowerCase()} /{' '}
+            {SEEDLING_BUNDLE_SIZE}
+          </span>
+          <button
+            type="button"
+            className="button small"
+            disabled={state.coins < SEEDLING_BUNDLE_PRICE}
+            onClick={() => void session.buySeedlings(SEEDLING_BUNDLE_SIZE)}
+          >
+            {t.buy}
+          </button>
+        </li>
       </ul>
     </section>
   );
@@ -737,10 +1104,49 @@ function WoodMarket({
   );
 }
 
+function FamilyGrowth({
+  session,
+  state,
+  t,
+}: {
+  session: SitioSession;
+  state: SitioFullState;
+  t: Strings;
+}) {
+  const houses = state.structures.filter((structure) => structure.kind === 'house').length;
+  const emptyHouses = Math.max(0, houses - state.families.length);
+  return (
+    <section>
+      <h2>
+        <Icon name="families" />
+        {t.familyGrowth}
+      </h2>
+      {emptyHouses > 0 ? (
+        <>
+          <p className="muted small">
+            {t.emptyHouse}: {emptyHouses}
+          </p>
+          <button
+            type="button"
+            className="button small"
+            disabled={state.coins < FAMILY_INVITE_COST}
+            onClick={() => void session.inviteFamily()}
+          >
+            {t.inviteFamily} · {FAMILY_INVITE_COST} {t.coins.toLowerCase()}
+          </button>
+        </>
+      ) : (
+        <p className="muted small">{t.needHouse}</p>
+      )}
+    </section>
+  );
+}
+
 function FamilyCard({
   family,
   people,
   sites,
+  plantOrders,
   hasSchool,
   fertilizer,
   limestone,
@@ -752,6 +1158,7 @@ function FamilyCard({
   family: Family;
   people: Person[];
   sites: { id: number; kind: BuildingKind; progress: number; required: number }[];
+  plantOrders: CoffeePlantOrder[];
   hasSchool: boolean;
   fertilizer: number;
   limestone: number;
@@ -815,6 +1222,11 @@ function FamilyCard({
                       <option value="yard">{t.task.quintal}</option>
                       <option value="coffee">{t.task.coffee}</option>
                       <option value="road">{t.task.road}</option>
+                      {plantOrders.map((order) => (
+                        <option key={order.id} value={`plantLot:${order.id}`}>
+                          {t.task.plantLot} ({order.progress}/{order.required})
+                        </option>
+                      ))}
                       {sites.map((site) => (
                         <option key={site.id} value={`build:${site.id}`}>
                           {t.task.build} {t.tools[site.kind]} ({site.progress}/{site.required})
@@ -828,13 +1240,6 @@ function FamilyCard({
                         onClick={() => onLand(person.id, period, 'clear')}
                       >
                         {t.task.clear}
-                      </button>
-                      <button
-                        type="button"
-                        className="mini"
-                        onClick={() => onLand(person.id, period, 'plant')}
-                      >
-                        {t.task.plant}
                       </button>
                       <button
                         type="button"
@@ -895,6 +1300,7 @@ function FamilyCard({
 
 function taskValue(task: WorkTask): string {
   if (task.kind === 'build') return `build:${task.siteId}`;
+  if (task.kind === 'plantLot') return `plantLot:${task.orderId}`;
   if (task.kind === 'rest') return 'idle';
   return task.kind;
 }
@@ -902,6 +1308,9 @@ function taskValue(task: WorkTask): string {
 function taskFromValue(value: string): WorkTask {
   if (value.startsWith('build:')) {
     return { kind: 'build', siteId: Number(value.slice(6)) };
+  }
+  if (value.startsWith('plantLot:')) {
+    return { kind: 'plantLot', orderId: Number(value.slice(9)) };
   }
   return { kind: value as 'idle' | 'rest' | 'yard' | 'coffee' | 'study' | 'road' };
 }
@@ -985,36 +1394,58 @@ function ReportModal({
           {t.season[report.season]} · {t.week} {report.week} · {t.year} {report.year}
         </p>
         <dl className="report-grid">
-          <Row label={t.report.harvest} value={report.harvest} />
-          <Row label={`${t.report.harvest} · ${t.grade.bad}`} value={report.harvestGrades.bad} />
-          <Row label={`${t.report.harvest} · ${t.grade.medium}`} value={report.harvestGrades.medium} />
-          <Row label={`${t.report.harvest} · ${t.grade.good}`} value={report.harvestGrades.good} />
-          <Row label={t.report.lost} value={report.lost} />
-          <Row label={t.report.sold} value={report.sold} />
-          <Row label={t.report.stock} value={`${report.stock}/${state.coffeeCapacity}`} />
-          <Row label={t.report.revenue} value={report.revenue} />
-          <Row label={t.report.price} value={report.price} />
-          <Row label={t.report.foodProduced} value={report.foodProduced} />
-          <Row label={t.report.foodConsumed} value={report.foodConsumed} />
-          <Row label={t.report.foodBought} value={report.foodBought} />
-          <Row label={t.report.foodSold} value={report.foodSold} />
-          <Row label={t.report.planted} value={report.planted} />
-          <Row label={t.report.cleared} value={report.cleared} />
-          <Row label={t.report.studied} value={report.studied} />
-          <Row label={t.report.educated} value={report.educated} />
-          <Row label={t.report.roads} value={report.roads} />
-          <Row label={t.report.fertilized} value={report.fertilized} />
-          <Row label={t.report.limed} value={report.limed} />
-          <Row label={t.report.arrivals} value={report.arrivals} />
-          <Row label={t.report.departures} value={report.departures} />
-          <Row label={t.report.completed} value={
-            report.completed.length > 0
-              ? report.completed.map((kind) => t.tools[kind]).join(', ')
-              : t.report.none
-          } />
-          <Row label={t.report.event} value={
-            report.event === 'none' ? t.report.none : t.report[report.event]
-          } />
+          {report.harvest > 0 ? <Row label={t.report.harvest} value={report.harvest} /> : null}
+          {report.harvestGrades.bad > 0 ? (
+            <Row label={`${t.report.harvest} · ${t.grade.bad}`} value={report.harvestGrades.bad} />
+          ) : null}
+          {report.harvestGrades.medium > 0 ? (
+            <Row
+              label={`${t.report.harvest} · ${t.grade.medium}`}
+              value={report.harvestGrades.medium}
+            />
+          ) : null}
+          {report.harvestGrades.good > 0 ? (
+            <Row label={`${t.report.harvest} · ${t.grade.good}`} value={report.harvestGrades.good} />
+          ) : null}
+          {report.lost > 0 ? <Row label={t.report.lost} value={report.lost} /> : null}
+          {report.sold > 0 ? <Row label={t.report.sold} value={report.sold} /> : null}
+          {report.stock > 0 ? (
+            <Row label={t.report.stock} value={`${report.stock}/${state.coffeeCapacity}`} />
+          ) : null}
+          {report.revenue > 0 ? <Row label={t.report.revenue} value={report.revenue} /> : null}
+          {report.price > 0 ? <Row label={t.report.price} value={report.price} /> : null}
+          {report.foodProduced > 0 ? (
+            <Row label={t.report.foodProduced} value={report.foodProduced} />
+          ) : null}
+          {report.foodConsumed > 0 ? (
+            <Row label={t.report.foodConsumed} value={report.foodConsumed} />
+          ) : null}
+          {report.foodBought > 0 ? (
+            <Row label={t.report.foodBought} value={report.foodBought} />
+          ) : null}
+          {report.foodSold > 0 ? <Row label={t.report.foodSold} value={report.foodSold} /> : null}
+          {report.planted > 0 ? <Row label={t.report.planted} value={report.planted} /> : null}
+          {report.cleared > 0 ? <Row label={t.report.cleared} value={report.cleared} /> : null}
+          {report.studied > 0 ? <Row label={t.report.studied} value={report.studied} /> : null}
+          {report.educated > 0 ? <Row label={t.report.educated} value={report.educated} /> : null}
+          {report.roads > 0 ? <Row label={t.report.roads} value={report.roads} /> : null}
+          {report.fertilized > 0 ? (
+            <Row label={t.report.fertilized} value={report.fertilized} />
+          ) : null}
+          {report.limed > 0 ? <Row label={t.report.limed} value={report.limed} /> : null}
+          {report.arrivals > 0 ? <Row label={t.report.arrivals} value={report.arrivals} /> : null}
+          {report.departures > 0 ? (
+            <Row label={t.report.departures} value={report.departures} />
+          ) : null}
+          {report.completed.length > 0 ? (
+            <Row
+              label={t.report.completed}
+              value={report.completed.map((kind) => t.tools[kind]).join(', ')}
+            />
+          ) : null}
+          {report.event !== 'none' ? (
+            <Row label={t.report.event} value={t.report[report.event]} />
+          ) : null}
         </dl>
         {report.hunger ? <p className="warning">{t.report.hunger}</p> : null}
         {report.stalledCoffee > 0 ? (

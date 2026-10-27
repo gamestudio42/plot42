@@ -16,6 +16,7 @@ import {
   type BuildingKind,
   type CoffeeGrades,
   type CoffeeLot,
+  type CoffeePlantOrder,
   type Family,
   type InputStock,
   type Person,
@@ -28,12 +29,13 @@ import {
   type SitioTotals,
   type StarterKind,
   type Structure,
+  type WeekHistoryPoint,
   type WorkTask,
   type YearEvent,
 } from './types';
 
 export const SITIO_SAVE_FORMAT = 'sitio-save';
-export const SITIO_SAVE_VERSION = 20;
+export const SITIO_SAVE_VERSION = 21;
 export const SITIO_SAVE_EXTENSION = '.sitio.json';
 
 const STATUSES: readonly SitioStatus[] = ['playing', 'won', 'lost', 'ended'];
@@ -48,6 +50,7 @@ interface SitioSaveState {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeePrice: number;
@@ -63,11 +66,14 @@ interface SitioSaveState {
   sites: Site[];
   structures: Structure[];
   coffeeLots: CoffeeLot[];
+  plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  history: WeekHistoryPoint[];
   totals: SitioTotals;
   lastReport: SeasonReport | null;
   weekSold: number;
   weekRevenue: number;
+  weekExpense: number;
 }
 
 export type SitioSaveFile = SaveEnvelope<typeof SITIO_SAVE_FORMAT, SitioMeta, SitioSaveState>;
@@ -85,6 +91,7 @@ export function encodeSitioSave(snapshot: SitioSnapshot, savedAt: string): Sitio
     food: snapshot.food,
     wood: snapshot.wood,
     inputStock: snapshot.inputStock,
+    seedlings: snapshot.seedlings,
     coffeeStock: snapshot.coffeeStock,
     coffeeGrades: snapshot.coffeeGrades,
     coffeePrice: snapshot.coffeePrice,
@@ -100,11 +107,14 @@ export function encodeSitioSave(snapshot: SitioSnapshot, savedAt: string): Sitio
     sites: snapshot.sites,
     structures: snapshot.structures,
     coffeeLots: snapshot.coffeeLots,
+    plantOrders: snapshot.plantOrders,
     roadPlan: snapshot.roadPlan,
+    history: snapshot.history,
     totals: snapshot.totals,
     lastReport: snapshot.lastReport,
     weekSold: snapshot.weekSold,
     weekRevenue: snapshot.weekRevenue,
+    weekExpense: snapshot.weekExpense,
   };
   return encodeEnvelope(
     SITIO_SAVE_FORMAT,
@@ -138,6 +148,10 @@ function decodeTask(value: unknown): WorkTask | null {
       return { kind: 'study' };
     case 'road':
       return { kind: 'road' };
+    case 'plantLot':
+      return typeof value.orderId === 'number'
+        ? { kind: 'plantLot', orderId: value.orderId }
+        : null;
     case 'fertilize':
       return typeof value.x === 'number' && typeof value.y === 'number'
         ? { kind: 'fertilize', x: value.x, y: value.y }
@@ -314,6 +328,64 @@ function decodeRoadPlan(value: unknown): { x: number; y: number }[] | null {
   return plan;
 }
 
+function decodePlantOrder(value: unknown): CoffeePlantOrder | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.id !== 'number' ||
+    typeof value.x !== 'number' ||
+    typeof value.y !== 'number' ||
+    typeof value.w !== 'number' ||
+    typeof value.h !== 'number' ||
+    typeof value.progress !== 'number' ||
+    typeof value.required !== 'number'
+  ) {
+    return null;
+  }
+  return {
+    id: value.id,
+    x: value.x,
+    y: value.y,
+    w: value.w,
+    h: value.h,
+    progress: value.progress,
+    required: value.required,
+  };
+}
+
+function decodeHistory(value: unknown): WeekHistoryPoint[] | null {
+  if (!Array.isArray(value)) return null;
+  const points: WeekHistoryPoint[] = [];
+  for (const entry of value) {
+    if (
+      !isRecord(entry) ||
+      typeof entry.turn !== 'number' ||
+      typeof entry.week !== 'number' ||
+      typeof entry.year !== 'number' ||
+      typeof entry.season !== 'string' ||
+      typeof entry.coins !== 'number' ||
+      typeof entry.income !== 'number' ||
+      typeof entry.expenses !== 'number'
+    ) {
+      return null;
+    }
+    const harvest = decodeGrades(entry.harvest);
+    const stock = decodeGrades(entry.stock);
+    if (!harvest || !stock) return null;
+    points.push({
+      turn: entry.turn,
+      week: entry.week,
+      year: entry.year,
+      season: entry.season as WeekHistoryPoint['season'],
+      coins: entry.coins,
+      income: entry.income,
+      expenses: entry.expenses,
+      harvest,
+      stock,
+    });
+  }
+  return points;
+}
+
 function decodeSetup(value: unknown): SetupStep | null | undefined {
   if (value === null) return null;
   if (typeof value !== 'string') return undefined;
@@ -411,6 +483,7 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     !isRecord(raw.inputStock) ||
     typeof raw.inputStock.fertilizer !== 'number' ||
     typeof raw.inputStock.limestone !== 'number' ||
+    typeof raw.seedlings !== 'number' ||
     typeof raw.coffeeStock !== 'number' ||
     !isRecord(raw.coffeeGrades) ||
     typeof raw.coffeeGrades.bad !== 'number' ||
@@ -433,9 +506,12 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     !Array.isArray(raw.sites) ||
     !Array.isArray(raw.structures) ||
     !Array.isArray(raw.coffeeLots) ||
+    !Array.isArray(raw.plantOrders) ||
     !Array.isArray(raw.roadPlan) ||
+    !Array.isArray(raw.history) ||
     typeof raw.weekSold !== 'number' ||
-    typeof raw.weekRevenue !== 'number'
+    typeof raw.weekRevenue !== 'number' ||
+    typeof raw.weekExpense !== 'number'
   ) {
     return invalid('state: header');
   }
@@ -488,6 +564,14 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     if (!lot) return invalid('state.coffeeLots');
     coffeeLots.push(lot);
   }
+  const plantOrders: CoffeePlantOrder[] = [];
+  for (const entry of raw.plantOrders) {
+    const order = decodePlantOrder(entry);
+    if (!order) return invalid('state.plantOrders');
+    plantOrders.push(order);
+  }
+  const history = decodeHistory(raw.history);
+  if (!history) return invalid('state.history');
   const totals = decodeTotals(raw.totals);
   if (!totals) return invalid('state.totals');
   const inputStock = decodeInputs(raw.inputStock);
@@ -507,6 +591,7 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     food: raw.food,
     wood: raw.wood,
     inputStock,
+    seedlings: raw.seedlings,
     coffeeStock: raw.coffeeStock,
     coffeeGrades,
     coffeePrice: raw.coffeePrice,
@@ -527,11 +612,14 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     sites,
     structures,
     coffeeLots,
+    plantOrders,
     roadPlan,
+    history,
     totals,
     lastReport,
     weekSold: raw.weekSold,
     weekRevenue: raw.weekRevenue,
+    weekExpense: raw.weekExpense,
   };
   const envelopeMeta = isRecord(decoded.file.meta) ? decoded.file.meta : {};
   const meta: SitioMeta = {

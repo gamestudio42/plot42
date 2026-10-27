@@ -5,6 +5,7 @@ import {
   BUILDING_TERREIRO,
   COFFEE_FORMING,
   COFFEE_MATURE,
+  COFFEE_MUDA,
   COFFEE_PES_PER_CELL,
   SITIO_SIZE,
   SitioEngine,
@@ -567,6 +568,49 @@ describe('SitioEngine', () => {
     expect(lot?.limed).toBe(false);
   });
 
+  it('buys seedlings and plants a coffee lot with two adult periods', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({
+      ok: false,
+      reason: 'no-seedlings',
+    });
+    expect(engine.execute({ type: 'buySeedlings', amount: 16 })).toEqual({ ok: true });
+    expect(engine.seedlings).toBe(16);
+    expect(engine.coins).toBe(8);
+    expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({ ok: true });
+    expect(engine.seedlings).toBe(0);
+    expect(engine.plantOrders).toHaveLength(1);
+    const order = engine.plantOrders[0];
+    if (!order) throw new Error('missing order');
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    for (const period of ['morning', 'afternoon'] as Period[]) {
+      expect(
+        engine.execute({
+          type: 'assign',
+          personId: person.id,
+          period,
+          task: { kind: 'plantLot', orderId: order.id },
+        }).ok,
+      ).toBe(true);
+    }
+    const report = endWeek(engine);
+    expect(report.planted).toBe(8);
+    expect(engine.plantOrders).toHaveLength(0);
+    expect(engine.coffeeLots).toHaveLength(2);
+    expect(engine.coffee.filter((stage) => stage === COFFEE_MUDA)).toHaveLength(8);
+  });
+
+  it('records weekly income and expenses in history', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'buySeedlings', amount: 16 })).toEqual({ ok: true });
+    expect(engine.execute({ type: 'buyWood', amount: 1 })).toEqual({ ok: true });
+    endWeek(engine);
+    expect(engine.history).toHaveLength(1);
+    expect(engine.history[0]?.expenses).toBe(5);
+    expect(engine.history[0]?.coins).toBe(engine.coins);
+  });
+
   it('builds up to four planned roads per adult per week without cost', () => {
     const engine = setup(create());
     const coins = engine.coins;
@@ -627,6 +671,26 @@ describe('SitioEngine', () => {
     expect(engine.canPlaceBuilding('house', 12, 12)).toEqual({
       ok: false,
       reason: 'road',
+    });
+  });
+
+  it('invites an unrelated family into an empty house', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-house',
+    });
+    addBuilding(engine, 'house', 12, 1, 2, 2);
+    expect(engine.emptyHouseCount()).toBe(1);
+    const family = engine.execute({ type: 'inviteFamily' });
+    expect(family).toEqual({ ok: true });
+    expect(engine.families).toHaveLength(2);
+    expect(engine.people).toHaveLength(8);
+    expect(engine.coins).toBe(8);
+    expect(engine.emptyHouseCount()).toBe(0);
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-house',
     });
   });
 
@@ -703,7 +767,7 @@ describe('SitioEngine', () => {
     expect(restored.hash()).toBe(engine.hash());
   });
 
-  it('round-trips the v20 save through the kernel envelope', () => {
+  it('round-trips the v21 save through the kernel envelope', () => {
     const engine = setup(create());
     assignAll(engine, { kind: 'coffee' });
     endWeek(engine);
@@ -711,6 +775,7 @@ describe('SitioEngine', () => {
     engine.coffeeGrades.bad = 4;
     engine.wood = 7;
     engine.inputStock.fertilizer = 2;
+    engine.seedlings = 8;
     const child = engine.people.find((person) => person.age < 16);
     if (child) child.educationProgress = 2;
     engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 1 });
@@ -725,6 +790,8 @@ describe('SitioEngine', () => {
     expect(decoded.snapshot.people).toHaveLength(4);
     expect(decoded.snapshot.people.some((person) => person.educationProgress === 2)).toBe(true);
     expect(decoded.snapshot.inputStock.fertilizer).toBe(2);
+    expect(decoded.snapshot.seedlings).toBe(8);
+    expect(decoded.snapshot.history).toHaveLength(1);
     expect(decoded.snapshot.coffeeStock).toBe(3);
     expect(decoded.snapshot.wood).toBe(7);
     expect(decoded.snapshot.weekSold).toBe(1);

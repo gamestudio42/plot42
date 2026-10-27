@@ -100,6 +100,12 @@ export const INPUT_PRICES: Record<InputKind, number> = {
   limestone: 2,
 };
 
+export const FAMILY_INVITE_COST = 4;
+export const SEEDLING_BUNDLE_SIZE = 4;
+export const SEEDLING_BUNDLE_PRICE = 1;
+export const COFFEE_LOT_SEEDLINGS = 16;
+export const COFFEE_PLANT_PERIODS = 2;
+
 export const COFFEE_QUALITY_BASE = 40;
 export const FERTILIZER_QUALITY_BONUS = 20;
 export const LIMESTONE_QUALITY_BONUS = 20;
@@ -171,6 +177,7 @@ export type WorkTask =
   | { kind: 'coffee' }
   | { kind: 'study' }
   | { kind: 'road' }
+  | { kind: 'plantLot'; orderId: number }
   | { kind: 'fertilize'; x: number; y: number }
   | { kind: 'limestone'; x: number; y: number }
   | { kind: 'build'; siteId: number }
@@ -238,6 +245,28 @@ export interface CoffeeLot {
   limed: boolean;
 }
 
+export interface CoffeePlantOrder {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  progress: number;
+  required: number;
+}
+
+export interface WeekHistoryPoint {
+  turn: number;
+  week: number;
+  year: number;
+  season: Season;
+  coins: number;
+  income: number;
+  expenses: number;
+  harvest: CoffeeGrades;
+  stock: CoffeeGrades;
+}
+
 export type YearEvent = 'none' | 'frost' | 'drought';
 
 export interface MoraleChange {
@@ -291,6 +320,7 @@ export interface SitioStats {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeeCapacity: number;
@@ -326,6 +356,7 @@ export interface SitioFullState {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeeCapacity: number;
@@ -341,9 +372,11 @@ export interface SitioFullState {
   sites: Site[];
   structures: Structure[];
   coffeeLots: CoffeeLot[];
+  plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
   yearEvent: YearEvent;
   lastReport: SeasonReport | null;
+  history: WeekHistoryPoint[];
   stats: SitioStats;
 }
 
@@ -355,6 +388,7 @@ export interface SitioSnapshot {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeePrice: number;
@@ -370,11 +404,14 @@ export interface SitioSnapshot {
   sites: Site[];
   structures: Structure[];
   coffeeLots: CoffeeLot[];
+  plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
   totals: SitioTotals;
   lastReport: SeasonReport | null;
+  history: WeekHistoryPoint[];
   weekSold: number;
   weekRevenue: number;
+  weekExpense: number;
 }
 
 export interface NewSitioOptions {
@@ -400,8 +437,11 @@ export type SitioCommand =
   | { type: 'sellCoffee'; grade: CoffeeGrade; amount: number }
   | { type: 'buyWood'; amount: number }
   | { type: 'buyInput'; kind: InputKind; amount: number }
+  | { type: 'buySeedlings'; amount: number }
+  | { type: 'plantCoffeeLot'; x: number; y: number }
   | { type: 'planRoad'; x: number; y: number }
   | { type: 'clearRoadPlan' }
+  | { type: 'inviteFamily' }
   | { type: 'endWeek' };
 
 export type SitioCommandReason =
@@ -413,6 +453,8 @@ export type SitioCommandReason =
   | 'no-coins'
   | 'no-wood'
   | 'no-input'
+  | 'no-seedlings'
+  | 'no-house'
   | 'no-family'
   | 'no-person'
   | 'not-adult'
@@ -440,6 +482,7 @@ export type ToSitioMessage =
   | { type: 'command'; id: number; command: SitioCommand }
   | { type: 'starterPreview'; id: number; kind: StarterKind; x: number; y: number }
   | { type: 'buildPreview'; id: number; kind: BuildingKind; x: number; y: number }
+  | { type: 'coffeePreview'; id: number; x: number; y: number }
   | { type: 'snapshot'; id: number }
   | { type: 'hash'; id: number }
   | { type: 'exportSave'; id: number; savedAt: string }
@@ -455,6 +498,7 @@ export type FromSitioMessage =
   | { type: 'commandResult'; id: number; result: SitioCommandResult }
   | { type: 'starterPreviewResult'; id: number; result: StarterPreviewResult }
   | { type: 'buildPreviewResult'; id: number; result: SitioCommandResult }
+  | { type: 'coffeePreviewResult'; id: number; result: SitioCommandResult }
   | { type: 'snapshot'; id: number; snapshot: SitioSnapshot }
   | { type: 'hash'; id: number; hash: string }
   | { type: 'saveData'; id: number; text: string; meta: SitioMeta }

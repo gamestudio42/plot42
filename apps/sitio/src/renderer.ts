@@ -418,6 +418,18 @@ export class SitioRenderer {
       );
     }
 
+    for (const order of state.plantOrders) {
+      this.drawSite(
+        this.objectAt(order.x, order.y, 0.3),
+        order.x,
+        order.y,
+        order.w,
+        order.h,
+        order.progress,
+        order.required,
+      );
+    }
+
     for (const family of state.families) {
       if (
         !this.drawSprite('family', family.houseX, family.houseY, 0.4, 1, 1, 8, 10)

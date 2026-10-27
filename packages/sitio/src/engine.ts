@@ -9,16 +9,19 @@ import {
   COFFEE_CELLS_PER_PERIOD,
   COFFEE_FORMING,
   COFFEE_GRADES,
+  COFFEE_LOT_SEEDLINGS,
   COFFEE_MATURE,
   COFFEE_MUDA,
   COFFEE_NONE,
   COFFEE_PES_PER_CELL,
+  COFFEE_PLANT_PERIODS,
   COFFEE_QUALITY_BASE,
   EDUCATION_PERIODS,
   FAMILY_NAMES,
   FAMILY_NEED,
   FERTILIZER_QUALITY_BONUS,
   FINAL_TURN,
+  FAMILY_INVITE_COST,
   FOOD_CAP,
   FROST_LOSS,
   HARVEST_YIELD,
@@ -29,6 +32,8 @@ import {
   PERSON_NAMES,
   ROAD_TILES_PER_WEEK,
   SCHOOL_AGE,
+  SEEDLING_BUNDLE_SIZE,
+  SEEDLING_BUNDLE_PRICE,
   SITIO_SIZE,
   START_COINS,
   START_FOOD,
@@ -54,6 +59,7 @@ import {
   type CoffeeGrade,
   type CoffeeGrades,
   type CoffeeLot,
+  type CoffeePlantOrder,
   type Family,
   type InputKind,
   type InputStock,
@@ -77,6 +83,7 @@ import {
   type StarterPreviewResult,
   type Structure,
   type WorkTask,
+  type WeekHistoryPoint,
   type YearEvent,
 } from './types';
 
@@ -108,6 +115,8 @@ function cloneTask(task: WorkTask): WorkTask {
       return { kind: 'study' };
     case 'road':
       return { kind: 'road' };
+    case 'plantLot':
+      return { kind: 'plantLot', orderId: task.orderId };
     case 'fertilize':
       return { kind: 'fertilize', x: task.x, y: task.y };
     case 'limestone':
@@ -199,6 +208,7 @@ export class SitioEngine {
   food = START_FOOD;
   wood = START_WOOD;
   inputStock: InputStock = emptyInputs();
+  seedlings = 0;
   coffeeStock = 0;
   coffeeGrades: CoffeeGrades = emptyGrades();
   coffeePrice = COFFEE_BASE_PRICE;
@@ -213,17 +223,21 @@ export class SitioEngine {
   sites: Site[] = [];
   structures: Structure[] = [];
   coffeeLots: CoffeeLot[] = [];
+  plantOrders: CoffeePlantOrder[] = [];
   roadPlan: { x: number; y: number }[] = [];
+  history: WeekHistoryPoint[] = [];
   totals: SitioTotals = emptyTotals();
   lastReport: SeasonReport | null = null;
   weekSold = 0;
   weekRevenue = 0;
+  weekExpense = 0;
   readonly rng: Rng;
   private nextFamilyId = 1;
   private nextPersonId = 1;
   private nextSiteId = 1;
   private nextStructureId = 1;
   private nextCoffeeLotId = 1;
+  private nextPlantOrderId = 1;
 
   private constructor(name: string, seed: string, rng: Rng) {
     this.name = name;
@@ -253,6 +267,7 @@ export class SitioEngine {
     engine.food = snapshot.food;
     engine.wood = snapshot.wood;
     engine.inputStock = { ...snapshot.inputStock };
+    engine.seedlings = snapshot.seedlings;
     engine.coffeeStock = snapshot.coffeeStock;
     engine.coffeeGrades = cloneGrades(snapshot.coffeeGrades);
     engine.coffeePrice = snapshot.coffeePrice;
@@ -267,7 +282,14 @@ export class SitioEngine {
     engine.sites = snapshot.sites.map(cloneSite);
     engine.structures = (snapshot.structures ?? []).map(cloneStructure);
     engine.coffeeLots = (snapshot.coffeeLots ?? []).map(cloneCoffeeLot);
+    engine.plantOrders = (snapshot.plantOrders ?? []).map((order) => ({ ...order }));
     engine.roadPlan = (snapshot.roadPlan ?? []).map((tile) => ({ ...tile }));
+    engine.history = (snapshot.history ?? []).map((point) => ({
+      ...point,
+      harvest: cloneGrades(point.harvest),
+      stock: cloneGrades(point.stock),
+    }));
+    engine.weekExpense = snapshot.weekExpense ?? 0;
     engine.totals = { ...snapshot.totals };
     engine.lastReport = cloneReport(snapshot.lastReport);
     engine.weekSold = snapshot.weekSold ?? 0;
@@ -289,6 +311,9 @@ export class SitioEngine {
     let maxLot = 0;
     for (const lot of engine.coffeeLots) maxLot = Math.max(maxLot, lot.id);
     engine.nextCoffeeLotId = maxLot + 1;
+    let maxOrder = 0;
+    for (const order of engine.plantOrders) maxOrder = Math.max(maxOrder, order.id);
+    engine.nextPlantOrderId = maxOrder + 1;
     return engine;
   }
 
@@ -444,7 +469,79 @@ export class SitioEngine {
     const cost = price * amount;
     if (this.coins < cost) return { ok: false, reason: 'no-coins' };
     this.coins -= cost;
+    this.weekExpense += cost;
     this.inputStock[kind] += amount;
+    return { ok: true };
+  }
+
+  buySeedlings(amount: number): SitioCommandResult {
+    if (this.setup) return { ok: false, reason: 'setup' };
+    if (!Number.isInteger(amount) || amount <= 0 || amount % SEEDLING_BUNDLE_SIZE !== 0) {
+      return { ok: false, reason: 'invalid-amount' };
+    }
+    const bundles = amount / SEEDLING_BUNDLE_SIZE;
+    const cost = bundles * SEEDLING_BUNDLE_PRICE;
+    if (this.coins < cost) return { ok: false, reason: 'no-coins' };
+    this.coins -= cost;
+    this.weekExpense += cost;
+    this.seedlings += amount;
+    return { ok: true };
+  }
+
+  canPlantCoffeeLot(x: number, y: number): SitioCommandResult {
+    if (this.setup) return { ok: false, reason: 'setup' };
+    for (let yy = y; yy < y + 2; yy++) {
+      for (let xx = x; xx < x + 4; xx++) {
+        if (!this.inBounds(xx, yy)) return { ok: false, reason: 'oob' };
+        if (this.terrain[this.index(xx, yy)] === TERRAIN_ROAD) {
+          return { ok: false, reason: 'road' };
+        }
+        if (this.terrain[this.index(xx, yy)] !== TERRAIN_TERRA) {
+          return { ok: false, reason: 'mata' };
+        }
+        if (this.buildingAt(xx, yy) !== BUILDING_NONE) {
+          return { ok: false, reason: 'occupied' };
+        }
+        if (this.coffeeAt(xx, yy) !== COFFEE_NONE) {
+          return { ok: false, reason: 'occupied' };
+        }
+        if (this.siteAt(xx, yy)) return { ok: false, reason: 'occupied' };
+        if (this.roadPlan.some((tile) => tile.x === xx && tile.y === yy)) {
+          return { ok: false, reason: 'occupied' };
+        }
+        if (
+          this.plantOrders.some(
+            (order) =>
+              xx >= order.x &&
+              yy >= order.y &&
+              xx < order.x + order.w &&
+              yy < order.y + order.h,
+          )
+        ) {
+          return { ok: false, reason: 'occupied' };
+        }
+      }
+    }
+    if (this.seedlings < COFFEE_LOT_SEEDLINGS) {
+      return { ok: false, reason: 'no-seedlings' };
+    }
+    return { ok: true };
+  }
+
+  plantCoffeeLot(x: number, y: number): SitioCommandResult {
+    const check = this.canPlantCoffeeLot(x, y);
+    if (!check.ok) return check;
+    this.seedlings -= COFFEE_LOT_SEEDLINGS;
+    const order: CoffeePlantOrder = {
+      id: this.nextPlantOrderId++,
+      x,
+      y,
+      w: 4,
+      h: 2,
+      progress: 0,
+      required: COFFEE_PLANT_PERIODS,
+    };
+    this.plantOrders.push(order);
     return { ok: true };
   }
 
@@ -470,6 +567,25 @@ export class SitioEngine {
     return this.structures.filter((structure) => structure.kind === 'house').length;
   }
 
+  emptyHouseCount(): number {
+    const houses = this.structures.filter((structure) => structure.kind === 'house');
+    const occupied = new Set(
+      this.families.map((family) => `${family.houseX},${family.houseY}`),
+    );
+    return houses.filter((house) => !occupied.has(`${house.x},${house.y}`)).length;
+  }
+
+  inviteFamily(): SitioCommandResult {
+    if (this.setup) return { ok: false, reason: 'setup' };
+    const empty = this.findEmptyHouse();
+    if (!empty) return { ok: false, reason: 'no-house' };
+    if (this.coins < FAMILY_INVITE_COST) return { ok: false, reason: 'no-coins' };
+    this.coins -= FAMILY_INVITE_COST;
+    this.weekExpense += FAMILY_INVITE_COST;
+    this.createFamilyAt(empty.x, empty.y);
+    return { ok: true };
+  }
+
   execute(command: SitioCommand): SitioCommandResult {
     if (this.status !== 'playing') return { ok: false, reason: 'game-over' };
     switch (command.type) {
@@ -485,10 +601,16 @@ export class SitioEngine {
         return this.buyWood(command.amount);
       case 'buyInput':
         return this.buyInput(command.kind, command.amount);
+      case 'buySeedlings':
+        return this.buySeedlings(command.amount);
+      case 'plantCoffeeLot':
+        return this.plantCoffeeLot(command.x, command.y);
       case 'planRoad':
         return this.planRoad(command.x, command.y);
       case 'clearRoadPlan':
         return this.clearRoadPlan();
+      case 'inviteFamily':
+        return this.inviteFamily();
       case 'endWeek':
         if (this.setup) return { ok: false, reason: 'setup' };
         this.endWeek();
@@ -578,6 +700,7 @@ export class SitioEngine {
       food: this.food,
       wood: this.wood,
       inputStock: { ...this.inputStock },
+      seedlings: this.seedlings,
       coffeeStock: this.coffeeStock,
       coffeeGrades: cloneGrades(this.coffeeGrades),
       coffeePrice: this.coffeePrice,
@@ -593,11 +716,18 @@ export class SitioEngine {
       sites: this.sites.map(cloneSite),
       structures: this.structures.map(cloneStructure),
       coffeeLots: this.coffeeLots.map(cloneCoffeeLot),
+      plantOrders: this.plantOrders.map((order) => ({ ...order })),
       roadPlan: this.roadPlan.map((tile) => ({ ...tile })),
       totals: { ...this.totals },
       lastReport: cloneReport(this.lastReport),
+      history: this.history.map((point) => ({
+        ...point,
+        harvest: cloneGrades(point.harvest),
+        stock: cloneGrades(point.stock),
+      })),
       weekSold: this.weekSold,
       weekRevenue: this.weekRevenue,
+      weekExpense: this.weekExpense,
     };
   }
 
@@ -615,6 +745,7 @@ export class SitioEngine {
       food: this.food,
       wood: this.wood,
       inputStock: { ...this.inputStock },
+      seedlings: this.seedlings,
       coffeeStock: this.coffeeStock,
       coffeeGrades: cloneGrades(this.coffeeGrades),
       coffeeCapacity: this.coffeeCapacity(),
@@ -630,9 +761,15 @@ export class SitioEngine {
       sites: this.sites.map(cloneSite),
       structures: this.structures.map(cloneStructure),
       coffeeLots: this.coffeeLots.map(cloneCoffeeLot),
+      plantOrders: this.plantOrders.map((order) => ({ ...order })),
       roadPlan: this.roadPlan.map((tile) => ({ ...tile })),
       yearEvent: this.yearEvent,
       lastReport: cloneReport(this.lastReport),
+      history: this.history.map((point) => ({
+        ...point,
+        harvest: cloneGrades(point.harvest),
+        stock: cloneGrades(point.stock),
+      })),
       stats: this.stats(),
     };
   }
@@ -649,6 +786,7 @@ export class SitioEngine {
       food: this.food,
       wood: this.wood,
       inputStock: { ...this.inputStock },
+      seedlings: this.seedlings,
       coffeeStock: this.coffeeStock,
       coffeeGrades: cloneGrades(this.coffeeGrades),
       coffeeCapacity: this.coffeeCapacity(),
@@ -687,6 +825,7 @@ export class SitioEngine {
         this.wood,
         this.inputStock.fertilizer,
         this.inputStock.limestone,
+        this.seedlings,
         this.coffeeStock,
         this.coffeeGrades.bad,
         this.coffeeGrades.medium,
@@ -694,6 +833,7 @@ export class SitioEngine {
         this.coffeePrice,
         this.weekSold,
         this.weekRevenue,
+        this.weekExpense,
       ])
       .bytes(this.terrain)
       .bytes(this.buildings)
@@ -745,12 +885,34 @@ export class SitioEngine {
     for (const tile of this.roadPlan) {
       hash.int32s([tile.x, tile.y]);
     }
+    for (const order of this.plantOrders) {
+      hash.int32s([order.id, order.x, order.y, order.progress, order.required]);
+    }
+    for (const point of this.history) {
+      hash
+        .string(point.season)
+        .int32s([
+          point.turn,
+          point.week,
+          point.year,
+          point.coins,
+          point.income,
+          point.expenses,
+          point.harvest.bad,
+          point.harvest.medium,
+          point.harvest.good,
+          point.stock.bad,
+          point.stock.medium,
+          point.stock.good,
+        ]);
+    }
     return hash.hex();
   }
 
   private hashTask(hash: Fnv1a, task: WorkTask): void {
     hash.string(task.kind);
     if (task.kind === 'build') hash.int32s([task.siteId]);
+    if (task.kind === 'plantLot') hash.int32s([task.orderId]);
     if (
       task.kind === 'plant' ||
       task.kind === 'clear' ||
@@ -794,6 +956,12 @@ export class SitioEngine {
     }
     if (task.kind === 'build') {
       if (!this.siteById(task.siteId)) return 'no-site';
+      return null;
+    }
+    if (task.kind === 'plantLot') {
+      if (!this.plantOrders.some((order) => order.id === task.orderId)) {
+        return 'no-site';
+      }
       return null;
     }
     if (task.kind === 'road') return null;
@@ -880,6 +1048,7 @@ export class SitioEngine {
     const spec = BUILDING_SPECS[kind];
     const footprint = footprintOfBuilding(BUILDING_IDS[kind]);
     this.coins -= spec.coins;
+    this.weekExpense += spec.coins;
     this.wood -= spec.wood;
     const site: Site = {
       id: this.nextSiteId++,
@@ -920,6 +1089,7 @@ export class SitioEngine {
     const cost = amount * WOOD_BUY_PRICE;
     if (this.coins < cost) return { ok: false, reason: 'no-coins' };
     this.coins -= cost;
+    this.weekExpense += cost;
     this.wood += amount;
     return { ok: true };
   }
@@ -1015,6 +1185,13 @@ export class SitioEngine {
             if (site.progress >= site.required) this.completeSite(site, report);
             break;
           }
+          case 'plantLot': {
+            const order = this.plantOrders.find((entry) => entry.id === task.orderId);
+            if (!order) break;
+            order.progress++;
+            if (order.progress >= order.required) this.completePlantOrder(order, report);
+            break;
+          }
           case 'plant':
             if (this.plantCoffee(task.x, task.y)) {
               this.coins -= 1;
@@ -1067,8 +1244,21 @@ export class SitioEngine {
     this.totals.arrivalsTotal += report.arrivals;
     this.totals.departuresTotal += report.departures;
     this.lastReport = report;
+    this.history.push({
+      turn: report.turn,
+      week: report.week,
+      year: report.year,
+      season: report.season,
+      coins: this.coins,
+      income: report.revenue + report.foodSold,
+      expenses: this.weekExpense,
+      harvest: cloneGrades(report.harvestGrades),
+      stock: cloneGrades(this.coffeeGrades),
+    });
+    if (this.history.length > 48) this.history = this.history.slice(-48);
     this.weekSold = 0;
     this.weekRevenue = 0;
+    this.weekExpense = 0;
 
     if (this.families.length < 1) {
       this.status = 'lost';
@@ -1241,6 +1431,25 @@ export class SitioEngine {
     return true;
   }
 
+  private completePlantOrder(order: CoffeePlantOrder, report: SeasonReport): void {
+    this.coffeeLots.push({
+      id: this.nextCoffeeLotId++,
+      x: order.x,
+      y: order.y,
+      w: order.w,
+      h: order.h,
+      fertilized: false,
+      limed: false,
+    });
+    for (let y = order.y; y < order.y + order.h; y++) {
+      for (let x = order.x; x < order.x + order.w; x++) {
+        this.coffee[this.index(x, y)] = COFFEE_MUDA;
+      }
+    }
+    this.plantOrders = this.plantOrders.filter((entry) => entry.id !== order.id);
+    report.planted += order.w * order.h;
+  }
+
   private completeSite(site: Site, report: SeasonReport): void {
     const id = BUILDING_IDS[site.kind];
     for (let y = site.y; y < site.y + site.h; y++) {
@@ -1283,6 +1492,7 @@ export class SitioEngine {
     if (short > 0) {
       const bought = Math.min(short, this.coins);
       this.coins -= bought;
+      this.weekExpense += bought;
       report.foodBought = bought;
       short -= bought;
     }
@@ -1332,25 +1542,29 @@ export class SitioEngine {
     });
   }
 
-  private arriveFamily(report: SeasonReport): void {
-    if (this.reputation() < ARRIVAL_REPUTATION) return;
-    const empty = this.findEmptyHouse();
-    if (!empty) return;
-    const id = this.nextFamilyId;
+  private createFamilyAt(houseX: number, houseY: number): Family {
+    const id = this.nextFamilyId++;
     const family: Family = {
       id,
       name: FAMILY_NAMES[(id - 1) % FAMILY_NAMES.length] ?? `Família ${id}`,
-      houseX: empty.x,
-      houseY: empty.y,
+      houseX,
+      houseY,
       morale: MORALE_START,
     };
-    this.nextFamilyId++;
     this.families.push(family);
     const offset = ((id - 1) * 4) % PERSON_NAMES.length;
     this.addPerson(family, PERSON_NAMES[offset] ?? 'João', 30, true);
     this.addPerson(family, PERSON_NAMES[(offset + 1) % PERSON_NAMES.length] ?? 'Maria', 28, true);
     this.addPerson(family, PERSON_NAMES[(offset + 2) % PERSON_NAMES.length] ?? 'Ana', 14, false);
     this.addPerson(family, PERSON_NAMES[(offset + 3) % PERSON_NAMES.length] ?? 'Pedro', 12, false);
+    return family;
+  }
+
+  private arriveFamily(report: SeasonReport): void {
+    if (this.reputation() < ARRIVAL_REPUTATION) return;
+    const empty = this.findEmptyHouse();
+    if (!empty) return;
+    this.createFamilyAt(empty.x, empty.y);
     report.arrivals = 1;
   }
 

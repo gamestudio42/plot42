@@ -25,7 +25,8 @@ import { applyDocumentLocale, bootLocale, catalog, persistLocale, type Locale } 
 import { SitioRenderer } from './renderer';
 
 export type Screen = 'menu' | 'game';
-export type Tool = 'select' | 'road' | BuildingKind;
+export type Tool = 'select' | 'road' | 'coffee' | BuildingKind;
+export type Panel = 'families' | 'works' | 'coffee' | 'market' | 'reports';
 
 export interface BootState {
   step: 'graphics' | 'farm' | 'done';
@@ -67,6 +68,7 @@ export interface SitioUi {
   saves: SitioSaveSlot[];
   toasts: ToastItem[];
   tool: Tool;
+  activePanel: Panel | null;
   selectedTile: { x: number; y: number } | null;
   setupPreview: SetupPreview | null;
   setupPinned: boolean;
@@ -88,6 +90,7 @@ export class SitioSession {
     saves: [],
     toasts: [],
     tool: 'select',
+    activePanel: null,
     selectedTile: null,
     setupPreview: null,
     setupPinned: false,
@@ -229,6 +232,12 @@ export class SitioSession {
     this.clearPlacement();
   }
 
+  setPanel(panel: Panel | null): void {
+    this.ui.set((state) => ({
+      activePanel: state.activePanel === panel ? null : panel,
+    }));
+  }
+
   async newGame(): Promise<void> {
     const { name, seed } = this.ui.get();
     this.renderer.setInputEnabled(true);
@@ -237,6 +246,7 @@ export class SitioSession {
     this.ui.set({
       screen: 'game',
       tool: 'select',
+      activePanel: null,
       selectedTile: null,
       setupPreview: null,
       setupPinned: false,
@@ -282,6 +292,7 @@ export class SitioSession {
       name: result.meta.name,
       seed: result.meta.seed,
       tool: 'select',
+      activePanel: null,
       selectedTile: null,
       setupPreview: null,
       setupPinned: false,
@@ -408,6 +419,15 @@ export class SitioSession {
     await this.client.command({ type: 'clearRoadPlan' });
   }
 
+  async inviteFamily(): Promise<void> {
+    const result = await this.client.command({ type: 'inviteFamily' });
+    if (!result.ok) {
+      this.toast('error', this.reason(result.reason));
+      return;
+    }
+    this.toast('info', catalog(this.ui.get().locale).familyArrived);
+  }
+
   async buyWood(amount: number): Promise<void> {
     const result = await this.client.command({ type: 'buyWood', amount });
     if (!result.ok) {
@@ -436,6 +456,7 @@ export class SitioSession {
     this.ui.set({
       screen: 'menu',
       selectedTile: null,
+      activePanel: null,
       setupPreview: null,
       setupPinned: false,
       pendingLand: null,
@@ -457,6 +478,47 @@ export class SitioSession {
   dispose(): void {
     this.client.dispose();
     this.renderer.destroy();
+  }
+
+  async previewCoffee(x: number, y: number): Promise<void> {
+    const token = ++this.previewToken;
+    this.renderer.setPlacement({
+      x,
+      y,
+      w: 4,
+      h: 2,
+      valid: true,
+      kind: 'coffee',
+    });
+    const result = await this.client.coffeePreview(x, y);
+    if (token !== this.previewToken) return;
+    this.renderer.setPlacement({
+      x,
+      y,
+      w: 4,
+      h: 2,
+      valid: result.ok,
+      kind: 'coffee',
+    });
+  }
+
+  async plantCoffeeLot(x: number, y: number): Promise<void> {
+    const result = await this.client.command({ type: 'plantCoffeeLot', x, y });
+    if (!result.ok) {
+      this.toast('error', this.reason(result.reason));
+      return;
+    }
+    this.clearPlacement();
+    this.toast('info', catalog(this.ui.get().locale).coffeeLotQueued);
+  }
+
+  async buySeedlings(amount: number): Promise<void> {
+    const result = await this.client.command({ type: 'buySeedlings', amount });
+    if (!result.ok) {
+      this.toast('error', this.reason(result.reason));
+      return;
+    }
+    this.toast('info', catalog(this.ui.get().locale).boughtSeedlings);
   }
 
   private async handleTile(x: number, y: number): Promise<void> {
@@ -484,6 +546,10 @@ export class SitioSession {
       await this.planRoad(x, y);
       return;
     }
+    if (ui.tool === 'coffee') {
+      await this.plantCoffeeLot(x, y);
+      return;
+    }
     await this.build(ui.tool, x, y);
   }
 
@@ -505,6 +571,10 @@ export class SitioSession {
     }
     if (ui.pendingLand || ui.tool === 'select' || ui.tool === 'road' || !tile) {
       this.clearPlacement();
+      return;
+    }
+    if (ui.tool === 'coffee') {
+      await this.previewCoffee(tile.x, tile.y);
       return;
     }
     await this.previewBuilding(ui.tool, tile.x, tile.y);
