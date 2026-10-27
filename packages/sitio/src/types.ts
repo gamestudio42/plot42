@@ -88,6 +88,16 @@ export interface CoffeeGrades {
   good: number;
 }
 
+export interface MarketCart {
+  wood: number;
+  fertilizer: number;
+  limestone: number;
+  seedlings: number;
+  bad: number;
+  medium: number;
+  good: number;
+}
+
 export type InputKind = 'fertilizer' | 'limestone';
 
 export interface InputStock {
@@ -353,6 +363,7 @@ export interface SitioFullState {
   year: number;
   season: Season;
   coins: number;
+  availableCoins: number;
   food: number;
   wood: number;
   inputStock: InputStock;
@@ -374,6 +385,7 @@ export interface SitioFullState {
   coffeeLots: CoffeeLot[];
   plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  marketCart: MarketCart;
   yearEvent: YearEvent;
   lastReport: SeasonReport | null;
   history: WeekHistoryPoint[];
@@ -406,6 +418,7 @@ export interface SitioSnapshot {
   coffeeLots: CoffeeLot[];
   plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  marketCart: MarketCart;
   totals: SitioTotals;
   lastReport: SeasonReport | null;
   history: WeekHistoryPoint[];
@@ -441,6 +454,7 @@ export type SitioCommand =
   | { type: 'plantCoffeeLot'; x: number; y: number }
   | { type: 'planRoad'; x: number; y: number }
   | { type: 'clearRoadPlan' }
+  | { type: 'clearMarketCart' }
   | { type: 'inviteFamily' }
   | { type: 'endWeek' };
 

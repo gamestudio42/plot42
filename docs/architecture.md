@@ -92,8 +92,8 @@ Families leave at morale 0 and the farm is lost when no family remains.
 
 Construction costs coins and wood and takes work periods; the site keeps its
 progress and is drawn as a generic canteiro in three stages. A new farm starts
-with 4 wood; clearing one forest tile yields 2 wood, wood can also be bought at
-the market for 1 coin each, and planting one coffee cell costs 1 coin. Houses
+with 4 wood; clearing one forest tile yields 2 wood, and wood can also be bought
+at the market for 1 coin each. Houses
 and terreiros can be repeated; a tulha, a venda, an escola and a capela are
 unique. The chain is tulha after terreiro, venda after tulha, escola after venda
 and capela after escola.
@@ -111,7 +111,11 @@ bundles for one coin. The order consumes two adult periods, four cells each,
 before becoming a muda lot. Weekly history records coins, income, expenses and
 harvest/stock by grade, and the Reports page draws the financial and production
 lines. The interface uses a bottom book navigation with Families, Works, Coffee,
-Market and Reports pages.
+Market and Reports pages. Market purchases and coffee sales are queued and
+applied together at the end of the week; the market page shows pending items,
+cost, revenue and net coins before confirmation. Queued purchases reserve their
+coins, so buildings and family invitations cannot spend them before the week
+ends.
 
 Roads are visually planned with the Road tool and saved as a queue. An adult
 assigned to Road builds up to four queued tiles per week, regardless of whether
@@ -119,7 +123,7 @@ the adult is assigned in one or both periods. Roads cost no coins or wood and
 do not gate construction. The school currently educates without a teacher or
 staff; staffed institutions are the next stage. The game ends at week 48: the
 farm wins if it has six families, a chapel, a school, a shop and morale of at
-least 2; otherwise it ends. Saves use `sitio-save` v21 (`.sitio.json`); v20 and
+least 2; otherwise it ends. Saves use `sitio-save` v22 (`.sitio.json`); v21 and
 earlier must start a new farm.
 
 ## Mata

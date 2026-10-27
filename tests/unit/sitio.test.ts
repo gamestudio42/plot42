@@ -166,6 +166,8 @@ describe('SitioEngine', () => {
 
     const coins = engine.coins;
     expect(engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.bad).toBe(16);
+    endWeek(engine);
     expect(engine.coffeeStock).toBe(0);
     expect(engine.coins).toBe(coins + 16);
   });
@@ -197,6 +199,9 @@ describe('SitioEngine', () => {
 
     const coins = engine.coins;
     expect(engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 8 })).toEqual({ ok: true });
+    expect(engine.marketCart.bad).toBe(8);
+    assignAll(engine, { kind: 'idle' });
+    endWeek(engine);
     expect(engine.coffeeStock).toBe(0);
     expect(engine.coins).toBe(coins + 8);
   });
@@ -223,10 +228,13 @@ describe('SitioEngine', () => {
     });
     const coins = engine.coins;
     expect(engine.execute({ type: 'sellCoffee', grade: 'medium', amount: 2 })).toEqual({ ok: true });
+    expect(engine.marketCart.medium).toBe(2);
+    assignAll(engine, { kind: 'idle' });
+    const report = endWeek(engine);
     expect(engine.coffeeStock).toBe(3);
     expect(engine.coins).toBe(coins + 4);
-    expect(engine.weekSold).toBe(2);
-    expect(engine.weekRevenue).toBe(4);
+    expect(report.sold).toBe(2);
+    expect(report.revenue).toBe(4);
     expect(engine.totals.revenueTotal).toBe(4);
   });
 
@@ -266,8 +274,9 @@ describe('SitioEngine', () => {
     expect(report.stock).toBe(16);
     expect(report.revenue).toBe(0);
     expect(engine.execute({ type: 'sellCoffee', grade: 'medium', amount: 16 })).toEqual({ ok: true });
-    expect(engine.coffeeStock).toBe(0);
+    expect(engine.marketCart.medium).toBe(16);
     const next = endWeek(engine);
+    expect(engine.coffeeStock).toBe(0);
     expect(next.sold).toBe(16);
     expect(next.revenue).toBe(48);
     expect(next.price).toBe(3);
@@ -501,12 +510,17 @@ describe('SitioEngine', () => {
   it('buys wood with coins and rejects invalid purchases', () => {
     const engine = setup(create());
     expect(engine.execute({ type: 'buyWood', amount: 3 })).toEqual({ ok: true });
-    expect(engine.wood).toBe(7);
-    expect(engine.coins).toBe(9);
+    expect(engine.marketCart.wood).toBe(3);
+    expect(engine.wood).toBe(4);
+    expect(engine.coins).toBe(12);
     expect(engine.execute({ type: 'buyWood', amount: 0 })).toEqual({
       ok: false,
       reason: 'invalid-amount',
     });
+    assignAll(engine, { kind: 'idle' });
+    endWeek(engine);
+    expect(engine.wood).toBe(7);
+    expect(engine.coins).toBe(9);
     engine.coins = 0;
     expect(engine.execute({ type: 'buyWood', amount: 1 })).toEqual({
       ok: false,
@@ -522,8 +536,9 @@ describe('SitioEngine', () => {
     expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
       ok: true,
     });
-    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
-    expect(engine.coins).toBe(2);
+    expect(engine.marketCart.fertilizer).toBe(2);
+    expect(engine.marketCart.limestone).toBe(2);
+    expect(engine.coins).toBe(12);
 
     const people = adults(engine);
     const first = people[0];
@@ -549,6 +564,7 @@ describe('SitioEngine', () => {
     expect(applied.fertilized).toBe(1);
     expect(applied.limed).toBe(1);
     expect(engine.inputStock).toEqual({ fertilizer: 1, limestone: 1 });
+    expect(engine.coins).toBe(2);
     const lot = engine.coffeeLots[0];
     expect(lot?.fertilized).toBe(true);
     expect(lot?.limed).toBe(true);
@@ -568,6 +584,49 @@ describe('SitioEngine', () => {
     expect(lot?.limed).toBe(false);
   });
 
+  it('reserves queued market purchases when paying for a building', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'buyInput', kind: 'fertilizer', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.coins).toBe(12);
+    expect(engine.fullState().availableCoins).toBe(2);
+
+    expect(engine.execute({ type: 'build', kind: 'house', x: 12, y: 1 })).toEqual({
+      ok: false,
+      reason: 'no-coins',
+    });
+
+    assignAll(engine, { kind: 'idle' });
+    endWeek(engine);
+    expect(engine.coins).toBe(2);
+    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
+  });
+
+  it('reserves queued market purchases when inviting a family', () => {
+    const engine = setup(create());
+    addBuilding(engine, 'house', 1, 9, 2, 2);
+    expect(engine.execute({ type: 'buyInput', kind: 'fertilizer', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
+      ok: true,
+    });
+
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-coins',
+    });
+    assignAll(engine, { kind: 'idle' });
+    endWeek(engine);
+    expect(engine.coins).toBe(2);
+    expect(engine.families).toHaveLength(1);
+    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
+  });
+
   it('buys seedlings and plants a coffee lot with two adult periods', () => {
     const engine = setup(create());
     expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({
@@ -575,6 +634,10 @@ describe('SitioEngine', () => {
       reason: 'no-seedlings',
     });
     expect(engine.execute({ type: 'buySeedlings', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.seedlings).toBe(16);
+    expect(engine.coins).toBe(12);
+    assignAll(engine, { kind: 'idle' });
+    endWeek(engine);
     expect(engine.seedlings).toBe(16);
     expect(engine.coins).toBe(8);
     expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({ ok: true });
@@ -767,7 +830,7 @@ describe('SitioEngine', () => {
     expect(restored.hash()).toBe(engine.hash());
   });
 
-  it('round-trips the v21 save through the kernel envelope', () => {
+  it('round-trips the v22 save through the kernel envelope', () => {
     const engine = setup(create());
     assignAll(engine, { kind: 'coffee' });
     endWeek(engine);
@@ -792,10 +855,11 @@ describe('SitioEngine', () => {
     expect(decoded.snapshot.inputStock.fertilizer).toBe(2);
     expect(decoded.snapshot.seedlings).toBe(8);
     expect(decoded.snapshot.history).toHaveLength(1);
-    expect(decoded.snapshot.coffeeStock).toBe(3);
+    expect(decoded.snapshot.coffeeStock).toBe(4);
+    expect(decoded.snapshot.marketCart.bad).toBe(1);
     expect(decoded.snapshot.wood).toBe(7);
-    expect(decoded.snapshot.weekSold).toBe(1);
-    expect(decoded.snapshot.weekRevenue).toBe(1);
+    expect(decoded.snapshot.weekSold).toBe(0);
+    expect(decoded.snapshot.weekRevenue).toBe(0);
     const restored = SitioEngine.fromSnapshot(decoded.snapshot);
     expect(restored.hash()).toBe(engine.hash());
   });

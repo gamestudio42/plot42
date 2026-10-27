@@ -395,7 +395,7 @@ export class SitioSession {
       this.toast('error', this.reason(result.reason));
       return;
     }
-    this.toast('info', catalog(this.ui.get().locale).sold);
+    this.toast('info', catalog(this.ui.get().locale).addedToMarket);
   }
 
   async buyInput(kind: InputKind, amount: number): Promise<void> {
@@ -404,7 +404,7 @@ export class SitioSession {
       this.toast('error', this.reason(result.reason));
       return;
     }
-    this.toast('info', catalog(this.ui.get().locale).boughtInput);
+    this.toast('info', catalog(this.ui.get().locale).addedToMarket);
   }
 
   async planRoad(x: number, y: number): Promise<void> {
@@ -434,7 +434,11 @@ export class SitioSession {
       this.toast('error', this.reason(result.reason));
       return;
     }
-    this.toast('info', catalog(this.ui.get().locale).boughtWood);
+    this.toast('info', catalog(this.ui.get().locale).addedToMarket);
+  }
+
+  async clearMarketCart(): Promise<void> {
+    await this.client.command({ type: 'clearMarketCart' });
   }
 
   selectTile(x: number, y: number): void {
@@ -518,7 +522,7 @@ export class SitioSession {
       this.toast('error', this.reason(result.reason));
       return;
     }
-    this.toast('info', catalog(this.ui.get().locale).boughtSeedlings);
+    this.toast('info', catalog(this.ui.get().locale).addedToMarket);
   }
 
   private async handleTile(x: number, y: number): Promise<void> {

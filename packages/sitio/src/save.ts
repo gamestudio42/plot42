@@ -19,6 +19,7 @@ import {
   type CoffeePlantOrder,
   type Family,
   type InputStock,
+  type MarketCart,
   type Person,
   type SeasonReport,
   type SetupStep,
@@ -35,7 +36,7 @@ import {
 } from './types';
 
 export const SITIO_SAVE_FORMAT = 'sitio-save';
-export const SITIO_SAVE_VERSION = 21;
+export const SITIO_SAVE_VERSION = 22;
 export const SITIO_SAVE_EXTENSION = '.sitio.json';
 
 const STATUSES: readonly SitioStatus[] = ['playing', 'won', 'lost', 'ended'];
@@ -68,6 +69,7 @@ interface SitioSaveState {
   coffeeLots: CoffeeLot[];
   plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  marketCart: MarketCart;
   history: WeekHistoryPoint[];
   totals: SitioTotals;
   lastReport: SeasonReport | null;
@@ -109,6 +111,7 @@ export function encodeSitioSave(snapshot: SitioSnapshot, savedAt: string): Sitio
     coffeeLots: snapshot.coffeeLots,
     plantOrders: snapshot.plantOrders,
     roadPlan: snapshot.roadPlan,
+    marketCart: snapshot.marketCart,
     history: snapshot.history,
     totals: snapshot.totals,
     lastReport: snapshot.lastReport,
@@ -352,6 +355,29 @@ function decodePlantOrder(value: unknown): CoffeePlantOrder | null {
   };
 }
 
+function decodeMarketCart(value: unknown): MarketCart | null {
+  if (!isRecord(value)) return null;
+  const fields = [
+    'wood',
+    'fertilizer',
+    'limestone',
+    'seedlings',
+    'bad',
+    'medium',
+    'good',
+  ] as const;
+  for (const field of fields) if (typeof value[field] !== 'number') return null;
+  return {
+    wood: value.wood,
+    fertilizer: value.fertilizer,
+    limestone: value.limestone,
+    seedlings: value.seedlings,
+    bad: value.bad,
+    medium: value.medium,
+    good: value.good,
+  } as MarketCart;
+}
+
 function decodeHistory(value: unknown): WeekHistoryPoint[] | null {
   if (!Array.isArray(value)) return null;
   const points: WeekHistoryPoint[] = [];
@@ -508,6 +534,7 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     !Array.isArray(raw.coffeeLots) ||
     !Array.isArray(raw.plantOrders) ||
     !Array.isArray(raw.roadPlan) ||
+    !isRecord(raw.marketCart) ||
     !Array.isArray(raw.history) ||
     typeof raw.weekSold !== 'number' ||
     typeof raw.weekRevenue !== 'number' ||
@@ -580,6 +607,8 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
   if (!coffeeGrades) return invalid('state.coffeeGrades');
   const roadPlan = decodeRoadPlan(raw.roadPlan);
   if (!roadPlan) return invalid('state.roadPlan');
+  const marketCart = decodeMarketCart(raw.marketCart);
+  if (!marketCart) return invalid('state.marketCart');
   const lastReport = decodeReport(raw.lastReport);
   if (lastReport === undefined) return invalid('state.lastReport');
 
@@ -614,6 +643,7 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     coffeeLots,
     plantOrders,
     roadPlan,
+    marketCart,
     history,
     totals,
     lastReport,

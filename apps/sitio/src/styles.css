@@ -1179,3 +1179,71 @@ input,
     min-width: 64px;
   }
 }
+
+@media (min-width: 901px) {
+  .side-panel.book-panel {
+    left: 12px;
+    right: auto;
+    transform: none;
+    width: min(540px, calc(100vw - 24px));
+  }
+}
+
+.market-summary {
+  border-top: 2px solid var(--line);
+  padding-top: 8px;
+}
+
+.market-forecast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  margin: 6px 0;
+}
+
+.market-forecast strong.positive {
+  color: var(--green);
+}
+
+.market-forecast strong.negative {
+  color: var(--red);
+}
+
+.panel-market .market-summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #241c16;
+  border-top: 0;
+  border-bottom: 2px solid var(--line);
+  padding: 8px 0;
+}
+
+.market-cart {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 11px;
+}
+
+.market-cart th,
+.market-cart td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(90, 67, 48, 0.6);
+  text-align: left;
+}
+
+.market-cart th {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.market-cart td.positive {
+  color: var(--green);
+}
+
+.market-cart td.negative {
+  color: var(--red);
+}

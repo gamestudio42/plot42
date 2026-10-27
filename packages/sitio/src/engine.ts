@@ -63,6 +63,7 @@ import {
   type Family,
   type InputKind,
   type InputStock,
+  type MarketCart,
   type NewSitioOptions,
   type Period,
   type Person,
@@ -176,6 +177,18 @@ function emptyInputs(): InputStock {
   return { fertilizer: 0, limestone: 0 };
 }
 
+function emptyMarketCart(): MarketCart {
+  return {
+    wood: 0,
+    fertilizer: 0,
+    limestone: 0,
+    seedlings: 0,
+    bad: 0,
+    medium: 0,
+    good: 0,
+  };
+}
+
 function emptyTotals(): SitioTotals {
   return {
     harvestTotal: 0,
@@ -225,6 +238,7 @@ export class SitioEngine {
   coffeeLots: CoffeeLot[] = [];
   plantOrders: CoffeePlantOrder[] = [];
   roadPlan: { x: number; y: number }[] = [];
+  marketCart: MarketCart = emptyMarketCart();
   history: WeekHistoryPoint[] = [];
   totals: SitioTotals = emptyTotals();
   lastReport: SeasonReport | null = null;
@@ -284,6 +298,7 @@ export class SitioEngine {
     engine.coffeeLots = (snapshot.coffeeLots ?? []).map(cloneCoffeeLot);
     engine.plantOrders = (snapshot.plantOrders ?? []).map((order) => ({ ...order }));
     engine.roadPlan = (snapshot.roadPlan ?? []).map((tile) => ({ ...tile }));
+    engine.marketCart = { ...emptyMarketCart(), ...(snapshot.marketCart ?? {}) };
     engine.history = (snapshot.history ?? []).map((point) => ({
       ...point,
       harvest: cloneGrades(point.harvest),
@@ -459,18 +474,41 @@ export class SitioEngine {
     return { ok: true };
   }
 
+  private marketCost(): number {
+    return (
+      this.marketCart.wood * WOOD_BUY_PRICE +
+      this.marketCart.fertilizer * INPUT_PRICES.fertilizer +
+      this.marketCart.limestone * INPUT_PRICES.limestone +
+      (this.marketCart.seedlings / SEEDLING_BUNDLE_SIZE) * SEEDLING_BUNDLE_PRICE
+    );
+  }
+
+  private marketRevenue(): number {
+    return (
+      this.marketCart.bad * this.priceForGrade('bad') +
+      this.marketCart.medium * this.priceForGrade('medium') +
+      this.marketCart.good * this.priceForGrade('good')
+    );
+  }
+
+  private availableCoins(): number {
+    return this.coins + this.marketRevenue() - this.marketCost();
+  }
+
+  private canQueueCost(cost: number): boolean {
+    return this.availableCoins() >= cost;
+  }
+
   buyInput(kind: InputKind, amount: number): SitioCommandResult {
     if (this.setup) return { ok: false, reason: 'setup' };
     if (!Number.isInteger(amount) || amount <= 0) {
       return { ok: false, reason: 'invalid-amount' };
     }
     const price = INPUT_PRICES[kind];
-    if (!price) return { ok: false, reason: 'invalid-task' };
-    const cost = price * amount;
-    if (this.coins < cost) return { ok: false, reason: 'no-coins' };
-    this.coins -= cost;
-    this.weekExpense += cost;
-    this.inputStock[kind] += amount;
+    if (!price || !this.canQueueCost(price * amount)) {
+      return { ok: false, reason: price ? 'no-coins' : 'invalid-task' };
+    }
+    this.marketCart[kind] += amount;
     return { ok: true };
   }
 
@@ -479,12 +517,14 @@ export class SitioEngine {
     if (!Number.isInteger(amount) || amount <= 0 || amount % SEEDLING_BUNDLE_SIZE !== 0) {
       return { ok: false, reason: 'invalid-amount' };
     }
-    const bundles = amount / SEEDLING_BUNDLE_SIZE;
-    const cost = bundles * SEEDLING_BUNDLE_PRICE;
-    if (this.coins < cost) return { ok: false, reason: 'no-coins' };
-    this.coins -= cost;
-    this.weekExpense += cost;
-    this.seedlings += amount;
+    const cost = (amount / SEEDLING_BUNDLE_SIZE) * SEEDLING_BUNDLE_PRICE;
+    if (!this.canQueueCost(cost)) return { ok: false, reason: 'no-coins' };
+    this.marketCart.seedlings += amount;
+    return { ok: true };
+  }
+
+  clearMarketCart(): SitioCommandResult {
+    this.marketCart = emptyMarketCart();
     return { ok: true };
   }
 
@@ -579,7 +619,7 @@ export class SitioEngine {
     if (this.setup) return { ok: false, reason: 'setup' };
     const empty = this.findEmptyHouse();
     if (!empty) return { ok: false, reason: 'no-house' };
-    if (this.coins < FAMILY_INVITE_COST) return { ok: false, reason: 'no-coins' };
+    if (this.availableCoins() < FAMILY_INVITE_COST) return { ok: false, reason: 'no-coins' };
     this.coins -= FAMILY_INVITE_COST;
     this.weekExpense += FAMILY_INVITE_COST;
     this.createFamilyAt(empty.x, empty.y);
@@ -609,6 +649,8 @@ export class SitioEngine {
         return this.planRoad(command.x, command.y);
       case 'clearRoadPlan':
         return this.clearRoadPlan();
+      case 'clearMarketCart':
+        return this.clearMarketCart();
       case 'inviteFamily':
         return this.inviteFamily();
       case 'endWeek':
@@ -718,6 +760,7 @@ export class SitioEngine {
       coffeeLots: this.coffeeLots.map(cloneCoffeeLot),
       plantOrders: this.plantOrders.map((order) => ({ ...order })),
       roadPlan: this.roadPlan.map((tile) => ({ ...tile })),
+      marketCart: { ...this.marketCart },
       totals: { ...this.totals },
       lastReport: cloneReport(this.lastReport),
       history: this.history.map((point) => ({
@@ -742,6 +785,7 @@ export class SitioEngine {
       year: this.year,
       season: this.season,
       coins: this.coins,
+      availableCoins: this.availableCoins(),
       food: this.food,
       wood: this.wood,
       inputStock: { ...this.inputStock },
@@ -763,6 +807,7 @@ export class SitioEngine {
       coffeeLots: this.coffeeLots.map(cloneCoffeeLot),
       plantOrders: this.plantOrders.map((order) => ({ ...order })),
       roadPlan: this.roadPlan.map((tile) => ({ ...tile })),
+      marketCart: { ...this.marketCart },
       yearEvent: this.yearEvent,
       lastReport: cloneReport(this.lastReport),
       history: this.history.map((point) => ({
@@ -885,6 +930,16 @@ export class SitioEngine {
     for (const tile of this.roadPlan) {
       hash.int32s([tile.x, tile.y]);
     }
+    const cart = this.marketCart;
+    hash.int32s([
+      cart.wood,
+      cart.fertilizer,
+      cart.limestone,
+      cart.seedlings,
+      cart.bad,
+      cart.medium,
+      cart.good,
+    ]);
     for (const order of this.plantOrders) {
       hash.int32s([order.id, order.x, order.y, order.progress, order.required]);
     }
@@ -973,8 +1028,18 @@ export class SitioEngine {
       if (!lot) return 'invalid-task';
       if (task.kind === 'fertilize' && lot.fertilized) return 'invalid-task';
       if (task.kind === 'limestone' && lot.limed) return 'invalid-task';
-      if (task.kind === 'fertilize' && this.inputStock.fertilizer < 1) return 'no-input';
-      if (task.kind === 'limestone' && this.inputStock.limestone < 1) return 'no-input';
+      if (
+        task.kind === 'fertilize' &&
+        this.inputStock.fertilizer + this.marketCart.fertilizer < 1
+      ) {
+        return 'no-input';
+      }
+      if (
+        task.kind === 'limestone' &&
+        this.inputStock.limestone + this.marketCart.limestone < 1
+      ) {
+        return 'no-input';
+      }
       return null;
     }
     if (!this.inBounds(task.x, task.y)) return 'oob';
@@ -1037,7 +1102,7 @@ export class SitioEngine {
         if (this.siteAt(xx, yy)) return { ok: false, reason: 'occupied' };
       }
     }
-    if (this.coins < spec.coins) return { ok: false, reason: 'no-coins' };
+    if (this.availableCoins() < spec.coins) return { ok: false, reason: 'no-coins' };
     if (this.wood < spec.wood) return { ok: false, reason: 'no-wood' };
     return { ok: true };
   }
@@ -1070,14 +1135,10 @@ export class SitioEngine {
     if (!Number.isInteger(amount) || amount <= 0) {
       return { ok: false, reason: 'invalid-amount' };
     }
-    if (amount > this.coffeeGrades[grade]) return { ok: false, reason: 'no-stock' };
-    const revenue = amount * this.priceForGrade(grade);
-    this.coffeeGrades[grade] -= amount;
-    this.coffeeStock -= amount;
-    this.coins += revenue;
-    this.weekSold += amount;
-    this.weekRevenue += revenue;
-    this.totals.revenueTotal += revenue;
+    if (amount > this.coffeeGrades[grade] - this.marketCart[grade]) {
+      return { ok: false, reason: 'no-stock' };
+    }
+    this.marketCart[grade] += amount;
     return { ok: true };
   }
 
@@ -1087,11 +1148,33 @@ export class SitioEngine {
       return { ok: false, reason: 'invalid-amount' };
     }
     const cost = amount * WOOD_BUY_PRICE;
-    if (this.coins < cost) return { ok: false, reason: 'no-coins' };
-    this.coins -= cost;
-    this.weekExpense += cost;
-    this.wood += amount;
+    if (!this.canQueueCost(cost)) return { ok: false, reason: 'no-coins' };
+    this.marketCart.wood += amount;
     return { ok: true };
+  }
+
+  private applyMarketOrders(): void {
+    for (const grade of COFFEE_GRADES) {
+      const amount = this.marketCart[grade];
+      if (amount <= 0) continue;
+      const revenue = amount * this.priceForGrade(grade);
+      this.coffeeGrades[grade] -= amount;
+      this.coffeeStock -= amount;
+      this.coins += revenue;
+      this.weekSold += amount;
+      this.weekRevenue += revenue;
+      this.totals.revenueTotal += revenue;
+    }
+    const cost = this.marketCost();
+    if (cost > 0 && this.coins >= cost) {
+      this.coins -= cost;
+      this.weekExpense += cost;
+      this.wood += this.marketCart.wood;
+      this.inputStock.fertilizer += this.marketCart.fertilizer;
+      this.inputStock.limestone += this.marketCart.limestone;
+      this.seedlings += this.marketCart.seedlings;
+    }
+    this.marketCart = emptyMarketCart();
   }
 
   private endWeek(): void {
@@ -1128,6 +1211,8 @@ export class SitioEngine {
       hunger: false,
       morale: [],
     };
+
+    this.applyMarketOrders();
 
     const lastWeekOfSeason = this.weekOfSeason === WEEKS_PER_SEASON;
     let eventThisSeason: YearEvent = 'none';

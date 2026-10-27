@@ -303,6 +303,7 @@ function Game({ session }: { session: SitioSession }) {
             ) : null}
 
             <div className="panel-section panel-market">
+              <MarketSummary session={session} state={state} t={t} salePrice={salePrice} />
               <MarketPanel session={session} state={state} t={t} salePrice={salePrice} />
               <InputMarket session={session} state={state} t={t} />
               <WoodMarket session={session} state={state} t={t} />
@@ -324,8 +325,8 @@ function Game({ session }: { session: SitioSession }) {
                     sites={state.sites}
                     plantOrders={state.plantOrders}
                     hasSchool={state.structures.some((structure) => structure.kind === 'escola')}
-                    fertilizer={state.inputStock.fertilizer}
-                    limestone={state.inputStock.limestone}
+                    fertilizer={state.inputStock.fertilizer + state.marketCart.fertilizer}
+                    limestone={state.inputStock.limestone + state.marketCart.limestone}
                     t={t}
                     onAssign={(personId, period, task) =>
                       void session.assignTask(personId, period, task)
@@ -982,12 +983,22 @@ function MarketPanel({
           <li key={grade}>
             <span className={`grade grade-${grade}`}>{t.grade[grade]}</span>
             <span className="muted small">{state.coffeeGrades[grade]} {t.sacks}</span>
+            {state.marketCart[grade] > 0 ? (
+              <span className="muted small">
+                +{state.marketCart[grade]} {t.weekEnd}
+              </span>
+            ) : null}
             <strong>{priceFor(grade)} {t.coins.toLowerCase()}</strong>
             <button
               type="button"
               className="button small"
-              disabled={state.coffeeGrades[grade] < 1}
-              onClick={() => void session.sellCoffee(grade, state.coffeeGrades[grade])}
+              disabled={state.coffeeGrades[grade] - state.marketCart[grade] < 1}
+              onClick={() =>
+                void session.sellCoffee(
+                  grade,
+                  state.coffeeGrades[grade] - state.marketCart[grade],
+                )
+              }
             >
               {t.sellAll}
             </button>
@@ -1013,12 +1024,12 @@ function InputMarket({
         <Icon name={kind} /> {kind === 'fertilizer' ? t.fertilizer : t.limestone}
       </span>
       <span className="muted small">
-        {state.inputStock[kind]} · {INPUT_PRICES[kind]} {t.coins.toLowerCase()}
+        {INPUT_PRICES[kind]} {t.coins.toLowerCase()}
       </span>
       <button
         type="button"
         className="button small"
-        disabled={state.coins < INPUT_PRICES[kind]}
+        disabled={state.availableCoins < INPUT_PRICES[kind]}
         onClick={() => void session.buyInput(kind, 1)}
       >
         {t.buy}
@@ -1039,13 +1050,12 @@ function InputMarket({
             <Icon name="stock" /> {t.seedlings}
           </span>
           <span className="muted small">
-            {state.seedlings} · {SEEDLING_BUNDLE_PRICE} {t.coins.toLowerCase()} /{' '}
-            {SEEDLING_BUNDLE_SIZE}
+            {SEEDLING_BUNDLE_PRICE} {t.coins.toLowerCase()} / {SEEDLING_BUNDLE_SIZE}
           </span>
           <button
             type="button"
             className="button small"
-            disabled={state.coins < SEEDLING_BUNDLE_PRICE}
+            disabled={state.availableCoins < SEEDLING_BUNDLE_PRICE}
             onClick={() => void session.buySeedlings(SEEDLING_BUNDLE_SIZE)}
           >
             {t.buy}
@@ -1066,9 +1076,9 @@ function WoodMarket({
   t: Strings;
 }) {
   const [amount, setAmount] = useState(1);
-  const maximum = Math.max(1, Math.floor(state.coins / WOOD_BUY_PRICE));
+  const maximum = Math.max(1, Math.floor(state.availableCoins / WOOD_BUY_PRICE));
   const value = Math.min(amount, maximum);
-  const disabled = state.coins < WOOD_BUY_PRICE;
+  const disabled = state.availableCoins < WOOD_BUY_PRICE;
   return (
     <section>
       <h2>
@@ -1104,6 +1114,114 @@ function WoodMarket({
   );
 }
 
+function MarketSummary({
+  session,
+  state,
+  t,
+  salePrice,
+}: {
+  session: SitioSession;
+  state: SitioFullState;
+  t: Strings;
+  salePrice: number;
+}) {
+  const cart = state.marketCart;
+  const priceFor = (grade: CoffeeGrade) =>
+    grade === 'bad' ? Math.max(1, salePrice - 1) : grade === 'good' ? salePrice + 1 : salePrice;
+  const rows: { type: string; label: string; quantity: number; value: number }[] = [];
+  if (cart.wood > 0) {
+    rows.push({ type: t.buy, label: t.wood, quantity: cart.wood, value: -cart.wood * WOOD_BUY_PRICE });
+  }
+  if (cart.fertilizer > 0) {
+    rows.push({
+      type: t.buy,
+      label: t.fertilizer,
+      quantity: cart.fertilizer,
+      value: -cart.fertilizer * INPUT_PRICES.fertilizer,
+    });
+  }
+  if (cart.limestone > 0) {
+    rows.push({
+      type: t.buy,
+      label: t.limestone,
+      quantity: cart.limestone,
+      value: -cart.limestone * INPUT_PRICES.limestone,
+    });
+  }
+  if (cart.seedlings > 0) {
+    rows.push({
+      type: t.buy,
+      label: t.seedlings,
+      quantity: cart.seedlings,
+      value: -(cart.seedlings / SEEDLING_BUNDLE_SIZE) * SEEDLING_BUNDLE_PRICE,
+    });
+  }
+  for (const grade of COFFEE_GRADES) {
+    if (cart[grade] > 0) {
+      rows.push({
+        type: t.sell,
+        label: `${t.task.coffee} ${t.grade[grade]}`,
+        quantity: cart[grade],
+        value: cart[grade] * priceFor(grade),
+      });
+    }
+  }
+  const cost = rows.filter((row) => row.value < 0).reduce((sum, row) => sum - row.value, 0);
+  const revenue = rows.filter((row) => row.value > 0).reduce((sum, row) => sum + row.value, 0);
+  const net = revenue - cost;
+  return (
+    <section className="market-summary">
+      <h2>{t.marketPreview}</h2>
+      {rows.length === 0 ? (
+        <p className="muted">{t.report.none}</p>
+      ) : (
+        <table className="market-cart">
+          <thead>
+            <tr>
+              <th>{t.operation}</th>
+              <th>{t.item}</th>
+              <th>{t.quantity}</th>
+              <th>{t.value}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.label}-${index}`}>
+                <td>{row.type}</td>
+                <td>{row.label}</td>
+                <td>{row.quantity}</td>
+                <td className={row.value >= 0 ? 'positive' : 'negative'}>
+                  {row.value >= 0 ? '+' : ''}
+                  {row.value}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="market-forecast">
+        <span>{t.expenses}: {cost}</span>
+        <span>{t.income}: {revenue}</span>
+        <strong className={net >= 0 ? 'positive' : 'negative'}>
+          {t.net}: {net >= 0 ? '+' : ''}{net} {t.coins.toLowerCase()}
+        </strong>
+        <span>
+          {t.balance}: {state.coins} → {state.coins + net}
+        </span>
+      </div>
+      <p className="hint">{t.marketAtWeekEnd}</p>
+      <button
+        type="button"
+        className="button small"
+        disabled={rows.length === 0}
+        onClick={() => void session.clearMarketCart()}
+      >
+        {t.clearCart}
+      </button>
+    </section>
+  );
+}
+
 function FamilyGrowth({
   session,
   state,
@@ -1129,7 +1247,7 @@ function FamilyGrowth({
           <button
             type="button"
             className="button small"
-            disabled={state.coins < FAMILY_INVITE_COST}
+            disabled={state.availableCoins < FAMILY_INVITE_COST}
             onClick={() => void session.inviteFamily()}
           >
             {t.inviteFamily} · {FAMILY_INVITE_COST} {t.coins.toLowerCase()}
