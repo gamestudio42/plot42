@@ -16,6 +16,7 @@
   --horta: #4ade80;
   --posto: #f0a14a;
   --mata: #c4a24a;
+  --sitio: #d08a4a;
   --neon: #22d3ee;
 }
 
@@ -246,6 +247,9 @@ body,
 .card-mata {
   border-top: 3px solid var(--mata);
 }
+.card-sitio {
+  border-top: 3px solid var(--sitio);
+}
 .card-neon {
   border-top: 3px solid var(--neon);
 }
@@ -292,6 +296,9 @@ body,
 }
 .card-mata .play {
   color: var(--mata);
+}
+.card-sitio .play {
+  color: var(--sitio);
 }
 .card-neon .play {
   color: var(--neon);

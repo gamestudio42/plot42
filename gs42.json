@@ -1,11 +1,11 @@
 {
   "title": "Plot 42",
   "tagline": {
-    "en": "Five games. One studio lot.",
-    "pt": "Cinco jogos. Um lote do estúdio.",
-    "es": "Cinco juegos. Un lote del estudio.",
-    "fr": "Cinq jeux. Un lot d'atelier.",
-    "de": "Fünf Spiele. Ein Studio-Grundstück."
+    "en": "Six games. One studio lot.",
+    "pt": "Seis jogos. Um lote do estúdio.",
+    "es": "Seis juegos. Un lote del estudio.",
+    "fr": "Six jeux. Un lot d'atelier.",
+    "de": "Sechs Spiele. Ein Studio-Grundstück."
   },
   "cover": "docs/screenshots/menu.jpg",
   "genre": "collection",
