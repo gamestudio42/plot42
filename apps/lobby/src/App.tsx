@@ -13,9 +13,10 @@ import {
 const MARK_BASE = `${import.meta.env.BASE_URL}marks`;
 const LOBBY_MARK = `${import.meta.env.BASE_URL}favicon.svg`;
 
-/** Urbe and Neo Urbe ship from their own repositories. The lot only links to them. */
+/** Urbe, Sítio and Neo Urbe ship from their own repositories. The lot only links to them. */
 const PUBLISHED = {
   urbe: 'https://gamestudio42.github.io/urbe/',
+  sitio: 'https://gamestudio42.github.io/sitio/',
   neon: 'https://gamestudio42.github.io/neo-urbe/',
 } as const;
 
@@ -24,7 +25,7 @@ const GAMES = [
   { slug: 'horta', port: 5174, kind: 'horta', title: 'hortaTitle', blurb: 'hortaBlurb' },
   { slug: 'posto', port: 5175, kind: 'posto', title: 'postoTitle', blurb: 'postoBlurb' },
   { slug: 'mata', port: 5177, kind: 'mata', title: 'mataTitle', blurb: 'mataBlurb' },
-  { slug: 'sitio', port: 5178, kind: 'sitio', title: 'sitioTitle', blurb: 'sitioBlurb' },
+  { slug: 'sitio', kind: 'sitio', title: 'sitioTitle', blurb: 'sitioBlurb', href: PUBLISHED.sitio },
   { slug: 'neon', kind: 'neon', title: 'neonTitle', blurb: 'neonBlurb', href: PUBLISHED.neon },
 ] as const;
 

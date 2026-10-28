@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * The lobby is the entry point of the static site. Horta, Posto, Mata and Sítio are hosted here.
- * Urbe and Neo Urbe open the sites published from their own repositories.
+ * The lobby is the entry point of the static site. Horta, Posto and Mata are hosted here.
+ * Urbe, Sítio and Neo Urbe open the sites published from their own repositories.
  * The spec runs against the built `site/` served by `pnpm preview:site`.
  */
 
@@ -13,7 +13,7 @@ const HREFS: Record<string, string> = {
   horta: 'horta/',
   posto: 'posto/',
   mata: 'mata/',
-  sitio: 'sitio/',
+  sitio: 'https://gamestudio42.github.io/sitio/',
   neon: 'https://gamestudio42.github.io/neo-urbe/',
 };
 
