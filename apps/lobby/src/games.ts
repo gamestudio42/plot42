@@ -36,7 +36,7 @@ export type GameSlug = (typeof GAME_SLUGS)[number];
 interface BaseGame {
   slug: GameSlug;
   tags: readonly Tag[];
-  /** Cover gradient, top-left to bottom-right. */
+  /** Placeholder gradient behind the cover screenshot (`public/covers/<slug>.webp`). */
   cover: readonly [string, string];
   accent: string;
   isNew?: boolean;

@@ -1,16 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Urbe Oasis">
-  <polygon points="5,46 32,59.5 32,55.5 5,42" fill="#a26a2c"/>
-  <polygon points="32,59.5 59,46 59,42 32,55.5" fill="#b97c36"/>
-  <polygon points="5,42 32,55.5 59,42 32,28.5" fill="#e3b468"/>
-  <polygon points="16,44 26,49 36,44 26,39" fill="#2bb3c0"/>
-  <polygon points="19,44 26,47.5 33,44 26,40.5" fill="#6ee0e6"/>
-  <polygon points="34,40 42,44 42,30 34,26" fill="#c98f4a"/>
-  <polygon points="42,44 50,40 50,26 42,30" fill="#e0a85e"/>
-  <polygon points="34,26 42,30 50,26 42,22" fill="#f4d29a"/>
-  <path d="M37 26 Q42 15 47 26 Z" fill="#f7e3b8"/>
-  <rect x="38" y="33" width="2.5" height="4" fill="#7a4a1e"/>
-  <rect x="45" y="32" width="2.5" height="4" fill="#7a4a1e"/>
-  <path d="M15 40 Q14 28 17 18" stroke="#7a4a1e" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  <path d="M17 18 Q10 16 6 21 M17 18 Q12 12 7 13 M17 18 Q20 11 26 12 M17 18 Q24 16 27 21 M17 18 Q17 12 16 8" stroke="#3f9a4a" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-  <circle cx="52" cy="11" r="4.5" fill="#ffd65a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#1c1410"/>
+  <path d="M8 46 H56" stroke="#1f8a86" stroke-width="3"/>
+  <path d="M14 46 V34 H34 V46" fill="#c4784a"/>
+  <path d="M18 46 V38 H30 V46" fill="#1c1410"/>
+  <path d="M24 46 V30" stroke="#8d5a3c" stroke-width="2"/>
+  <circle cx="46" cy="28" r="8" fill="#6d9a48"/>
+  <path d="M46 36 V46" stroke="#8d5a3c" stroke-width="2"/>
 </svg>
