@@ -13,6 +13,7 @@ import {
 } from './i18n';
 
 const MARK_BASE = `${import.meta.env.BASE_URL}marks`;
+const COVER_BASE = `${import.meta.env.BASE_URL}covers`;
 const LOBBY_MARK = `${import.meta.env.BASE_URL}favicon.svg`;
 
 type Filter = 'all' | 'sandbox' | 'web';
@@ -21,12 +22,13 @@ function markUrl(game: Game): string {
   return `${MARK_BASE}/${game.slug}.svg`;
 }
 
-function coverStyle(game: Game): CSSProperties {
+/** Card art is a screenshot of the game; the featured banner uses a wider `-hero` crop. */
+function coverStyle(game: Game, hero = false): CSSProperties {
   return {
+    '--cover': `url("${COVER_BASE}/${game.slug}${hero ? '-hero' : ''}.webp")`,
     '--cover-a': game.cover[0],
     '--cover-b': game.cover[1],
     '--accent': game.accent,
-    '--mark': `url("${markUrl(game)}")`,
   } as CSSProperties;
 }
 
@@ -93,7 +95,7 @@ function Hero({ game, t }: { game: Game; t: Strings }) {
     <a
       className={`hero kind-${game.kind}`}
       href={gameHref(game)}
-      style={coverStyle(game)}
+      style={coverStyle(game, true)}
       data-testid="lobby-featured"
     >
       <span className="hero-art" aria-hidden="true" />
@@ -103,7 +105,10 @@ function Hero({ game, t }: { game: Game; t: Strings }) {
           {game.isNew ? <span className="badge badge-new">{t.newBadge}</span> : null}
           <KindBadge game={game} t={t} />
         </span>
-        <span className="hero-title">{strings.title}</span>
+        <span className="hero-title">
+          <img className="hero-icon" src={markUrl(game)} width={64} height={64} alt="" />
+          {strings.title}
+        </span>
         <span className="hero-blurb">{strings.blurb}</span>
         <Tags game={game} t={t} />
         <Cta game={game} t={t} />

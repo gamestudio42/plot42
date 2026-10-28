@@ -39,6 +39,10 @@ test('shelves sandbox and studio games apart, with their marks', async ({ page }
       await expect(card).toHaveAttribute('href', href);
       // BASE_PATH can prefix the mark, so only the tail is contractual.
       await expect(card.locator('img')).toHaveAttribute('src', new RegExp(`marks/${slug}\\.svg$`));
+      // Each card shows a screenshot of the game as its cover.
+      await expect(card).toHaveAttribute('style', new RegExp(`covers/${slug}\\.webp`));
+      const cover = await page.request.get(`covers/${slug}.webp`);
+      expect(cover.ok()).toBe(true);
     }
   }
   await expect(page.getByTestId('lobby-featured')).toHaveAttribute('href', WEB.vazante);

@@ -351,9 +351,8 @@ body,
 
 .hero {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  min-height: 340px;
+  display: flex;
+  min-height: 380px;
   border-radius: 24px;
   overflow: hidden;
   color: inherit;
@@ -370,32 +369,30 @@ body,
   inset: 0;
   z-index: -1;
   background:
-    repeating-linear-gradient(30deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(-30deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px),
-    linear-gradient(90deg, rgba(5, 7, 10, 0.9) 0%, rgba(5, 7, 10, 0.55) 45%, transparent 75%);
+    linear-gradient(90deg, rgba(5, 7, 10, 0.92) 0%, rgba(5, 7, 10, 0.7) 38%, transparent 72%),
+    linear-gradient(0deg, rgba(5, 7, 10, 0.55) 0%, transparent 40%);
 }
 
 .hero-art {
-  grid-column: 2;
-  grid-row: 1;
-  background: var(--mark) center / min(300px, 80%) no-repeat;
-  filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55));
-  transition: transform 0.4s ease;
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--cover) center / cover no-repeat;
+  transition: transform 0.6s ease;
 }
 
 .hero:hover .hero-art,
 .hero:focus-visible .hero-art {
-  transform: scale(1.05) translateY(-4px);
+  transform: scale(1.04);
 }
 
 .hero-body {
-  grid-column: 1;
-  grid-row: 1;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 14px;
-  padding: 40px 0 40px 44px;
+  padding: 40px 24px 40px 44px;
 }
 
 .hero-labels {
@@ -405,10 +402,19 @@ body,
 }
 
 .hero-title {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   font-size: clamp(40px, 6vw, 64px);
   font-weight: 900;
   letter-spacing: -0.02em;
   line-height: 1;
+}
+
+.hero-icon {
+  flex-shrink: 0;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
 .hero-blurb {
@@ -557,22 +563,36 @@ body,
 .card-cover {
   position: relative;
   aspect-ratio: 16 / 9;
-  background:
-    var(--mark) center 58% / 46% no-repeat,
-    repeating-linear-gradient(30deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 22px),
-    repeating-linear-gradient(-30deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 22px),
-    radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(135deg, var(--cover-a), var(--cover-b));
-  transition: background-size 0.3s ease;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--cover-a), var(--cover-b));
 }
 
-.card:hover .card-cover,
-.card:focus-visible .card-cover {
-  background-size: 52%, auto, auto, auto, auto;
+.card-cover::before,
+.card-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.card-cover::before {
+  background: var(--cover) center / cover no-repeat;
+  transition: transform 0.4s ease;
+}
+
+.card-cover::after {
+  background:
+    linear-gradient(180deg, rgba(5, 7, 10, 0.45) 0%, transparent 32%),
+    linear-gradient(0deg, var(--surface) 0%, transparent 28%);
+}
+
+.card:hover .card-cover::before,
+.card:focus-visible .card-cover::before {
+  transform: scale(1.06);
 }
 
 .card-cover-labels {
   position: absolute;
+  z-index: 1;
   top: 12px;
   left: 12px;
   right: 12px;
@@ -680,32 +700,32 @@ body,
   }
 
   .hero {
-    grid-template-columns: 1fr;
-    grid-template-rows: 180px auto;
+    min-height: 460px;
+    align-items: flex-end;
   }
 
   .hero::before {
-    background:
-      repeating-linear-gradient(30deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 28px),
-      linear-gradient(0deg, rgba(5, 7, 10, 0.92) 0%, rgba(5, 7, 10, 0.5) 55%, transparent 100%);
+    background: linear-gradient(
+      0deg,
+      rgba(5, 7, 10, 0.95) 0%,
+      rgba(5, 7, 10, 0.75) 50%,
+      transparent 85%
+    );
   }
 
-  .hero-art {
-    grid-column: 1;
-    grid-row: 1;
-    background-size: auto 80%;
+  .hero-icon {
+    width: 48px;
+    height: 48px;
   }
 
   .hero-body {
-    grid-column: 1;
-    grid-row: 2;
     padding: 0 22px 26px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .card-cover,
+  .card-cover::before,
   .hero-art {
     transition: none;
   }
