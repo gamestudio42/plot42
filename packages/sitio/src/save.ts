@@ -19,8 +19,10 @@ import {
   type CoffeePlantOrder,
   type Family,
   type InputStock,
+  OUTFIT_COUNT,
   type MarketCart,
   type Person,
+  type PersonSex,
   type SeasonReport,
   type SetupStep,
   type Site,
@@ -30,13 +32,13 @@ import {
   type SitioTotals,
   type StarterKind,
   type Structure,
-  type WeekHistoryPoint,
+  type MonthHistoryPoint,
   type WorkTask,
   type YearEvent,
 } from './types';
 
 export const SITIO_SAVE_FORMAT = 'sitio-save';
-export const SITIO_SAVE_VERSION = 22;
+export const SITIO_SAVE_VERSION = 24;
 export const SITIO_SAVE_EXTENSION = '.sitio.json';
 
 const STATUSES: readonly SitioStatus[] = ['playing', 'won', 'lost', 'ended'];
@@ -70,12 +72,12 @@ interface SitioSaveState {
   plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
   marketCart: MarketCart;
-  history: WeekHistoryPoint[];
+  history: MonthHistoryPoint[];
   totals: SitioTotals;
   lastReport: SeasonReport | null;
-  weekSold: number;
-  weekRevenue: number;
-  weekExpense: number;
+  monthSold: number;
+  monthRevenue: number;
+  monthExpense: number;
 }
 
 export type SitioSaveFile = SaveEnvelope<typeof SITIO_SAVE_FORMAT, SitioMeta, SitioSaveState>;
@@ -115,9 +117,9 @@ export function encodeSitioSave(snapshot: SitioSnapshot, savedAt: string): Sitio
     history: snapshot.history,
     totals: snapshot.totals,
     lastReport: snapshot.lastReport,
-    weekSold: snapshot.weekSold,
-    weekRevenue: snapshot.weekRevenue,
-    weekExpense: snapshot.weekExpense,
+    monthSold: snapshot.monthSold,
+    monthRevenue: snapshot.monthRevenue,
+    monthExpense: snapshot.monthExpense,
   };
   return encodeEnvelope(
     SITIO_SAVE_FORMAT,
@@ -190,9 +192,12 @@ function decodePerson(value: unknown): Person | null {
   ) {
     return null;
   }
-  const morning = decodeTask(value.morning);
-  const afternoon = decodeTask(value.afternoon);
-  if (!morning || !afternoon) return null;
+  const task = decodeTask(value.task);
+  const sex = value.sex === 'male' || value.sex === 'female' ? (value.sex as PersonSex) : null;
+  if (!task || !sex) return null;
+  if (typeof value.outfit !== 'number' || !Number.isInteger(value.outfit) || value.outfit < 0 || value.outfit >= OUTFIT_COUNT) {
+    return null;
+  }
   return {
     id: value.id,
     name: value.name,
@@ -200,8 +205,9 @@ function decodePerson(value: unknown): Person | null {
     familyId: value.familyId,
     education: value.education,
     educationProgress: value.educationProgress,
-    morning,
-    afternoon,
+    sex,
+    outfit: value.outfit,
+    task,
   };
 }
 
@@ -362,6 +368,7 @@ function decodeMarketCart(value: unknown): MarketCart | null {
     'fertilizer',
     'limestone',
     'seedlings',
+    'food',
     'bad',
     'medium',
     'good',
@@ -378,14 +385,14 @@ function decodeMarketCart(value: unknown): MarketCart | null {
   } as MarketCart;
 }
 
-function decodeHistory(value: unknown): WeekHistoryPoint[] | null {
+function decodeHistory(value: unknown): MonthHistoryPoint[] | null {
   if (!Array.isArray(value)) return null;
-  const points: WeekHistoryPoint[] = [];
+  const points: MonthHistoryPoint[] = [];
   for (const entry of value) {
     if (
       !isRecord(entry) ||
       typeof entry.turn !== 'number' ||
-      typeof entry.week !== 'number' ||
+      typeof entry.month !== 'number' ||
       typeof entry.year !== 'number' ||
       typeof entry.season !== 'string' ||
       typeof entry.coins !== 'number' ||
@@ -399,9 +406,9 @@ function decodeHistory(value: unknown): WeekHistoryPoint[] | null {
     if (!harvest || !stock) return null;
     points.push({
       turn: entry.turn,
-      week: entry.week,
+      month: entry.month,
       year: entry.year,
-      season: entry.season as WeekHistoryPoint['season'],
+      season: entry.season as MonthHistoryPoint['season'],
       coins: entry.coins,
       income: entry.income,
       expenses: entry.expenses,
@@ -443,7 +450,7 @@ function decodeReport(value: unknown): SeasonReport | null | undefined {
   if (!isRecord(value)) return undefined;
   if (
     typeof value.turn !== 'number' ||
-    typeof value.week !== 'number' ||
+    typeof value.month !== 'number' ||
     typeof value.year !== 'number' ||
     typeof value.season !== 'string' ||
     typeof value.harvest !== 'number' ||
@@ -456,6 +463,8 @@ function decodeReport(value: unknown): SeasonReport | null | undefined {
     typeof value.foodConsumed !== 'number' ||
     typeof value.foodBought !== 'number' ||
     typeof value.foodSold !== 'number' ||
+    typeof value.foodWasted !== 'number' ||
+    typeof value.restBonus !== 'number' ||
     typeof value.planted !== 'number' ||
     typeof value.cleared !== 'number' ||
     typeof value.studied !== 'number' ||
@@ -492,6 +501,7 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
   const decoded = decodeEnvelope(text, {
     format: SITIO_SAVE_FORMAT,
     currentVersion: SITIO_SAVE_VERSION,
+
   });
   if (!decoded.ok) return decoded;
   const raw = decoded.file.state;
@@ -536,9 +546,9 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     !Array.isArray(raw.roadPlan) ||
     !isRecord(raw.marketCart) ||
     !Array.isArray(raw.history) ||
-    typeof raw.weekSold !== 'number' ||
-    typeof raw.weekRevenue !== 'number' ||
-    typeof raw.weekExpense !== 'number'
+    typeof raw.monthSold !== 'number' ||
+    typeof raw.monthRevenue !== 'number' ||
+    typeof raw.monthExpense !== 'number'
   ) {
     return invalid('state: header');
   }
@@ -647,9 +657,9 @@ export function decodeSitioSave(text: string): SitioDecodeResult {
     history,
     totals,
     lastReport,
-    weekSold: raw.weekSold,
-    weekRevenue: raw.weekRevenue,
-    weekExpense: raw.weekExpense,
+    monthSold: raw.monthSold,
+    monthRevenue: raw.monthRevenue,
+    monthExpense: raw.monthExpense,
   };
   const envelopeMeta = isRecord(decoded.file.meta) ? decoded.file.meta : {};
   const meta: SitioMeta = {

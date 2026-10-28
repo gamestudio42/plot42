@@ -31,7 +31,13 @@ describe('readSlices', () => {
       'utf8',
     );
     const slices = readSlices(JSON.parse(raw));
-    for (const name of [
+    for (const role of ['man', 'woman', 'boy', 'girl']) {
+      for (let outfit = 0; outfit < 6; outfit++) {
+        for (let frame = 0; frame < 2; frame++) {
+          expect(slices.has(`person_${role}_${outfit}_${frame}`), role).toBe(true);
+        }
+      }
+    }    for (const name of [
       'tile_terra',
       'tile_terra_alt',
       'tile_mata',
@@ -69,6 +75,9 @@ describe('readSlices', () => {
       'venda',
       'escola',
       'family',
+      'icon_fertilizer',
+      'icon_limestone',
+      'icon_clock',
     ]) {
       expect(slices.has(name), name).toBe(true);
     }

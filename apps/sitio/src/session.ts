@@ -7,7 +7,6 @@ import {
   type BuildingKind,
   type CoffeeGrade,
   type InputKind,
-  type Period,
   type SitioCommandReason,
   type SitioFullState,
   type StarterKind,
@@ -54,7 +53,6 @@ export interface SetupPreview {
 
 export interface PendingLand {
   personId: number;
-  period: Period;
   kind: 'plant' | 'clear' | 'fertilize' | 'limestone';
 }
 
@@ -268,16 +266,6 @@ export class SitioSession {
     await this.loadFile(text);
   }
 
-  async loadTestFarm(): Promise<void> {
-    try {
-      const response = await fetch(`${import.meta.env.BASE_URL}test/sitio-review.json`);
-      if (!response.ok) throw new Error('test farm not found');
-      await this.loadFile(await response.text());
-    } catch {
-      this.toast('error', catalog(this.ui.get().locale).invalidSave);
-    }
-  }
-
   async loadFile(text: string): Promise<void> {
     const result = await this.client.importSave(text);
     if (!result.ok) {
@@ -335,14 +323,14 @@ export class SitioSession {
     });
   }
 
-  async endWeek(): Promise<void> {
+  async endMonth(): Promise<void> {
     const before = this.ui.get().state;
     if (!before || before.status !== 'playing') return;
     if (before.setup) {
       this.toast('error', this.reason('setup'));
       return;
     }
-    const result = await this.client.command({ type: 'endWeek' });
+    const result = await this.client.command({ type: 'endMonth' });
     if (!result.ok) {
       this.toast('error', this.reason(result.reason));
       return;
@@ -360,8 +348,8 @@ export class SitioSession {
     await this.save(false);
   }
 
-  async assignTask(personId: number, period: Period, task: WorkTask): Promise<boolean> {
-    const result = await this.client.command({ type: 'assign', personId, period, task });
+  async assignTask(personId: number, task: WorkTask): Promise<boolean> {
+    const result = await this.client.command({ type: 'assign', personId, task });
     if (!result.ok) {
       this.toast('error', this.reason(result.reason));
       return false;
@@ -369,8 +357,8 @@ export class SitioSession {
     return true;
   }
 
-  beginLand(kind: 'plant' | 'clear' | 'fertilize' | 'limestone', personId: number, period: Period): void {
-    this.ui.set({ pendingLand: { kind, personId, period } });
+  beginLand(kind: 'plant' | 'clear' | 'fertilize' | 'limestone', personId: number): void {
+    this.ui.set({ pendingLand: { kind, personId } });
     this.clearPlacement();
   }
 
@@ -398,6 +386,14 @@ export class SitioSession {
     this.toast('info', catalog(this.ui.get().locale).addedToMarket);
   }
 
+  async sellFood(amount: number): Promise<void> {
+    const result = await this.client.command({ type: 'sellFood', amount });
+    if (!result.ok) {
+      this.toast('error', this.reason(result.reason));
+      return;
+    }
+    this.toast('info', catalog(this.ui.get().locale).addedToMarket);
+  }
   async buyInput(kind: InputKind, amount: number): Promise<void> {
     const result = await this.client.command({ type: 'buyInput', kind, amount });
     if (!result.ok) {
@@ -534,7 +530,7 @@ export class SitioSession {
       return;
     }
     if (ui.pendingLand) {
-      const ok = await this.assignTask(ui.pendingLand.personId, ui.pendingLand.period, {
+      const ok = await this.assignTask(ui.pendingLand.personId, {
         kind: ui.pendingLand.kind,
         x,
         y,

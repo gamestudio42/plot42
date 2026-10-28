@@ -1,10 +1,13 @@
 import {
   BUILDING_SPECS,
   BUILDING_VENDA,
+  coffeeHarvestForecast,
   COFFEE_GRADES,
   COFFEE_LOT_SEEDLINGS,
   EDUCATION_PERIODS,
   FAMILY_INVITE_COST,
+  FAMILY_NEED,
+  FOOD_SELL_PRICE,
   INPUT_PRICES,
   SEEDLING_BUNDLE_PRICE,
   SEEDLING_BUNDLE_SIZE,
@@ -15,7 +18,6 @@ import {
   type CoffeePlantOrder,
   type Family,
   type InputKind,
-  type Period,
   type Person,
   type SetupStep,
   type SitioFullState,
@@ -29,8 +31,10 @@ import {
   useStore,
 } from '@shell/chrome';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { fieldMarkers } from './actors';
 import { LOCALES, LOCALE_LABELS, useStrings, type Strings } from './i18n';
 import { lobbyHref } from './platform';
+import { FamilyPortraits } from './portrait';
 import { SitioSession, type Panel } from './session';
 
 const MARK = `${import.meta.env.BASE_URL}favicon.svg`;
@@ -147,14 +151,6 @@ function Menu({ session }: { session: SitioSession }) {
               {t.continue}: {latest.name}
             </button>
           ) : null}
-          <button
-            type="button"
-            className="button"
-            data-testid="sitio-test"
-            onClick={() => void session.loadTestFarm()}
-          >
-            {t.testFarm}
-          </button>
         </div>
         <label className="button file-button">
           {t.loadFile}
@@ -226,12 +222,12 @@ function Game({ session }: { session: SitioSession }) {
         <div className="clock">
           <strong>{t.season[state.season]}</strong>
           <span>
-            {t.week} {state.weekOfSeason} · {t.year} {state.year}
+            {t.month} {state.monthOfSeason} · {t.year} {state.year}
           </span>
         </div>
         <Resource icon="families" label={t.families} value={state.families.length} />
         <Resource icon="coins" label={t.coins} value={state.coins} />
-        <Resource icon="food" label={t.food} value={state.food} />
+        <Resource icon="food" label={t.food} value={`${state.food}/${state.foodCapacity}`} />
         <Resource icon="wood" label={t.wood} value={state.wood} />
         <Resource icon="fertilizer" label={t.fertilizer} value={state.inputStock.fertilizer} />
         <Resource icon="limestone" label={t.limestone} value={state.inputStock.limestone} />
@@ -306,6 +302,7 @@ function Game({ session }: { session: SitioSession }) {
               <MarketSummary session={session} state={state} t={t} salePrice={salePrice} />
               <MarketPanel session={session} state={state} t={t} salePrice={salePrice} />
               <InputMarket session={session} state={state} t={t} />
+              <FoodMarket session={session} state={state} t={t} />
               <WoodMarket session={session} state={state} t={t} />
             </div>
 
@@ -328,11 +325,11 @@ function Game({ session }: { session: SitioSession }) {
                     fertilizer={state.inputStock.fertilizer + state.marketCart.fertilizer}
                     limestone={state.inputStock.limestone + state.marketCart.limestone}
                     t={t}
-                    onAssign={(personId, period, task) =>
-                      void session.assignTask(personId, period, task)
+                    onAssign={(personId, task) =>
+                      void session.assignTask(personId, task)
                     }
-                    onLand={(personId, period, kind) =>
-                      session.beginLand(kind, personId, period)
+                    onLand={(personId, kind) =>
+                      session.beginLand(kind, personId)
                     }
                     onCancelLand={() => session.cancelLand()}
                   />
@@ -394,7 +391,7 @@ function Game({ session }: { session: SitioSession }) {
                       </span>
                       <small>
                         {spec.coins} {t.coins.toLowerCase()} · {spec.wood}{' '}
-                        {t.wood.toLowerCase()} · {spec.days} {t.periods.toLowerCase()}
+                        {t.wood.toLowerCase()} · {spec.days} {t.months.toLowerCase()}
                       </small>
                       {lock ? (
                         <em>
@@ -469,6 +466,10 @@ function CoffeePage({
   t: Strings;
 }) {
   const canPlant = state.seedlings >= COFFEE_LOT_SEEDLINGS;
+  const forecasts = new Map(
+    coffeeHarvestForecast(state).map((forecast) => [forecast.lotId, forecast]),
+  );
+  const markers = new Map(fieldMarkers(state).map((marker) => [marker.lotId, marker]));
   return (
     <div className="panel-section panel-coffee">
       <section>
@@ -516,25 +517,54 @@ function CoffeePage({
           <p className="muted">{t.noCoffeeLots}</p>
         ) : (
           <ul className="site-list">
-            {state.coffeeLots.map((lot) => (
-              <li key={lot.id}>
-                <div>
-                  <strong>
-                    {lot.w}×{lot.h} · {lot.x},{lot.y}
-                  </strong>
-                  <span className="muted">
-                    {lot.fertilized ? t.fertilizer : ''} {lot.limed ? t.limestone : ''}
-                  </span>
-                </div>
-              </li>
-            ))}
+            {state.coffeeLots.map((lot) => {
+              const forecast = forecasts.get(lot.id);
+              const marker = markers.get(lot.id);
+              const applied = [
+                lot.fertilized ? t.fertilizer : null,
+                lot.limed ? t.limestone : null,
+              ].filter((entry): entry is string => Boolean(entry));
+              return (
+                <li key={lot.id}>
+                  <div>
+                    <strong>
+                      {lot.w}×{lot.h} · {lot.x},{lot.y}
+                    </strong>
+                    {applied.length > 0 ? (
+                      <span className="muted small">{applied.join(' · ')}</span>
+                    ) : null}
+                    {marker?.fertilizer ? (
+                      <span className="queued-input" title={t.queued}>
+                        <Icon name="fertilizer" />
+                      </span>
+                    ) : null}
+                    {marker?.limestone ? (
+                      <span className="queued-input" title={t.queued}>
+                        <Icon name="limestone" />
+                      </span>
+                    ) : null}
+                    <span className="muted small lot-forecast">
+                      <Icon name="clock" />
+                      {forecast?.firstHarvestMonth != null
+                        ? `${t.firstHarvest}: ${forecast.firstHarvestMonth} ${t.months}`
+                        : t.noCoffeeWork}
+                      {forecast?.firstHarvestMonth != null &&
+                      forecast.completeHarvestMonth != null &&
+                      forecast.completeHarvestMonth !== forecast.firstHarvestMonth
+                        ? ` · ${t.completeHarvest}: ${forecast.completeHarvestMonth} ${t.months}`
+                        : ''}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
+        {state.coffeeLots.length > 0 ? <p className="hint">{t.forecastHint}</p> : null}
       </section>
     </div>
   );
 }
-
 function ReportsPage({ state, t }: { state: SitioFullState; t: Strings }) {
   const history = state.history;
   return (
@@ -555,7 +585,7 @@ function ReportsPage({ state, t }: { state: SitioFullState; t: Strings }) {
               history.map((point) => point.income),
               history.map((point) => point.expenses),
             ]}
-            weekLabel={t.week}
+            monthLabel={t.month}
           />
         )}
       </section>
@@ -575,7 +605,7 @@ function ReportsPage({ state, t }: { state: SitioFullState; t: Strings }) {
               history.map((point) => point.harvest.medium),
               history.map((point) => point.harvest.good),
             ]}
-            weekLabel={t.week}
+            monthLabel={t.month}
           />
         )}
       </section>
@@ -587,12 +617,12 @@ function LineChart({
   labels,
   colors,
   series,
-  weekLabel,
+  monthLabel,
 }: {
   labels: string[];
   colors: string[];
   series: number[][];
-  weekLabel: string;
+  monthLabel: string;
 }) {
   const count = Math.max(1, series[0]?.length ?? 0);
   const maximum = Math.max(1, ...series.flat());
@@ -614,7 +644,7 @@ function LineChart({
         ))}
       </svg>
       <p className="muted small">
-        {weekLabel} 1–{count} · {maximum}
+        {monthLabel} 1–{count} · {maximum}
       </p>
       <div className="chart-legend">
         {labels.map((label, index) => (
@@ -664,7 +694,7 @@ function BookNav({
         type="button"
         className="book-end"
         disabled={state.status !== 'playing'}
-        onClick={() => void session.endWeek()}
+        onClick={() => void session.endMonth()}
       >
         {t.endSeason}
       </button>
@@ -706,6 +736,7 @@ type IconName =
   | 'reputation'
   | 'market'
   | 'chart'
+  | 'clock'
   | 'house'
   | 'terreiro'
   | 'tulha'
@@ -790,6 +821,12 @@ const ICON_PATHS: Record<Exclude<IconName, 'chevron'>, ReactNode> = {
     <>
       <path d="M4 20V4M4 20h16" />
       <path d="m7 15 4-5 3 3 5-7" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7v5l3 2" />
     </>
   ),
   house: (
@@ -985,7 +1022,7 @@ function MarketPanel({
             <span className="muted small">{state.coffeeGrades[grade]} {t.sacks}</span>
             {state.marketCart[grade] > 0 ? (
               <span className="muted small">
-                +{state.marketCart[grade]} {t.weekEnd}
+                +{state.marketCart[grade]} {t.monthEnd}
               </span>
             ) : null}
             <strong>{priceFor(grade)} {t.coins.toLowerCase()}</strong>
@@ -1066,6 +1103,55 @@ function InputMarket({
   );
 }
 
+function FoodMarket({
+  session,
+  state,
+  t,
+}: {
+  session: SitioSession;
+  state: SitioFullState;
+  t: Strings;
+}) {
+  const reserved = state.families.length * FAMILY_NEED + state.marketCart.food;
+  const available = Math.max(0, state.food - reserved);
+  const [amount, setAmount] = useState(1);
+  const value = Math.min(amount, Math.max(1, available));
+  const disabled = available < 1;
+  return (
+    <section>
+      <h2>
+        <Icon name="food" />
+        {t.houseFood} <span className="count">{state.food}/{state.foodCapacity}</span>
+      </h2>
+      <p className="muted small">
+        {t.foodPrice}: {FOOD_SELL_PRICE} {t.coins.toLowerCase()} · {t.availableAfterFood}:{' '}
+        {available}
+      </p>
+      <div className="market-row">
+        <input
+          type="number"
+          min={1}
+          max={Math.max(1, available)}
+          value={value}
+          disabled={disabled}
+          aria-label={t.food}
+          onChange={(event) => {
+            const next = Number(event.target.value);
+            setAmount(Number.isFinite(next) ? Math.max(1, Math.min(next, Math.max(1, available))) : 1);
+          }}
+        />
+        <button
+          type="button"
+          className="button small"
+          disabled={disabled}
+          onClick={() => void session.sellFood(value)}
+        >
+          {t.sell}
+        </button>
+      </div>
+    </section>
+  );
+}
 function WoodMarket({
   session,
   state,
@@ -1156,7 +1242,14 @@ function MarketSummary({
       value: -(cart.seedlings / SEEDLING_BUNDLE_SIZE) * SEEDLING_BUNDLE_PRICE,
     });
   }
-  for (const grade of COFFEE_GRADES) {
+  if (cart.food > 0) {
+    rows.push({
+      type: t.sell,
+      label: t.food,
+      quantity: cart.food,
+      value: cart.food * FOOD_SELL_PRICE,
+    });
+  }  for (const grade of COFFEE_GRADES) {
     if (cart[grade] > 0) {
       rows.push({
         type: t.sell,
@@ -1209,7 +1302,7 @@ function MarketSummary({
           {t.balance}: {state.coins} → {state.coins + net}
         </span>
       </div>
-      <p className="hint">{t.marketAtWeekEnd}</p>
+      <p className="hint">{t.marketAtMonthEnd}</p>
       <button
         type="button"
         className="button small"
@@ -1281,10 +1374,9 @@ function FamilyCard({
   fertilizer: number;
   limestone: number;
   t: Strings;
-  onAssign: (personId: number, period: Period, task: WorkTask) => void;
+  onAssign: (personId: number, task: WorkTask) => void;
   onLand: (
     personId: number,
-    period: Period,
     kind: 'plant' | 'clear' | 'fertilize' | 'limestone',
   ) => void;
   onCancelLand: () => void;
@@ -1303,6 +1395,7 @@ function FamilyCard({
           <Icon name="chevron" />
           <strong>{family.name}</strong>
         </button>
+        <FamilyPortraits people={people} />
         <span className="morale" title={t.morale}>
           {[0, 1, 2, 3].map((index) => (
             <i key={index} className={index < family.morale ? 'on' : ''} />
@@ -1315,47 +1408,60 @@ function FamilyCard({
         </p>
       ) : (
         <ul className="people">
-        {people.map((person) => (
-          <li key={person.id} className="person">
-            <div className="person-name">
-              <strong>{person.name}</strong>
-              <span className="muted small">
-                {person.age >= 16 ? t.adult : t.child} · {person.age}
-                {person.education ? ` · ${t.educated}` : ''}
-              </span>
-            </div>
-            {person.age >= 16 ? (
+          {people.map((person) => (
+            <li key={person.id} className="person">
+              <div className="person-name">
+                <strong>{person.name}</strong>
+                <span className="muted small">
+                  {person.age >= 16 ? t.adult : t.child} · {person.age}
+                  {person.education ? ` · ${t.educated}` : ''}
+                </span>
+              </div>
               <div className="routine">
-                {(['morning', 'afternoon'] as Period[]).map((period) => (
-                  <label key={period}>
-                    <span>{t.period[period]}</span>
-                    <select
-                      value={taskValue(person[period])}
-                      onChange={(event) => {
-                        onCancelLand();
-                        onAssign(person.id, period, taskFromValue(event.target.value));
-                      }}
-                    >
-                      <option value="idle">{t.task.idle}</option>
-                      <option value="yard">{t.task.quintal}</option>
-                      <option value="coffee">{t.task.coffee}</option>
-                      <option value="road">{t.task.road}</option>
-                      {plantOrders.map((order) => (
-                        <option key={order.id} value={`plantLot:${order.id}`}>
-                          {t.task.plantLot} ({order.progress}/{order.required})
-                        </option>
-                      ))}
-                      {sites.map((site) => (
-                        <option key={site.id} value={`build:${site.id}`}>
-                          {t.task.build} {t.tools[site.kind]} ({site.progress}/{site.required})
-                        </option>
-                      ))}
-                    </select>
+                <label>
+                  <span>{t.monthlyTask}</span>
+                  <select
+                    value={taskValue(person.task)}
+                    onChange={(event) => {
+                      onCancelLand();
+                      onAssign(person.id, taskFromValue(event.target.value));
+                    }}
+                  >
+                    {targetedTaskLabel(person.task, t) ? (
+                      <option value={person.task.kind} disabled>
+                        {targetedTaskLabel(person.task, t)}
+                      </option>
+                    ) : null}
+                    <option value="idle">{t.task.idle}</option>
+                    {person.age >= 16 ? <option value="rest">{t.task.rest} (+1)</option> : null}
+                    <option value="yard">{t.task.quintal}</option>
+                    {person.age >= 16 ? (
+                      <>
+                        <option value="coffee">{t.task.coffee}</option>
+                        <option value="road">{t.task.road}</option>
+                        {plantOrders.map((order) => (
+                          <option key={order.id} value={`plantLot:${order.id}`}>
+                            {t.task.plantLot} ({order.progress}/{order.required})
+                          </option>
+                        ))}
+                        {sites.map((site) => (
+                          <option key={site.id} value={`build:${site.id}`}>
+                            {t.task.build} {t.tools[site.kind]} ({site.progress}/{site.required})
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="study" disabled={!hasSchool || person.education}>
+                        {t.task.study}
+                      </option>
+                    )}
+                  </select>
+                  {person.age >= 16 ? (
                     <span className="land-actions">
                       <button
                         type="button"
                         className="mini"
-                        onClick={() => onLand(person.id, period, 'clear')}
+                        onClick={() => onLand(person.id, 'clear')}
                       >
                         {t.task.clear}
                       </button>
@@ -1363,7 +1469,7 @@ function FamilyCard({
                         type="button"
                         className="mini"
                         disabled={fertilizer < 1}
-                        onClick={() => onLand(person.id, period, 'fertilize')}
+                        onClick={() => onLand(person.id, 'fertilize')}
                       >
                         {t.task.fertilize}
                       </button>
@@ -1371,55 +1477,39 @@ function FamilyCard({
                         type="button"
                         className="mini"
                         disabled={limestone < 1}
-                        onClick={() => onLand(person.id, period, 'limestone')}
+                        onClick={() => onLand(person.id, 'limestone')}
                       >
                         {t.task.limestone}
                       </button>
                     </span>
-                  </label>
-                ))}
+                  ) : null}
+                </label>
               </div>
-            ) : (
-              <>
-                <div className="routine">
-                  {(['morning', 'afternoon'] as Period[]).map((period) => (
-                    <label key={period}>
-                      <span>{t.period[period]}</span>
-                      <select
-                        value={taskValue(person[period])}
-                        onChange={(event) => {
-                          onCancelLand();
-                          onAssign(person.id, period, taskFromValue(event.target.value));
-                        }}
-                      >
-                        <option value="idle">{t.task.idle}</option>
-                        <option value="yard">{t.task.quintal}</option>
-                        <option value="study" disabled={!hasSchool || person.education}>
-                          {t.task.study}
-                        </option>
-                      </select>
-                    </label>
-                  ))}
-                </div>
+              {person.age < 16 ? (
                 <span className="muted small">
                   {person.education
                     ? t.educated
                     : `${t.study} ${person.educationProgress}/${EDUCATION_PERIODS}`}
                 </span>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+              ) : null}
+            </li>
+          ))}
+        </ul>
       )}
     </article>
   );
+}
+function targetedTaskLabel(task: WorkTask, t: Strings): string | null {
+  if (task.kind === 'fertilize') return `${t.task.fertilize} (${task.x},${task.y})`;
+  if (task.kind === 'limestone') return `${t.task.limestone} (${task.x},${task.y})`;
+  if (task.kind === 'clear') return `${t.task.clear} (${task.x},${task.y})`;
+  if (task.kind === 'plant') return `${t.task.plant} (${task.x},${task.y})`;
+  return null;
 }
 
 function taskValue(task: WorkTask): string {
   if (task.kind === 'build') return `build:${task.siteId}`;
   if (task.kind === 'plantLot') return `plantLot:${task.orderId}`;
-  if (task.kind === 'rest') return 'idle';
   return task.kind;
 }
 
@@ -1509,7 +1599,7 @@ function ReportModal({
       <div className="modal">
         <h2>{t.report.title}</h2>
         <p className="muted">
-          {t.season[report.season]} · {t.week} {report.week} · {t.year} {report.year}
+          {t.season[report.season]} · {t.month} {report.month} · {t.year} {report.year}
         </p>
         <dl className="report-grid">
           {report.harvest > 0 ? <Row label={t.report.harvest} value={report.harvest} /> : null}
@@ -1542,6 +1632,12 @@ function ReportModal({
             <Row label={t.report.foodBought} value={report.foodBought} />
           ) : null}
           {report.foodSold > 0 ? <Row label={t.report.foodSold} value={report.foodSold} /> : null}
+          {report.foodWasted > 0 ? (
+            <Row label={t.report.foodWasted} value={report.foodWasted} />
+          ) : null}
+          {report.restBonus > 0 ? (
+            <Row label={t.report.restBonus} value={report.restBonus} />
+          ) : null}
           {report.planted > 0 ? <Row label={t.report.planted} value={report.planted} /> : null}
           {report.cleared > 0 ? <Row label={t.report.cleared} value={report.cleared} /> : null}
           {report.studied > 0 ? <Row label={t.report.studied} value={report.studied} /> : null}

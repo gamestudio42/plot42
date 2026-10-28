@@ -28,6 +28,12 @@ const TARGETS: Record<string, Target> = {
 
 function targetFor(name: string): Target {
   if (TARGETS[name]) return TARGETS[name];
+  if (name.startsWith('person_')) {
+    return { footprint: '1x1', scale: 2, note: 'Actor frame; anchor bottom center' };
+  }
+  if (name.startsWith('icon_')) {
+    return { footprint: '1x1', scale: 2, note: 'Map status icon' };
+  }
   if (name.startsWith('coffee_lot_')) {
     return { footprint: '4×2', scale: 2, note: '16 pés, 4 fileiras de 4; arte no jogo, mecânica pendente' };
   }

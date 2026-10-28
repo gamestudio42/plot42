@@ -16,8 +16,10 @@ import {
   TERRAIN_MATA,
   TERRAIN_ROAD,
   type BuildingKind,
+  coffeeHarvestForecast,
   type CoffeeLot,
   type SitioFullState,
+  type WorkTask,
 } from '@sitio/sim';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import {
@@ -30,6 +32,8 @@ import {
   type HeightSource,
   type Point,
 } from '@shell/view-iso';
+import { fieldMarkers, planActors, restingHouses, type ActorPlan } from './actors';
+import { spriteName } from './appearance';
 import { readSlices } from './atlas';
 
 class FlatHeights implements HeightSource {
@@ -48,6 +52,165 @@ function tileHash(x: number, y: number): number {
   let h = Math.imul(x + 17, 374761393) + Math.imul(y + 31, 668265263);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+const ACTOR_SLOTS = [
+  { x: 0, y: 0 },
+  { x: -12, y: 2 },
+  { x: 12, y: 2 },
+  { x: 0, y: -8 },
+  { x: -20, y: -3 },
+  { x: 20, y: -3 },
+  { x: -7, y: 8 },
+  { x: 7, y: 8 },
+  { x: -25, y: 6 },
+  { x: 25, y: 6 },
+  { x: 0, y: 11 },
+  { x: -15, y: 11 },
+] as const;
+
+const DIGITS: Record<string, string[]> = {
+  '0': ['111', '101', '101', '101', '111'],
+  '1': ['010', '110', '010', '010', '111'],
+  '2': ['111', '001', '111', '100', '111'],
+  '3': ['111', '001', '111', '001', '111'],
+  '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'],
+  '6': ['111', '100', '111', '101', '111'],
+  '7': ['111', '001', '010', '010', '010'],
+  '8': ['111', '101', '111', '101', '111'],
+  '9': ['111', '101', '111', '001', '111'],
+  '-': ['000', '000', '111', '000', '000'],
+};
+
+const Z_GLYPH = ['111', '001', '010', '100', '111'];
+
+function drawGlyph(
+  g: Graphics,
+  rows: string[],
+  x: number,
+  y: number,
+  color: number,
+  scale = 1,
+): number {
+  for (let row = 0; row < rows.length; row++) {
+    const line = rows[row];
+    if (!line) continue;
+    for (let col = 0; col < line.length; col++) {
+      if (line[col] === '1') g.rect(x + col * scale, y + row * scale, scale, scale).fill(color);
+    }
+  }
+  return (rows[0]?.length ?? 0) * scale;
+}
+
+function drawNumber(
+  g: Graphics,
+  value: number | null,
+  x: number,
+  y: number,
+  color: number,
+  scale = 1,
+): number {
+  if (value === null) return drawGlyph(g, DIGITS['-'] ?? [], x, y, color, scale);
+  const text = String(Math.max(0, Math.min(99, Math.floor(value))));
+  let width = 0;
+  for (const char of text) {
+    width += drawGlyph(g, DIGITS[char] ?? DIGITS['-'] ?? [], x + width, y, color, scale) + scale;
+  }
+  return Math.max(0, width - scale);
+}
+
+function drawTool(g: Graphics, task: WorkTask): void {
+  const dark = 0x4a2c1e;
+  const metal = 0xb8b0a0;
+  switch (task.kind) {
+    case 'yard':
+    case 'plant':
+    case 'clear':
+      g.rect(0, -11, 2, 12).fill(0x8a5a3b);
+      g.rect(-3, -14, 6, 3).fill(metal);
+      break;
+    case 'coffee':
+      g.rect(-4, -8, 8, 6).fill(0x9a6b43);
+      g.rect(-3, -9, 6, 2).fill(0xd0a86a);
+      g.rect(-2, -3, 4, 2).fill(dark);
+      break;
+    case 'build':
+      g.rect(0, -12, 2, 10).fill(0x8a5a3b);
+      g.rect(-3, -15, 6, 3).fill(metal);
+      break;
+    case 'fertilize':
+    case 'limestone':
+      g.rect(-3, -9, 6, 7).fill(0xb89a6a);
+      g.rect(-2, -10, 4, 2).fill(0x6a4a32);
+      break;
+    case 'study':
+      g.rect(-4, -8, 8, 6).fill(0xf0e2c4);
+      g.rect(-4, -8, 1, 6).fill(0x8a5a3b);
+      break;
+    case 'road':
+      g.rect(0, -11, 2, 12).fill(0x8a5a3b);
+      g.rect(-3, -14, 6, 3).fill(metal);
+      break;
+    default:
+      break;
+  }
+}
+
+interface AnimatedView {
+  update(time: number): void;
+}
+
+class FloatView implements AnimatedView {
+  constructor(
+    private readonly target: Container,
+    private readonly baseY: number,
+    private readonly phase: number,
+    private readonly amplitude = 1.5,
+  ) {}
+
+  update(time: number): void {
+    this.target.y = this.baseY + Math.sin(time / 600 + this.phase * Math.PI * 2) * this.amplitude;
+  }
+}
+
+class ActorView implements AnimatedView {
+  private frame = 0;
+
+  constructor(
+    private readonly body: Container,
+    private readonly sprite: Sprite,
+    private readonly frames: Texture[],
+    private readonly phase: number,
+    private readonly tool: Graphics | null,
+  ) {}
+
+  update(time: number): void {
+    const next = Math.floor((time + this.phase * 500) / 420) % 2;
+    if (next !== this.frame && this.frames[next]) {
+      this.frame = next;
+      this.sprite.texture = this.frames[next];
+    }
+    this.body.y = Math.sin(time / 650 + this.phase * Math.PI * 2) * 0.9;
+    if (this.tool) this.tool.rotation = Math.sin(time / 430 + this.phase * 4) * 0.18;
+  }
+}
+
+class RestBubbleView implements AnimatedView {
+  constructor(
+    private readonly letters: Graphics[],
+    private readonly offsets: { x: number; y: number }[],
+  ) {}
+
+  update(time: number): void {
+    this.letters.forEach((letter, index) => {
+      const phase = ((time / 1100 + index * 0.33) % 1 + 1) % 1;
+      const offset = this.offsets[index];
+      letter.x = (offset?.x ?? 0) + phase * 4;
+      letter.y = (offset?.y ?? 0) - phase * 16;
+      letter.alpha = 0.25 + (1 - phase) * 0.75;
+    });
+  }
 }
 
 function buildingColor(id: number): number {
@@ -153,6 +316,8 @@ export class SitioRenderer {
   private readonly ground = new Graphics();
   private readonly tileLayer = new Container();
   private readonly objects = new Container();
+  private readonly statusLayer = new Container();
+  private readonly animated: AnimatedView[] = [];
   private readonly ghostLayer = new Container();
   private readonly planLayer = new Graphics();
   private readonly overlay = new Graphics();
@@ -175,6 +340,7 @@ export class SitioRenderer {
   private initialized = false;
   private destroyed = false;
   private inputEnabled = true;
+  private time = 0;
   private readonly listeners = new AbortController();
 
   async init(host: HTMLElement): Promise<void> {
@@ -194,10 +360,12 @@ export class SitioRenderer {
     this.app.canvas.classList.add('game-canvas');
     this.objects.sortableChildren = true;
     this.tileLayer.sortableChildren = true;
+    this.statusLayer.sortableChildren = true;
     this.root.addChild(
       this.ground,
       this.tileLayer,
       this.objects,
+      this.statusLayer,
       this.ghostLayer,
       this.planLayer,
       this.overlay,
@@ -314,8 +482,10 @@ export class SitioRenderer {
   private rebuild(): void {
     this.ground.clear();
     this.planLayer.clear();
+    this.animated.length = 0;
     for (const child of this.tileLayer.removeChildren()) child.destroy();
     for (const child of this.objects.removeChildren()) child.destroy();
+    for (const child of this.statusLayer.removeChildren()) child.destroy();
     const state = this.state;
     if (!state) return;
 
@@ -407,8 +577,8 @@ export class SitioRenderer {
     }
 
     for (const site of state.sites) {
-      this.drawSite(
-        this.objectAt(site.x, site.y, 0.3),
+      this.drawConstructionSite(
+        this.objectAtCenter(site.x, site.y, site.w, site.h, 0.3),
         site.x,
         site.y,
         site.w,
@@ -419,8 +589,8 @@ export class SitioRenderer {
     }
 
     for (const order of state.plantOrders) {
-      this.drawSite(
-        this.objectAt(order.x, order.y, 0.3),
+      this.drawPlantOrder(
+        this.objectAtCenter(order.x, order.y, order.w, order.h, 0.3),
         order.x,
         order.y,
         order.w,
@@ -430,16 +600,10 @@ export class SitioRenderer {
       );
     }
 
-    for (const family of state.families) {
-      if (
-        !this.drawSprite('family', family.houseX, family.houseY, 0.4, 1, 1, 8, 10)
-      ) {
-        const sprite = this.objectAt(family.houseX, family.houseY, 0.4);
-        sprite.position.x += 12;
-        sprite.position.y -= 2;
-        this.drawFamily(sprite);
-      }
-    }
+    for (const plan of planActors(state)) this.drawActor(state, plan);
+    this.drawFieldMarkers(state);
+    this.drawForecasts(state);
+    this.drawRestBubbles(state);
   }
 
   private roadMask(state: SitioFullState, x: number, y: number): number {
@@ -547,6 +711,15 @@ export class SitioRenderer {
     return true;
   }
 
+  private objectAtCenter(x: number, y: number, w: number, h: number, offset = 0): Graphics {
+    const sprite = new Graphics();
+    const centre = vertexToScreen(x + w / 2, y + h / 2, 0);
+    sprite.position.set(centre.x, centre.y);
+    sprite.zIndex = x + y + w / 2 + h / 2 + offset;
+    this.objects.addChild(sprite);
+    return sprite;
+  }
+
   private objectAt(x: number, y: number, offset = 0): Graphics {
     const sprite = new Graphics();
     const centre = tileCenter(this.heights, x, y);
@@ -638,7 +811,7 @@ export class SitioRenderer {
     g.poly([-16, -14, 0, -24, 16, -14]).fill(0x8c4a34);
   }
 
-  private drawSite(
+  private drawConstructionSite(
     g: Graphics,
     x: number,
     y: number,
@@ -647,49 +820,360 @@ export class SitioRenderer {
     progress: number,
     required: number,
   ): void {
-    const centre = tileCenter(this.heights, x, y);
-    const corners = [
-      vertexToScreen(x, y, 0),
-      vertexToScreen(x + w, y, 0),
-      vertexToScreen(x + w, y + h, 0),
-      vertexToScreen(x, y + h, 0),
-    ].flatMap((point) => [point.x - centre.x, point.y - centre.y]);
-    g.poly(corners)
-      .fill({ color: 0xe8d8b8, alpha: 0.22 })
-      .stroke({ width: 1, color: 0xe8d8b8, alpha: 0.55 });
-    const ratio = required > 0 ? Math.max(0, Math.min(1, progress / required)) : 0;
-    const barWidth = Math.max(24, w * 12);
+    const centre = vertexToScreen(x + w / 2, y + h / 2, 0);
     const local = (wx: number, wy: number) => {
       const point = vertexToScreen(wx, wy, 0);
       return { x: point.x - centre.x, y: point.y - centre.y };
     };
-    const posts: [number, number][] = [
-      [x, y],
-      [x + w, y],
-      [x + w, y + h],
-      [x, y + h],
-      [x + w / 2, y],
-      [x + w / 2, y + h],
+    const corners = [
+      local(x, y),
+      local(x + w, y),
+      local(x + w, y + h),
+      local(x, y + h),
     ];
-    for (const [px, py] of posts) {
-      const point = local(px, py);
-      g.rect(point.x - 1, point.y - 11, 2, 11).fill(0x6b4d30);
-      g.rect(point.x - 2, point.y - 12, 4, 2).fill(0x9a6b43);
+    const ratio = required > 0 ? Math.max(0, Math.min(1, progress / required)) : 0;
+    const barWidth = Math.max(28, w * 13);
+    const beam = (a: { x: number; y: number }, b: { x: number; y: number }, width: number, color: number) => {
+      g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ width, color });
+    };
+    const stake = (point: { x: number; y: number }, height: number) => {
+      g.rect(point.x - 1, point.y - height, 3, height).fill(0x6b4d30);
+      g.rect(point.x - 2, point.y - height - 2, 5, 3).fill(0xb07a4a);
+    };
+
+    g.poly(corners.flatMap((point) => [point.x, point.y]))
+      .fill({ color: 0x6b4a32, alpha: 0.96 })
+      .stroke({ width: 1, color: 0x3f2a1e });
+    const inner = [
+      local(x + 0.18, y + 0.18),
+      local(x + w - 0.18, y + 0.18),
+      local(x + w - 0.18, y + h - 0.18),
+      local(x + 0.18, y + h - 0.18),
+    ];
+    g.poly(inner.flatMap((point) => [point.x, point.y]))
+      .fill({ color: 0x8a7a68, alpha: 0.8 })
+      .stroke({ width: 1, color: 0x5a4a3a });
+
+    for (const point of corners) stake(point, 7);
+    beam(corners[0] ?? { x: 0, y: 0 }, corners[1] ?? { x: 0, y: 0 }, 1, 0xd6c2a0);
+    beam(corners[1] ?? { x: 0, y: 0 }, corners[2] ?? { x: 0, y: 0 }, 1, 0xd6c2a0);
+
+    const materialLeft = local(x - 0.22, y + h + 0.35);
+    const materialRight = local(x + w + 0.22, y + h * 0.55);
+    const pile = (point: { x: number; y: number }) => {
+      g.rect(point.x - 8, point.y - 3, 12, 3).fill(0xb07a4a);
+      g.rect(point.x - 7, point.y - 6, 11, 3).fill(0xc9b38a);
+      g.rect(point.x - 5, point.y - 8, 8, 2).fill(0xd6c2a0);
+    };
+    pile(materialLeft);
+    pile(materialRight);
+    g.rect(materialLeft.x - 2, materialLeft.y - 12, 2, 12).fill(0x8a5a3b);
+    g.rect(materialRight.x - 2, materialRight.y - 10, 2, 10).fill(0x8a5a3b);
+
+    const frontLeft = local(x + 0.2, y + h);
+    const frontRight = local(x + w - 0.2, y + h);
+    const barrow = local(x + 0.2, y + h + 0.55);
+    g.rect(barrow.x - 10, barrow.y - 5, 13, 3).fill(0xd6c2a0);
+    g.circle(barrow.x - 9, barrow.y - 1, 3).fill(0x4a2c1e);
+    g.circle(barrow.x + 1, barrow.y - 1, 2).fill(0x4a2c1e);
+    g.rect(barrow.x - 3, barrow.y - 7, 2, 5).fill(0xb07a4a);
+
+    const sawhorse = local(x + w - 0.25, y + h + 0.35);
+    g.rect(sawhorse.x - 6, sawhorse.y - 5, 2, 5).fill(0x8a5a3b);
+    g.rect(sawhorse.x + 4, sawhorse.y - 5, 2, 5).fill(0x8a5a3b);
+    g.rect(sawhorse.x - 7, sawhorse.y - 7, 14, 2).fill(0xb07a4a);
+
+    const ladder = local(x + w - 0.15, y + h - 0.5);
+    g.rect(ladder.x - 5, ladder.y - 12, 2, 12).fill(0xb07a4a);
+    g.rect(ladder.x + 1, ladder.y - 12, 2, 12).fill(0xb07a4a);
+    for (let rung = 0; rung < 4; rung++) {
+      g.rect(ladder.x - 5, ladder.y - 10 + rung * 3, 8, 1).fill(0xf0e2c4);
     }
+
+    const bricks = local(x + w + 0.22, y + h + 0.55);
+    for (let row = 0; row < 3; row++) {
+      g.rect(bricks.x - 8, bricks.y - row * 3, 15, 2).fill(row % 2 === 0 ? 0xb8563a : 0xd6c2a0);
+    }
+
+    if (ratio >= 0) {
+      const scaffoldHeight = 7 + ratio * 13;
+      const topLeft = local(x + 0.15, y + 0.15);
+      const topRight = local(x + w - 0.15, y + 0.15);
+      const bottomLeft = local(x + 0.15, y + h - 0.15);
+      const bottomRight = local(x + w - 0.15, y + h - 0.15);
+      stake(topLeft, scaffoldHeight);
+      stake(topRight, scaffoldHeight);
+      stake(bottomLeft, scaffoldHeight);
+      stake(bottomRight, scaffoldHeight);
+      beam(
+        { x: topLeft.x, y: topLeft.y - scaffoldHeight },
+        { x: topRight.x, y: topRight.y - scaffoldHeight },
+        3,
+        0xb07a4a,
+      );
+      beam(
+        { x: bottomLeft.x, y: bottomLeft.y - scaffoldHeight },
+        { x: bottomRight.x, y: bottomRight.y - scaffoldHeight },
+        3,
+        0xb07a4a,
+      );
+      beam(
+        { x: topLeft.x, y: topLeft.y - scaffoldHeight },
+        { x: bottomLeft.x, y: bottomLeft.y - scaffoldHeight },
+        2,
+        0x8a5a3b,
+      );
+      beam(
+        { x: topRight.x, y: topRight.y - scaffoldHeight },
+        { x: bottomRight.x, y: bottomRight.y - scaffoldHeight },
+        2,
+        0x8a5a3b,
+      );
+      beam({ x: topLeft.x, y: topLeft.y - scaffoldHeight }, { x: bottomRight.x, y: bottomRight.y - 3 }, 1, 0xd6c2a0);
+      beam({ x: topRight.x, y: topRight.y - scaffoldHeight }, { x: bottomLeft.x, y: bottomLeft.y - 3 }, 1, 0xd6c2a0);
+    }
+
+    if (ratio > 0.28) {
+      const wallHeight = 3 + ratio * 11;
+      g.poly([
+        frontLeft.x,
+        frontLeft.y,
+        frontRight.x,
+        frontRight.y,
+        frontRight.x,
+        frontRight.y - wallHeight,
+        frontLeft.x,
+        frontLeft.y - wallHeight,
+      ])
+        .fill({ color: 0xf0e2c4, alpha: 0.95 })
+        .stroke({ width: 1, color: 0x6b4d30 });
+      g.rect(frontLeft.x + 2, frontLeft.y - 6, 3, 4).fill(0x6a8a9a);
+    }
+
+    if (ratio > 0.46) {
+      g.poly([
+        frontLeft.x,
+        frontLeft.y - 12,
+        frontRight.x,
+        frontRight.y - 12,
+        frontRight.x - 3,
+        frontRight.y - 16,
+        frontLeft.x + 3,
+        frontLeft.y - 16,
+      ])
+        .fill({ color: 0xb8563a, alpha: 0.85 })
+        .stroke({ width: 1, color: 0x6e3a28 });
+    }
+
+    if (ratio > 0.64) {
+      const roofTop = local(x + w / 2, y + h / 2);
+      beam(frontLeft, { x: roofTop.x, y: roofTop.y - 19 }, 1, 0x8c4a34);
+      beam(frontRight, { x: roofTop.x, y: roofTop.y - 19 }, 1, 0x8c4a34);
+      beam(
+        { x: frontLeft.x, y: frontLeft.y - 13 },
+        { x: roofTop.x, y: roofTop.y - 19 },
+        1,
+        0xb8563a,
+      );
+      beam(
+        { x: frontRight.x, y: frontRight.y - 13 },
+        { x: roofTop.x, y: roofTop.y - 19 },
+        1,
+        0xb8563a,
+      );
+    }
+
+    if (ratio > 0.12) {
+      const crane = local(x + w + 0.3, y + 0.1);
+      g.rect(crane.x - 1, crane.y - 26, 3, 26).fill(0x6b4d30);
+      g.rect(crane.x - 12, crane.y - 27, 24, 3).fill(0xb07a4a);
+      g.rect(crane.x + 10, crane.y - 24, 1, 15).fill(0x4a2c1e);
+      g.rect(crane.x + 7, crane.y - 10, 7, 4).fill(0xb8563a);
+      g.rect(crane.x + 8, crane.y - 9, 4, 2).fill(0xd6c2a0);
+    }
+
     g.rect(-barWidth / 2, -4, barWidth, 3).fill(0x2a2018);
     g.rect(-barWidth / 2, -4, barWidth * ratio, 3).fill(0xe0a84a);
-    g.rect(-12, -7, 9, 2).fill(0x9a6b43);
-    g.rect(-10, -9, 9, 2).fill(0xb07a4a);
-    g.rect(-12, -6, 2, 4).fill(0x6b3d2a);
-    g.circle(10, -5, 3).fill(0x4a2c1e);
-    g.rect(7, -9, 7, 2).fill(0x6b3d2a);
-    g.rect(6, -12, 2, 7).fill(0x8a5a3b);
-    if (ratio > 0.45) {
-      g.rect(-6, -16, 14, 7).fill({ color: 0xd6c2a0, alpha: 0.7 });
-      g.rect(-6, -9, 14, 2).fill(0x6b3d2a);
+    if (ratio > 0.9) g.rect(-6, -6, 12, 1).fill(0xf0e2c4);
+  }
+
+  private drawPlantOrder(
+    g: Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    progress: number,
+    required: number,
+  ): void {
+    const centre = vertexToScreen(x + w / 2, y + h / 2, 0);
+    const local = (wx: number, wy: number) => {
+      const point = vertexToScreen(wx, wy, 0);
+      return { x: point.x - centre.x, y: point.y - centre.y };
+    };
+    const corners = [
+      local(x, y),
+      local(x + w, y),
+      local(x + w, y + h),
+      local(x, y + h),
+    ];
+    const ratio = required > 0 ? Math.max(0, Math.min(1, progress / required)) : 0;
+    const barWidth = Math.max(28, w * 13);
+    g.poly(corners.flatMap((point) => [point.x, point.y]))
+      .fill({ color: 0x6b452c, alpha: 0.95 })
+      .stroke({ width: 1, color: 0x3f2a1e });
+    const planted = Math.round(ratio * w * h);
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w; col++) {
+        const point = local(x + col + 0.5, y + row + 0.5);
+        g.ellipse(point.x, point.y, 5, 2).fill(0x8a5a3b);
+        if (row * w + col < planted) {
+          g.rect(point.x - 1, point.y - 7, 2, 7).fill(0x3f7434);
+          g.poly([point.x - 4, point.y - 5, point.x, point.y - 10, point.x + 4, point.y - 5]).fill(0x5c8f3e);
+        } else {
+          g.rect(point.x - 1, point.y - 2, 2, 2).fill(0x6b452c);
+        }
+      }
     }
-    if (ratio >= 1) {
-      g.rect(-8, -18, 16, 2).fill(0x8c4a34);
+    for (let col = 0; col <= w; col++) {
+      const point = local(x + col, y + h + 0.08);
+      g.rect(point.x - 1, point.y - 4, 2, 4).fill(0x9a6b43);
+    }
+    g.rect(-barWidth / 2, -4, barWidth, 3).fill(0x2a2018);
+    g.rect(-barWidth / 2, -4, barWidth * ratio, 3).fill(0x7fae5a);
+  }
+
+  private drawActor(state: SitioFullState, plan: ActorPlan): void {
+    const textures = [
+      spriteName(plan.variant, plan.outfit, 0),
+      spriteName(plan.variant, plan.outfit, 1),
+    ]
+      .map((name) => this.atlas?.get(name))
+      .filter((texture): texture is Texture => Boolean(texture));
+    const anchor = vertexToScreen(plan.anchorX, plan.anchorY, 0);
+    const slot = ACTOR_SLOTS[plan.slot % ACTOR_SLOTS.length] ?? ACTOR_SLOTS[0];
+    const root = new Container();
+    root.position.set(anchor.x + slot.x, anchor.y + slot.y);
+    root.zIndex = this.actorDepth(state, plan);
+    const shadow = new Graphics();
+    shadow.ellipse(0, 0, 7, 3).fill({ color: 0x1a120d, alpha: 0.35 });
+    root.addChild(shadow);
+    const body = new Container();
+    body.y = -1;
+    root.addChild(body);
+    if (!textures[0]) {
+      const fallback = new Graphics();
+      fallback.position.set(anchor.x + slot.x, anchor.y + slot.y);
+      fallback.zIndex = root.zIndex;
+      this.objects.addChild(fallback);
+      this.drawFamily(fallback);
+      return;
+    }
+    const sprite = new Sprite(textures[0]);
+    sprite.anchor.set(0.5, 1);
+    sprite.scale.set(2);
+    body.addChild(sprite);
+    const tool = new Graphics();
+    tool.position.set(7, -11);
+    drawTool(tool, plan.task);
+    body.addChild(tool);
+    this.objects.addChild(root);
+    const phase = (plan.personId * 0.37) % 1;
+    this.animated.push(new ActorView(body, sprite, textures, phase, tool));
+  }
+
+  private actorDepth(state: SitioFullState, plan: ActorPlan): number {
+    if (plan.groupKey.startsWith('lot:')) {
+      const id = Number(plan.groupKey.slice(4));
+      const lot = state.coffeeLots.find((entry) => entry.id === id);
+      if (lot) return lot.x + lot.y + lot.w + lot.h + 0.5;
+    }
+    if (plan.groupKey.startsWith('order:')) {
+      const id = Number(plan.groupKey.slice(6));
+      const order = state.plantOrders.find((entry) => entry.id === id);
+      if (order) return order.x + order.y + order.w + order.h + 0.5;
+    }
+    if (plan.groupKey.startsWith('site:')) {
+      const id = Number(plan.groupKey.slice(5));
+      const site = state.sites.find((entry) => entry.id === id);
+      if (site) return site.x + site.y + site.w + site.h + 0.5;
+    }
+    return plan.anchorX + plan.anchorY + 0.65;
+  }
+  private drawFieldMarkers(state: SitioFullState): void {
+    for (const marker of fieldMarkers(state)) {
+      const lot = state.coffeeLots.find((entry) => entry.id === marker.lotId);
+      if (!lot) continue;
+      const top = vertexToScreen(lot.x + lot.w / 2, lot.y, 0);
+      const names = [
+        marker.fertilizer ? 'icon_fertilizer' : null,
+        marker.limestone ? 'icon_limestone' : null,
+      ].filter((name): name is string => Boolean(name));
+      names.forEach((name, index) => {
+        const texture = this.atlas?.get(name);
+        if (!texture) return;
+        const holder = new Container();
+        const x = top.x + (names.length === 1 ? 0 : index === 0 ? -9 : 9);
+        const y = top.y - 15;
+        holder.position.set(x, y);
+        holder.zIndex = 1000 + index;
+        const sprite = new Sprite(texture);
+        sprite.anchor.set(0.5, 1);
+        holder.addChild(sprite);
+        this.statusLayer.addChild(holder);
+        this.animated.push(new FloatView(holder, y, (lot.id + index) * 0.21, 1.4));
+      });
+    }
+  }
+
+  private drawForecasts(state: SitioFullState): void {
+    const clock = this.atlas?.get('icon_clock');
+    for (const forecast of coffeeHarvestForecast(state)) {
+      const lot = state.coffeeLots.find((entry) => entry.id === forecast.lotId);
+      if (!lot) continue;
+      const top = vertexToScreen(lot.x + lot.w / 2, lot.y, 0);
+      const holder = new Container();
+      const x = top.x;
+      const y = top.y - 38;
+      holder.position.set(x, y);
+      holder.zIndex = 1002;
+      const background = new Graphics();
+      const color = forecast.firstHarvestMonth === null ? 0xb9a78a : 0xe0a84a;
+      background
+        .rect(-19, -9, 38, 16)
+        .fill({ color: 0x241c16, alpha: 0.94 })
+        .stroke({ width: 1, color });
+      holder.addChild(background);
+      if (clock) {
+        const icon = new Sprite(clock);
+        icon.position.set(-18, -8);
+        holder.addChild(icon);
+      }
+      const digits = new Graphics();
+      drawNumber(digits, forecast.firstHarvestMonth, -2, -9, color, 2);
+      holder.addChild(digits);
+      this.statusLayer.addChild(holder);
+      this.animated.push(new FloatView(holder, y, lot.id * 0.29, 1.2));
+    }
+  }
+
+  private drawRestBubbles(state: SitioFullState): void {
+    for (const house of restingHouses(state)) {
+      const top = vertexToScreen(house.x, house.y, 0);
+      const holder = new Container();
+      holder.position.set(top.x, top.y - 120);
+      holder.zIndex = 1003;
+      const letters: Graphics[] = [];
+      const offsets: { x: number; y: number }[] = [];
+      for (let index = 0; index < 3; index++) {
+        const letter = new Graphics();
+        drawGlyph(letter, Z_GLYPH, 0, 0, 0xf0e2c4, 2);
+        holder.addChild(letter);
+        letters.push(letter);
+        offsets.push({ x: index * 8, y: -index * 6 });
+      }
+      this.statusLayer.addChild(holder);
+      this.animated.push(new RestBubbleView(letters, offsets));
     }
   }
 
@@ -707,9 +1191,11 @@ export class SitioRenderer {
   }
 
   private frame(): void {
+    this.time += this.app.ticker.deltaMS;
     this.camera.viewWidth = this.app.screen.width;
     this.camera.viewHeight = this.app.screen.height;
     this.camera.apply(this.root, true);
+    for (const view of this.animated) view.update(this.time);
     this.drawHover();
   }
 

@@ -336,6 +336,37 @@ select {
   cursor: pointer;
 }
 
+.family-portraits {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.portrait {
+  display: inline-block;
+  width: 16px;
+  height: 24px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  animation: portrait-frame 900ms steps(1, end) infinite;
+}
+
+.portrait-missing {
+  background: #4a3a2a;
+  border: 1px solid var(--line);
+}
+
+@keyframes portrait-frame {
+  0%,
+  49% {
+    background-position: var(--frame0);
+  }
+  50%,
+  100% {
+    background-position: var(--frame1);
+  }
+}
 .family-toggle:hover {
   color: var(--gold);
 }
@@ -821,9 +852,14 @@ select {
 }
 
 .market-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
+}
+
+.market-row > button {
+  justify-self: end;
 }
 
 .market-row input {
@@ -985,11 +1021,23 @@ input,
 
 .grade-list li,
 .input-list li {
-  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 4px 0;
   border-top: 1px solid rgba(90, 67, 48, 0.7);
+}
+
+.grade-list li {
+  display: flex;
+}
+
+.input-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.input-list li > button {
+  justify-self: end;
 }
 
 .grade-list li:first-child,
@@ -1189,6 +1237,29 @@ input,
   }
 }
 
+.queued-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+}
+
+.queued-input .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.lot-forecast {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gold);
+}
+
+.lot-forecast .icon {
+  width: 14px;
+  height: 14px;
+}
 .market-summary {
   border-top: 2px solid var(--line);
   padding-top: 8px;
@@ -1210,7 +1281,30 @@ input,
   color: var(--red);
 }
 
-.panel-market .market-summary {
+.panel-market .queued-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+}
+
+.queued-input .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.lot-forecast {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gold);
+}
+
+.lot-forecast .icon {
+  width: 14px;
+  height: 14px;
+}
+.market-summary {
   position: sticky;
   top: 0;
   z-index: 2;

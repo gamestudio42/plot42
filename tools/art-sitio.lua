@@ -53,7 +53,7 @@ local ROAD_EDGE = C(0x4A2C1E)
 local ROAD_MASK = C(0xFF00FF)
 local ROAD_MASK_PIXEL = app.pixelColor.rgba(255, 0, 255, 255)
 
-local sprite = Sprite(512, 480, ColorMode.RGB)
+local sprite = Sprite(512, 640, ColorMode.RGB)
 
 local OX, OY = 0, 0
 
@@ -1144,6 +1144,165 @@ rect(family, 6, 3, 5, 2, HAT)
 px(family, 7, 11, SHADOW)
 px(family, 10, 11, SHADOW)
 
+local function drawActors()
+  local SKIN_DARK = C(0xB87A50)
+  local HAIR = C(0x3A2A1E)
+  local APRON = C(0xE8D8B8)
+  local PANTS = C(0x4A3A2A)
+  local BOOT = C(0x2A1C12)
+  local HAT_DARK = C(0xB89A52)
+  local SACK = C(0xB89A6A)
+  local SACK_DARK = C(0x8A6A48)
+  local LIME_SACK = C(0xD6C2A0)
+  local LIME_DARK = C(0x9A8A70)
+  local outfits = {
+    C(0xA64B3C),
+    C(0x3F6B8A),
+    C(0x4F7A3A),
+    C(0xB07A4A),
+    C(0x7A4A6A),
+    C(0x3F7A72),
+  }
+  local roles = { "man", "woman", "boy", "girl" }
+
+  local function man(img, color, frame)
+    rect(img, 4, 10, 8, 7, color)
+    rect(img, 3, 11, 2, 5, color)
+    rect(img, 12, 11, 2, 5, color)
+    rect(img, 3, 15, 2, 2, SKIN)
+    rect(img, 12, 15, 2, 2, SKIN)
+    rect(img, 5, 17, 3, 5, PANTS)
+    rect(img, 9, 17, 3, 5, PANTS)
+    rect(img, 4, 21, 3, 2, BOOT)
+    rect(img, 9, 21, 3, 2, BOOT)
+    rect(img, 5, 5, 6, 6, SKIN)
+    rect(img, 5, 4, 6, 2, HAIR)
+    px(img, 7, 8, SHADOW)
+    px(img, 10, 8, SHADOW)
+    rect(img, 3, 3, 10, 2, HAT)
+    rect(img, 5, 1, 6, 2, HAT)
+    rect(img, 4, 2, 8, 1, HAT_DARK)
+    if frame == 1 then
+      rect(img, 3, 17, 2, 4, color)
+      rect(img, 12, 10, 2, 5, color)
+      rect(img, 4, 17, 3, 4, PANTS)
+      rect(img, 10, 18, 3, 4, PANTS)
+      rect(img, 3, 21, 3, 2, BOOT)
+      rect(img, 10, 21, 3, 2, BOOT)
+    end
+  end
+
+  local function woman(img, color, frame)
+    rect(img, 4, 10, 8, 7, color)
+    rect(img, 3, 16, 10, 5, color)
+    rect(img, 6, 11, 4, 6, APRON)
+    rect(img, 3, 11, 2, 5, color)
+    rect(img, 12, 11, 2, 5, color)
+    rect(img, 3, 15, 2, 2, SKIN)
+    rect(img, 12, 15, 2, 2, SKIN)
+    rect(img, 5, 20, 2, 2, PANTS)
+    rect(img, 9, 20, 2, 2, PANTS)
+    rect(img, 4, 22, 3, 1, BOOT)
+    rect(img, 9, 22, 3, 1, BOOT)
+    rect(img, 5, 5, 6, 6, SKIN)
+    rect(img, 4, 4, 8, 2, HAIR)
+    rect(img, 3, 6, 2, 4, HAIR)
+    rect(img, 11, 6, 2, 4, HAIR)
+    px(img, 7, 8, SHADOW)
+    px(img, 10, 8, SHADOW)
+    rect(img, 6, 2, 5, 2, APRON)
+    if frame == 1 then
+      rect(img, 4, 20, 2, 2, PANTS)
+      rect(img, 10, 20, 2, 2, PANTS)
+      rect(img, 3, 22, 3, 1, BOOT)
+      rect(img, 10, 22, 3, 1, BOOT)
+    end
+  end
+
+  local function boy(img, color, frame)
+    rect(img, 5, 13, 6, 6, color)
+    rect(img, 4, 12, 2, 4, color)
+    rect(img, 10, 12, 2, 4, color)
+    rect(img, 5, 18, 6, 2, PANTS)
+    rect(img, 5, 20, 2, 3, PANTS)
+    rect(img, 9, 20, 2, 3, PANTS)
+    rect(img, 4, 22, 3, 1, BOOT)
+    rect(img, 9, 22, 3, 1, BOOT)
+    rect(img, 6, 8, 4, 5, SKIN)
+    rect(img, 6, 7, 4, 2, HAIR)
+    px(img, 7, 10, SHADOW)
+    px(img, 9, 10, SHADOW)
+    rect(img, 6, 5, 4, 2, HAT_DARK)
+    if frame == 1 then
+      rect(img, 4, 20, 2, 3, PANTS)
+      rect(img, 10, 20, 2, 3, PANTS)
+      rect(img, 3, 22, 3, 1, BOOT)
+      rect(img, 10, 22, 3, 1, BOOT)
+    end
+  end
+
+  local function girl(img, color, frame)
+    rect(img, 5, 12, 6, 7, color)
+    rect(img, 4, 17, 8, 4, color)
+    rect(img, 6, 13, 4, 4, APRON)
+    rect(img, 4, 12, 2, 4, color)
+    rect(img, 10, 12, 2, 4, color)
+    rect(img, 5, 20, 2, 2, PANTS)
+    rect(img, 9, 20, 2, 2, PANTS)
+    rect(img, 4, 22, 3, 1, BOOT)
+    rect(img, 9, 22, 3, 1, BOOT)
+    rect(img, 6, 8, 4, 5, SKIN)
+    rect(img, 5, 7, 6, 2, HAIR)
+    rect(img, 5, 9, 1, 3, HAIR)
+    rect(img, 10, 9, 1, 3, HAIR)
+    px(img, 7, 10, SHADOW)
+    px(img, 9, 10, SHADOW)
+    rect(img, 6, 5, 4, 2, APRON)
+    if frame == 1 then
+      rect(img, 4, 20, 2, 2, PANTS)
+      rect(img, 10, 20, 2, 2, PANTS)
+      rect(img, 3, 22, 3, 1, BOOT)
+      rect(img, 10, 22, 3, 1, BOOT)
+    end
+  end
+
+  local drawers = { man = man, woman = woman, boy = boy, girl = girl }
+  for roleIndex, role in ipairs(roles) do
+    for outfitIndex, color in ipairs(outfits) do
+      for frame = 0, 1 do
+        local index = (roleIndex - 1) * 12 + (outfitIndex - 1) * 2 + frame
+        local x = (index % 12) * 16
+        local y = 480 + math.floor(index / 12) * 24
+        local img = layer("person_" .. role .. "_" .. (outfitIndex - 1) .. "_" .. frame, x, y)
+        drawers[role](img, color, frame)
+      end
+    end
+  end
+
+  local fertilizer = layer("icon_fertilizer", 0, 600)
+  rect(fertilizer, 4, 4, 8, 10, SACK)
+  rect(fertilizer, 5, 2, 6, 2, SACK_DARK)
+  rect(fertilizer, 3, 13, 10, 1, SACK_DARK)
+  rect(fertilizer, 6, 7, 4, 3, COFFEE)
+  px(fertilizer, 7, 6, COFFEE_LIGHT)
+  px(fertilizer, 8, 6, COFFEE_LIGHT)
+
+  local limestone = layer("icon_limestone", 24, 600)
+  rect(limestone, 4, 4, 8, 10, LIME_SACK)
+  rect(limestone, 5, 2, 6, 2, LIME_DARK)
+  rect(limestone, 3, 13, 10, 1, LIME_DARK)
+  rect(limestone, 6, 8, 4, 2, STONE_DARK)
+
+  local clock = layer("icon_clock", 48, 600)
+  rect(clock, 6, 2, 4, 1, GOLD)
+  rect(clock, 4, 3, 8, 2, GOLD)
+  rect(clock, 3, 5, 10, 6, GOLD)
+  rect(clock, 4, 11, 8, 3, GOLD)
+  rect(clock, 6, 14, 4, 1, GOLD)
+  rect(clock, 7, 5, 1, 5, SHADOW)
+  rect(clock, 8, 9, 4, 1, SHADOW)
+end
+drawActors()
 local function slice(name, x, y, w, h)
   local s = sprite:newSlice(Rectangle(x, y, w, h))
   s.name = name
@@ -1173,6 +1332,23 @@ slice("capela", 320, 368, 80, 112)
 slice("venda", 128, 368, 96, 64)
 slice("escola", 224, 368, 96, 88)
 slice("family", 464, 160, 16, 24)
+local function addPersonSlices()
+for roleIndex, role in ipairs({ "man", "woman", "boy", "girl" }) do
+  for outfit = 0, 5 do
+    for frame = 0, 1 do
+      local index = (roleIndex - 1) * 12 + outfit * 2 + frame
+      local x = (index % 12) * 16
+      local y = 480 + math.floor(index / 12) * 24
+      slice("person_" .. role .. "_" .. outfit .. "_" .. frame, x, y, 16, 24)
+    end
+  end
+end
+end
+addPersonSlices()
+
+slice("icon_fertilizer", 0, 600, 16, 16)
+slice("icon_limestone", 24, 600, 16, 16)
+slice("icon_clock", 48, 600, 16, 16)
 
 app.activeSprite = sprite
 sprite:saveAs(OUT)
