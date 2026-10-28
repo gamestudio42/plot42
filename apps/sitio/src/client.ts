@@ -63,6 +63,13 @@ export class SitioClient {
     );
   }
 
+  coffeePreview(x: number, y: number): Promise<SitioCommandResult> {
+    return this.rpc.request(
+      (id) => this.send({ type: 'coffeePreview', id, x, y }),
+      (message) => (message.type === 'coffeePreviewResult' ? message.result : undefined),
+    );
+  }
+
   snapshot(): Promise<SitioSnapshot> {
     return this.rpc.request(
       (id) => this.send({ type: 'snapshot', id }),

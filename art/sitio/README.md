@@ -31,9 +31,15 @@ pnpm art:draw   # regenerate the .aseprite from tools/art-sitio.lua first
 - Coffee tiles (per-cell simulation): 32×32 art, used as fallback.
 - Coffee lot: 128×96 art, 4×2 footprint, eight cells and 16 pés in four rows of
   four, low wooden border, no high fence. Base centre `(76,56)`. Each cell holds
-  two pés; two worker-periods cover the full 16-pé lot, one period takes half.
+  two pés; one monthly coffee task covers the full 16-pé lot.
   The terreiro's capacity 16 holds one full lot.
-- Trees and family: 32×48 / 16×24 art, rendered at 2×.
+- Trees: 32×48 art, rendered at 2×. People and family slices are 16×24 art,
+  rendered at 2× with the anchor at bottom center.
+- People: person_man, person_woman, person_boy and person_girl, six outfit
+  colors and two frames each. The renderer alternates the frames and adds a small
+  bob plus task props; the family portrait uses the same slices.
+- Field icons: icon_fertilizer, icon_limestone, icon_clock at 16×16,
+  rendered at 1× in the map status layer.
 - Casa grande: 112×88 art, 3×2 footprint, single storey, rendered at 2×. Base
   centre `(64,52)`.
 - Colono house: 96×80 art, 2×2 footprint (house + horta + galinheiro + varal),
@@ -76,6 +82,8 @@ as its new art, never before.
 | `tile_*`, `coffee_*`, `tree` | 1×1 | done |
 | `road_*` | 1×1 | done |
 | `family` | 1×1 | done |
+| `person_*` | 1x1 | done |
+| `icon_*` | 1x1 | done |
 
 ## Queue
 
@@ -84,7 +92,7 @@ as its new art, never before.
 2. **Casa de colono** — 2×2 lot with the house, horta, galinheiro and varal.
    Done.
 3. **Cafezal modular** — 4×2 lot, eight cells, 16 pés, 4 stages, low border.
-   Done: two worker-periods harvest 16 pés, one period harvests 8.
+   Done: one monthly coffee task harvests 16 pés.
 4. **Terreiro** — 2×2 drying patio, capacity 16. Done.
 5. **Tulha** — 3×3 yard with a 2×2 storehouse, sack area and cart in the
    remaining 5 tiles. Done.
@@ -94,7 +102,8 @@ as its new art, never before.
    Done.
 9. Terrain, fences, well.
 10. Coffee post-harvest stage.
-11. People poses, chickens, props.
+11. People poses, chickens, props. People, outfit variants, family portraits
+    and field icons done; chickens and remaining props pending.
 12. HUD icons, panel, cursor. Implemented as a DOM pixel skin with Pixelify
     Sans and crisp vector icons; the canteiro is drawn generically by the
     renderer, so no new map slice is required.
@@ -106,7 +115,9 @@ Each element is reviewed in `/?art` and in the map before the next one starts.
 
 `tile_terra`, `tile_terra_alt`, `tile_mata`, `tile_mata_alt`, `road_0` to
 `road_15`, `coffee_0` to `coffee_3`, `coffee_lot_0` to `coffee_lot_3`, `tree`,
-`sede`, `house`, `terreiro`, `tulha`, `capela`, `venda`, `escola`, `family`.
+`sede`, `house`, `terreiro`, `tulha`, `capela`, `venda`, `escola`, `family`,
+`person_man_0..5_0/1`, `person_woman_0..5_0/1`, `person_boy_0..5_0/1`,
+`person_girl_0..5_0/1`, `icon_fertilizer`, `icon_limestone`, `icon_clock`.
 
 ## Palette
 

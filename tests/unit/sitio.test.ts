@@ -5,19 +5,24 @@ import {
   BUILDING_TERREIRO,
   COFFEE_FORMING,
   COFFEE_MATURE,
+  COFFEE_MUDA,
   COFFEE_PES_PER_CELL,
+  FOOD_CAP,
+  OUTFIT_COUNT,
+  SITIO_SAVE_VERSION,
   SITIO_SIZE,
   SitioEngine,
   TERRAIN_TERRA,
+  coffeeHarvestForecast,
   decodeSitioSave,
   encodeSitioSave,
   type BuildingKind,
   type Family,
-  type Period,
   type SeasonReport,
   type WorkTask,
 } from '@sitio/sim';
 import { stringifySave } from '@shell/kernel';
+import { fieldMarkers, planActors, restingHouses } from '../../apps/sitio/src/actors';
 import { describe, expect, it } from 'vitest';
 
 function create(seed = 'sitio'): SitioEngine {
@@ -42,14 +47,12 @@ function adults(engine: SitioEngine) {
 
 function assignAll(engine: SitioEngine, task: WorkTask): void {
   for (const person of adults(engine)) {
-    for (const period of ['morning', 'afternoon'] as Period[]) {
-      expect(engine.execute({ type: 'assign', personId: person.id, period, task }).ok).toBe(true);
-    }
+    expect(engine.execute({ type: 'assign', personId: person.id, task }).ok).toBe(true);
   }
 }
 
-function endWeek(engine: SitioEngine): SeasonReport {
-  expect(engine.execute({ type: 'endWeek' }).ok).toBe(true);
+function endMonth(engine: SitioEngine): SeasonReport {
+  expect(engine.execute({ type: 'endMonth' }).ok).toBe(true);
   expect(engine.lastReport).not.toBeNull();
   return engine.lastReport as SeasonReport;
 }
@@ -81,7 +84,7 @@ describe('SitioEngine', () => {
     expect(engine.coins).toBe(12);
     expect(engine.food).toBe(4);
     expect(engine.wood).toBe(4);
-    expect(engine.execute({ type: 'endWeek' })).toEqual({ ok: false, reason: 'setup' });
+    expect(engine.execute({ type: 'endMonth' })).toEqual({ ok: false, reason: 'setup' });
     expect(engine.execute({ type: 'placeStarter', kind: 'house', x: 3, y: 5 })).toEqual({
       ok: false,
       reason: 'setup',
@@ -101,8 +104,7 @@ describe('SitioEngine', () => {
     expect(engine.people.filter((person) => person.age < 16)).toHaveLength(2);
     const family = engine.families[0] as Family;
     expect(family).toMatchObject({ houseX: 3, houseY: 5, morale: 3 });
-    expect(adults(engine).every((person) => person.morning.kind === 'yard')).toBe(true);
-    expect(adults(engine).every((person) => person.afternoon.kind === 'yard')).toBe(true);
+    expect(adults(engine).every((person) => person.task.kind === 'yard')).toBe(true);
 
     place(engine, 'terreiro', 9, 9);
     expect(engine.setup).toBe('coffee');
@@ -118,44 +120,115 @@ describe('SitioEngine', () => {
     expect(engine.buildingAt(3, 5)).toBe(BUILDING_HOUSE);
     expect(engine.buildingAt(9, 9)).toBe(BUILDING_TERREIRO);
     expect(engine.structures).toHaveLength(3);
-    expect(engine.execute({ type: 'endWeek' }).ok).toBe(true);
+    expect(engine.execute({ type: 'endMonth' }).ok).toBe(true);
   });
 
-  it('runs the first week from morning to afternoon and persists routines', () => {
+  it('runs the first monthly task and persists routines', () => {
     const engine = setup(create());
-    const report = endWeek(engine);
+    const report = endMonth(engine);
     expect(report).toMatchObject({
       turn: 0,
-      week: 1,
+      month: 1,
       year: 1,
       season: 'spring',
       foodProduced: 8,
       foodConsumed: 2,
-      foodSold: 2,
+      foodSold: 0,
+      foodWasted: 2,
       hunger: false,
     });
     expect(engine.turn).toBe(1);
-    expect(engine.week).toBe(2);
-    expect(engine.weekOfSeason).toBe(2);
-    expect(engine.coins).toBe(14);
+    expect(engine.month).toBe(2);
+    expect(engine.monthOfSeason).toBe(2);
+    expect(engine.coins).toBe(12);
     expect(engine.food).toBe(8);
     expect(engine.coffee.filter((stage) => stage === COFFEE_FORMING)).toHaveLength(8);
-    expect(adults(engine).every((person) => person.morning.kind === 'yard')).toBe(true);
-    expect(adults(engine).every((person) => person.afternoon.kind === 'yard')).toBe(true);
+    expect(adults(engine).every((person) => person.task.kind === 'yard')).toBe(true);
   });
 
+  it('accumulates food in the house stock and sells it only through the market', () => {
+    const engine = setup(create());
+    assignAll(engine, { kind: 'yard' });
+    let report = endMonth(engine);
+    expect(report.foodProduced).toBe(8);
+    expect(report.foodSold).toBe(0);
+    expect(report.foodWasted).toBe(2);
+    expect(engine.food).toBe(FOOD_CAP);
+    expect(engine.coins).toBe(12);
+
+    const coins = engine.coins;
+    expect(engine.execute({ type: 'sellFood', amount: 4 })).toEqual({ ok: true });
+    expect(engine.marketCart.food).toBe(4);
+    assignAll(engine, { kind: 'idle' });
+    report = endMonth(engine);
+    expect(report.foodSold).toBe(4);
+    expect(engine.food).toBe(2);
+    expect(engine.coins).toBe(coins + 4);
+    expect(engine.history.at(-1)?.income).toBe(4);
+  });
+
+  it('pays one coin for each adult on vacation', () => {
+    const engine = setup(create());
+    const people = adults(engine);
+    const first = people[0];
+    const second = people[1];
+    if (!first || !second) throw new Error('missing adults');
+    engine.execute({ type: 'assign', personId: first.id, task: { kind: 'rest' } });
+    engine.execute({ type: 'assign', personId: second.id, task: { kind: 'idle' } });
+    const coins = engine.coins;
+    const report = endMonth(engine);
+    expect(report.restBonus).toBe(1);
+    expect(engine.coins).toBe(coins + 1);
+    expect(planActors(engine).some((plan) => plan.personId === first.id)).toBe(false);
+    expect(restingHouses(engine)).toHaveLength(1);
+  });
+
+  it('sends builders home on vacation when the site is completed', () => {
+    const engine = setup(create());
+    const built = engine.execute({ type: 'build', kind: 'house', x: 12, y: 1 });
+    if (!built.ok) throw new Error(built.reason);
+    const people = adults(engine);
+    const first = people[0];
+    const second = people[1];
+    if (!first || !second) throw new Error('missing adults');
+    for (const person of [first, second]) {
+      expect(
+        engine.execute({
+          type: 'assign',
+          personId: person.id,
+          task: { kind: 'build', siteId: built.siteId ?? 0 },
+        }).ok,
+      ).toBe(true);
+    }
+    endMonth(engine);
+    expect(engine.sites).toHaveLength(0);
+    expect(first.task.kind).toBe('rest');
+    expect(second.task.kind).toBe('rest');
+    expect(planActors(engine).some((plan) => plan.personId === first.id)).toBe(false);
+    const coins = engine.coins;
+    const report = endMonth(engine);
+    expect(report.restBonus).toBe(2);
+    expect(engine.coins).toBe(coins + 2);
+  });
+
+  it('creates adults and children with sex and outfit colors', () => {
+    const engine = setup(create());
+    expect(engine.people.every((person) => person.sex === 'male' || person.sex === 'female')).toBe(true);
+    expect(engine.people.every((person) => person.outfit >= 0 && person.outfit < OUTFIT_COUNT)).toBe(true);
+    expect(engine.people.find((person) => person.age < 16)?.sex).toMatch(/male|female/);
+  });
   it('grows and harvests the full 16-pé lot with two workers', () => {
     const engine = setup(create());
     assignAll(engine, { kind: 'coffee' });
-    endWeek(engine);
+    endMonth(engine);
     expect(engine.coffee.filter((stage) => stage === COFFEE_MATURE)).toHaveLength(8);
 
-    for (let week = 0; week < 7; week++) {
+    for (let month = 0; month < 7; month++) {
       assignAll(engine, { kind: 'yard' });
-      endWeek(engine);
+      endMonth(engine);
     }
     assignAll(engine, { kind: 'coffee' });
-    const report = endWeek(engine);
+    const report = endMonth(engine);
     expect(report.harvest).toBe(16);
     expect(report.lost).toBe(0);
     expect(report.sold).toBe(0);
@@ -165,41 +238,61 @@ describe('SitioEngine', () => {
 
     const coins = engine.coins;
     expect(engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.bad).toBe(16);
+    endMonth(engine);
     expect(engine.coffeeStock).toBe(0);
     expect(engine.coins).toBe(coins + 16);
   });
 
-  it('lets one worker-period harvest only half of the lot', () => {
+  it('lets one adult task harvest the full lot', () => {
     const engine = setup(create());
     assignAll(engine, { kind: 'coffee' });
-    endWeek(engine);
+    endMonth(engine);
     expect(engine.coffee.filter((stage) => stage === COFFEE_MATURE)).toHaveLength(8);
 
-    for (let week = 0; week < 7; week++) {
+    for (let month = 0; month < 7; month++) {
       assignAll(engine, { kind: 'yard' });
-      endWeek(engine);
+      endMonth(engine);
     }
     const people = adults(engine);
     const first = people[0];
     const second = people[1];
     if (!first || !second) throw new Error('missing adults');
-    engine.execute({ type: 'assign', personId: first.id, period: 'morning', task: { kind: 'coffee' } });
-    engine.execute({ type: 'assign', personId: first.id, period: 'afternoon', task: { kind: 'yard' } });
-    engine.execute({ type: 'assign', personId: second.id, period: 'morning', task: { kind: 'yard' } });
-    engine.execute({ type: 'assign', personId: second.id, period: 'afternoon', task: { kind: 'yard' } });
-    const report = endWeek(engine);
-    expect(report.harvest).toBe(8);
+    engine.execute({ type: 'assign', personId: first.id, task: { kind: 'coffee' } });
+    engine.execute({ type: 'assign', personId: second.id, task: { kind: 'yard' } });
+    const report = endMonth(engine);
+    expect(report.harvest).toBe(16);
     expect(report.lost).toBe(0);
-    expect(report.stock).toBe(8);
+    expect(report.stock).toBe(16);
     expect(report.revenue).toBe(0);
-    expect(engine.coffee.filter((stage) => stage === COFFEE_MATURE)).toHaveLength(4);
+    expect(engine.coffee.filter((stage) => stage === COFFEE_MATURE)).toHaveLength(0);
 
     const coins = engine.coins;
-    expect(engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 8 })).toEqual({ ok: true });
+    expect(engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.bad).toBe(16);
+    assignAll(engine, { kind: 'idle' });
+    endMonth(engine);
     expect(engine.coffeeStock).toBe(0);
-    expect(engine.coins).toBe(coins + 8);
+    expect(engine.coins).toBe(coins + 16);
   });
 
+  it('keeps a two-adult farm progressing through a coffee cycle', () => {
+    const engine = setup(create());
+    assignAll(engine, { kind: 'coffee' });
+    endMonth(engine);
+    expect(engine.coffee.filter((stage) => stage === COFFEE_MATURE)).toHaveLength(8);
+
+    for (let month = 0; month < 7; month++) {
+      assignAll(engine, { kind: 'yard' });
+      endMonth(engine);
+    }
+    assignAll(engine, { kind: 'coffee' });
+    const harvest = endMonth(engine);
+    expect(harvest.harvest).toBe(16);
+    expect(engine.status).toBe('playing');
+    expect(engine.families).toHaveLength(1);
+    expect(engine.people.filter((person) => person.age >= 16)).toHaveLength(2);
+  });
   it('sells coffee only from stock and rejects invalid amounts', () => {
     const engine = setup(create());
     expect(engine.execute({ type: 'sellCoffee', grade: 'medium', amount: 1 })).toEqual({
@@ -222,10 +315,13 @@ describe('SitioEngine', () => {
     });
     const coins = engine.coins;
     expect(engine.execute({ type: 'sellCoffee', grade: 'medium', amount: 2 })).toEqual({ ok: true });
+    expect(engine.marketCart.medium).toBe(2);
+    assignAll(engine, { kind: 'idle' });
+    const report = endMonth(engine);
     expect(engine.coffeeStock).toBe(3);
     expect(engine.coins).toBe(coins + 4);
-    expect(engine.weekSold).toBe(2);
-    expect(engine.weekRevenue).toBe(4);
+    expect(report.sold).toBe(2);
+    expect(report.revenue).toBe(4);
     expect(engine.totals.revenueTotal).toBe(4);
   });
 
@@ -238,7 +334,7 @@ describe('SitioEngine', () => {
       for (let y = 6; y < 8; y++) engine.coffee[engine.index(x, y)] = COFFEE_MATURE;
     }
     assignAll(engine, { kind: 'coffee' });
-    const report = endWeek(engine);
+    const report = endMonth(engine);
     expect(report.harvest).toBe(16);
     expect(report.lost).toBe(14);
     expect(report.stock).toBe(16);
@@ -252,21 +348,22 @@ describe('SitioEngine', () => {
     const engine = setup(create());
     addBuilding(engine, 'venda', 1, 9, 2, 1);
     assignAll(engine, { kind: 'coffee' });
-    endWeek(engine);
-    for (let week = 0; week < 7; week++) {
+    endMonth(engine);
+    for (let month = 0; month < 7; month++) {
       assignAll(engine, { kind: 'yard' });
-      endWeek(engine);
+      endMonth(engine);
     }
     const lot = engine.coffeeLots[0];
     if (lot) lot.limed = true;
     assignAll(engine, { kind: 'coffee' });
-    const report = endWeek(engine);
+    const report = endMonth(engine);
     expect(report.price).toBe(3);
     expect(report.stock).toBe(16);
     expect(report.revenue).toBe(0);
     expect(engine.execute({ type: 'sellCoffee', grade: 'medium', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.medium).toBe(16);
+    const next = endMonth(engine);
     expect(engine.coffeeStock).toBe(0);
-    const next = endWeek(engine);
     expect(next.sold).toBe(16);
     expect(next.revenue).toBe(48);
     expect(next.price).toBe(3);
@@ -279,7 +376,7 @@ describe('SitioEngine', () => {
     expect(engine.index(SITIO_SIZE - 1, SITIO_SIZE - 1)).toBe(SITIO_SIZE * SITIO_SIZE - 1);
   });
 
-  it('builds a house with work periods and keeps the site progress', () => {
+  it('builds a house with one monthly task', () => {
     const engine = setup(create());
     const built = engine.execute({ type: 'build', kind: 'house', x: 12, y: 1 });
     expect(built.ok).toBe(true);
@@ -296,18 +393,14 @@ describe('SitioEngine', () => {
     engine.execute({
       type: 'assign',
       personId: first.id,
-      period: 'morning',
       task: { kind: 'build', siteId: built.siteId ?? 0 },
     });
     engine.execute({
       type: 'assign',
-      personId: first.id,
-      period: 'afternoon',
+      personId: second.id,
       task: { kind: 'build', siteId: built.siteId ?? 0 },
     });
-    engine.execute({ type: 'assign', personId: second.id, period: 'morning', task: { kind: 'yard' } });
-    engine.execute({ type: 'assign', personId: second.id, period: 'afternoon', task: { kind: 'yard' } });
-    const report = endWeek(engine);
+    const report = endMonth(engine);
 
     expect(engine.sites).toHaveLength(0);
     expect(engine.buildingAt(12, 1)).toBe(BUILDING_HOUSE);
@@ -319,6 +412,28 @@ describe('SitioEngine', () => {
     expect(engine.coins).toBe(8);
   });
 
+  it('takes two months for one adult to finish a house', () => {
+    const engine = setup(create());
+    const built = engine.execute({ type: 'build', kind: 'house', x: 12, y: 1 });
+    if (!built.ok) throw new Error(built.reason);
+    const people = adults(engine);
+    const first = people[0];
+    const second = people[1];
+    if (!first || !second) throw new Error('missing adults');
+    engine.execute({
+      type: 'assign',
+      personId: first.id,
+      task: { kind: 'build', siteId: built.siteId ?? 0 },
+    });
+    engine.execute({ type: 'assign', personId: second.id, task: { kind: 'idle' } });
+    endMonth(engine);
+    expect(engine.sites).toHaveLength(1);
+    expect(engine.sites[0]?.progress).toBe(1);
+    endMonth(engine);
+    expect(engine.sites).toHaveLength(0);
+    expect(engine.buildingAt(12, 1)).toBe(BUILDING_HOUSE);
+    expect(first.task.kind).toBe('rest');
+  });
   it('lets children work only in the yard', () => {
     const engine = setup(create());
     const child = engine.people.find((person) => person.age < 16);
@@ -328,7 +443,6 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: child.id,
-        period: 'morning',
         task: { kind: 'coffee' },
       }),
     ).toEqual({ ok: false, reason: 'not-adult' });
@@ -336,7 +450,6 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: child.id,
-        period: 'morning',
         task: { kind: 'yard' },
       }).ok,
     ).toBe(true);
@@ -344,7 +457,6 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: child.id,
-        period: 'afternoon',
         task: { kind: 'yard' },
       }).ok,
     ).toBe(true);
@@ -355,17 +467,14 @@ describe('SitioEngine', () => {
     assignAll(engine, { kind: 'idle' });
     const child = engine.people.find((person) => person.age < 16);
     if (!child) throw new Error('missing child');
-    for (const period of ['morning', 'afternoon'] as Period[]) {
-      expect(
-        engine.execute({
-          type: 'assign',
-          personId: child.id,
-          period,
-          task: { kind: 'yard' },
-        }).ok,
-      ).toBe(true);
-    }
-    const report = endWeek(engine);
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: child.id,
+        task: { kind: 'yard' },
+      }).ok,
+    ).toBe(true);
+    const report = endMonth(engine);
     expect(report.foodProduced).toBe(2);
     expect(report.foodConsumed).toBe(2);
     expect(report.foodSold).toBe(0);
@@ -373,7 +482,7 @@ describe('SitioEngine', () => {
     expect(engine.coins).toBe(12);
   });
 
-  it('lets children study only after a school exists and graduate after four periods', () => {
+  it('lets children study only after a school exists and graduate after two monthly tasks', () => {
     const engine = setup(create());
     const child = engine.people.find((person) => person.age < 16);
     expect(child).toBeDefined();
@@ -382,29 +491,25 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: child.id,
-        period: 'morning',
         task: { kind: 'study' },
       }),
     ).toEqual({ ok: false, reason: 'no-school' });
 
     addBuilding(engine, 'escola', 20, 5, 2, 2);
-    for (const period of ['morning', 'afternoon'] as Period[]) {
-      expect(
-        engine.execute({
-          type: 'assign',
-          personId: child.id,
-          period,
-          task: { kind: 'study' },
-        }).ok,
-      ).toBe(true);
-    }
-    const first = endWeek(engine);
-    expect(first.studied).toBe(2);
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: child.id,
+        task: { kind: 'study' },
+      }).ok,
+    ).toBe(true);
+    const first = endMonth(engine);
+    expect(first.studied).toBe(1);
     expect(child.education).toBe(false);
     expect(child.educationProgress).toBe(2);
 
-    const second = endWeek(engine);
-    expect(second.studied).toBe(2);
+    const second = endMonth(engine);
+    expect(second.studied).toBe(1);
     expect(second.educated).toBe(1);
     expect(child.education).toBe(true);
     expect(child.educationProgress).toBe(4);
@@ -419,63 +524,33 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: adult.id,
-        period: 'morning',
         task: { kind: 'study' },
       }),
     ).toEqual({ ok: false, reason: 'invalid-task' });
   });
 
-  it('gives educated workers double coffee and build output', () => {
+  it('gives educated workers the full monthly bonus', () => {
     const engine = setup(create());
-    engine.turn = 8;
-    for (let x = 6; x < 10; x++) {
-      for (let y = 6; y < 8; y++) engine.coffee[engine.index(x, y)] = COFFEE_MATURE;
-    }
     const people = adults(engine);
     const educated = people[0];
     const other = people[1];
     if (!educated || !other) throw new Error('missing adults');
     educated.education = true;
-    engine.execute({
-      type: 'assign',
-      personId: educated.id,
-      period: 'morning',
-      task: { kind: 'coffee' },
-    });
-    engine.execute({
-      type: 'assign',
-      personId: educated.id,
-      period: 'afternoon',
-      task: { kind: 'yard' },
-    });
-    engine.execute({
-      type: 'assign',
-      personId: other.id,
-      period: 'morning',
-      task: { kind: 'yard' },
-    });
-    engine.execute({
-      type: 'assign',
-      personId: other.id,
-      period: 'afternoon',
-      task: { kind: 'yard' },
-    });
-    const report = endWeek(engine);
-    expect(report.harvest).toBe(16);
-    expect(report.foodProduced).toBe(7);
+    engine.execute({ type: 'assign', personId: educated.id, task: { kind: 'yard' } });
+    engine.execute({ type: 'assign', personId: other.id, task: { kind: 'idle' } });
+    const report = endMonth(engine);
+    expect(report.foodProduced).toBe(6);
   });
-
   it('ages people at the end of the year and turns a 16-year-old into a worker', () => {
     const engine = setup(create());
     const child = engine.people.find((person) => person.age === 15);
     expect(child).toBeDefined();
     if (!child) return;
     engine.turn = 15;
-    endWeek(engine);
+    endMonth(engine);
     const grown = engine.people.find((person) => person.id === child.id);
     expect(grown?.age).toBe(16);
-    expect(grown?.morning).toEqual({ kind: 'yard' });
-    expect(grown?.afternoon).toEqual({ kind: 'yard' });
+    expect(grown?.task).toEqual({ kind: 'yard' });
   });
 
   it('collects wood when a forest tile is cleared', () => {
@@ -487,25 +562,55 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: person.id,
-        period: 'morning',
         task: { kind: 'clear', x: 1, y: 0 },
       }).ok,
     ).toBe(true);
-    const report = endWeek(engine);
+    const report = endMonth(engine);
     expect(report.cleared).toBe(1);
     expect(engine.wood).toBe(2);
     expect(engine.terrain[engine.index(1, 0)]).toBe(TERRAIN_TERRA);
   });
 
+  it('lets the two starting adults clear wood for construction', () => {
+    const engine = setup(create());
+    engine.wood = 0;
+    const people = adults(engine);
+    const first = people[0];
+    const second = people[1];
+    if (!first || !second) throw new Error('missing adults');
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: first.id,
+        task: { kind: 'clear', x: 1, y: 0 },
+      }).ok,
+    ).toBe(true);
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: second.id,
+        task: { kind: 'clear', x: 2, y: 0 },
+      }).ok,
+    ).toBe(true);
+    endMonth(engine);
+    expect(engine.wood).toBe(4);
+    expect(engine.terrain[engine.index(1, 0)]).toBe(TERRAIN_TERRA);
+    expect(engine.terrain[engine.index(2, 0)]).toBe(TERRAIN_TERRA);
+  });
   it('buys wood with coins and rejects invalid purchases', () => {
     const engine = setup(create());
     expect(engine.execute({ type: 'buyWood', amount: 3 })).toEqual({ ok: true });
-    expect(engine.wood).toBe(7);
-    expect(engine.coins).toBe(9);
+    expect(engine.marketCart.wood).toBe(3);
+    expect(engine.wood).toBe(4);
+    expect(engine.coins).toBe(12);
     expect(engine.execute({ type: 'buyWood', amount: 0 })).toEqual({
       ok: false,
       reason: 'invalid-amount',
     });
+    assignAll(engine, { kind: 'idle' });
+    endMonth(engine);
+    expect(engine.wood).toBe(7);
+    expect(engine.coins).toBe(9);
     engine.coins = 0;
     expect(engine.execute({ type: 'buyWood', amount: 1 })).toEqual({
       ok: false,
@@ -521,8 +626,9 @@ describe('SitioEngine', () => {
     expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
       ok: true,
     });
-    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
-    expect(engine.coins).toBe(2);
+    expect(engine.marketCart.fertilizer).toBe(2);
+    expect(engine.marketCart.limestone).toBe(2);
+    expect(engine.coins).toBe(12);
 
     const people = adults(engine);
     const first = people[0];
@@ -532,22 +638,21 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: first.id,
-        period: 'morning',
         task: { kind: 'fertilize', x: 6, y: 6 },
       }).ok,
     ).toBe(true);
     expect(
       engine.execute({
         type: 'assign',
-        personId: first.id,
-        period: 'afternoon',
+        personId: second.id,
         task: { kind: 'limestone', x: 6, y: 6 },
       }).ok,
     ).toBe(true);
-    const applied = endWeek(engine);
+    const applied = endMonth(engine);
     expect(applied.fertilized).toBe(1);
     expect(applied.limed).toBe(1);
     expect(engine.inputStock).toEqual({ fertilizer: 1, limestone: 1 });
+    expect(engine.coins).toBe(2);
     const lot = engine.coffeeLots[0];
     expect(lot?.fertilized).toBe(true);
     expect(lot?.limed).toBe(true);
@@ -558,7 +663,7 @@ describe('SitioEngine', () => {
       for (let y = 6; y < 8; y++) engine.coffee[engine.index(x, y)] = COFFEE_MATURE;
     }
     assignAll(engine, { kind: 'coffee' });
-    const harvest = endWeek(engine);
+    const harvest = endMonth(engine);
     expect(harvest.harvest).toBe(24);
     expect(harvest.harvestGrades.good).toBe(24);
     expect(harvest.lost).toBe(8);
@@ -567,7 +672,254 @@ describe('SitioEngine', () => {
     expect(lot?.limed).toBe(false);
   });
 
-  it('builds up to four planned roads per adult per week without cost', () => {
+  it('reserves queued market purchases when paying for a building', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'buyInput', kind: 'fertilizer', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.coins).toBe(12);
+    expect(engine.fullState().availableCoins).toBe(2);
+
+    expect(engine.execute({ type: 'build', kind: 'house', x: 12, y: 1 })).toEqual({
+      ok: false,
+      reason: 'no-coins',
+    });
+
+    assignAll(engine, { kind: 'idle' });
+    endMonth(engine);
+    expect(engine.coins).toBe(2);
+    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
+  });
+
+  it('reserves queued market purchases when inviting a family', () => {
+    const engine = setup(create());
+    addBuilding(engine, 'house', 1, 9, 2, 2);
+    expect(engine.execute({ type: 'buyInput', kind: 'fertilizer', amount: 2 })).toEqual({
+      ok: true,
+    });
+    expect(engine.execute({ type: 'buyInput', kind: 'limestone', amount: 2 })).toEqual({
+      ok: true,
+    });
+
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-coins',
+    });
+    assignAll(engine, { kind: 'idle' });
+    endMonth(engine);
+    expect(engine.coins).toBe(2);
+    expect(engine.families).toHaveLength(1);
+    expect(engine.inputStock).toEqual({ fertilizer: 2, limestone: 2 });
+  });
+
+  it('forecasts the next harvest from the current coffee crew', () => {
+    const engine = setup(create());
+    const lot = engine.coffeeLots[0];
+    if (!lot) throw new Error('missing lot');
+    for (let y = lot.y; y < lot.y + lot.h; y++) {
+      for (let x = lot.x; x < lot.x + lot.w; x++) {
+        engine.coffee[engine.index(x, y)] = COFFEE_MATURE;
+      }
+    }
+    engine.turn = 4;
+    assignAll(engine, { kind: 'idle' });
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    engine.execute({
+      type: 'assign',
+      personId: person.id,
+      task: { kind: 'coffee' },
+    });
+
+    const before = Array.from(engine.coffee);
+    const forecast = coffeeHarvestForecast(engine)[0];
+    expect(forecast).toEqual({
+      lotId: lot.id,
+      firstHarvestMonth: 5,
+      completeHarvestMonth: 5,
+    });
+    expect(Array.from(engine.coffee)).toEqual(before);
+  });
+
+  it('returns no forecast when coffee has no crew', () => {
+    const engine = setup(create());
+    assignAll(engine, { kind: 'idle' });
+    expect(coffeeHarvestForecast(engine)).toEqual([
+      {
+        lotId: engine.coffeeLots[0]?.id,
+        firstHarvestMonth: null,
+        completeHarvestMonth: null,
+      },
+    ]);
+  });
+
+  it('forecasts a lot from muda to harvest with the current crew', () => {
+    const engine = setup(create());
+    const lot = engine.coffeeLots[0];
+    if (!lot) throw new Error('missing lot');
+    for (let y = lot.y; y < lot.y + lot.h; y++) {
+      for (let x = lot.x; x < lot.x + lot.w; x++) {
+        engine.coffee[engine.index(x, y)] = COFFEE_MUDA;
+      }
+    }
+    assignAll(engine, { kind: 'coffee' });
+    expect(coffeeHarvestForecast(engine)[0]).toEqual({
+      lotId: lot.id,
+      firstHarvestMonth: 9,
+      completeHarvestMonth: 9,
+    });
+  });
+
+  it('places one worker at the monthly coffee task', () => {
+    const engine = setup(create());
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: person.id,
+        task: { kind: 'coffee' },
+      }).ok,
+    ).toBe(true);
+
+    const lot = engine.coffeeLots[0];
+    const plans = planActors(engine).filter((plan) => plan.personId === person.id);
+    expect(plans).toHaveLength(1);
+    expect(plans[0]?.task.kind).toBe('coffee');
+    expect(plans[0]?.anchorX).toBe((lot?.x ?? 0) + (lot?.w ?? 0) / 2);
+    expect(plans[0]?.anchorY).toBe((lot?.y ?? 0) + (lot?.h ?? 0) / 2);
+  });
+
+  it('replaces the monthly task without duplicating the worker', () => {
+    const engine = setup(create());
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: person.id,
+        task: { kind: 'coffee' },
+      }).ok,
+    ).toBe(true);
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: person.id,
+        task: { kind: 'yard' },
+      }).ok,
+    ).toBe(true);
+    const plans = planActors(engine).filter((plan) => plan.personId === person.id);
+    expect(plans).toHaveLength(1);
+    expect(plans[0]?.task.kind).toBe('yard');
+  });
+  it('removes resting workers from the map and keeps only Zzz', () => {
+    const engine = setup(create());
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    engine.execute({
+      type: 'assign',
+      personId: person.id,
+      task: { kind: 'idle' },
+    });
+    engine.execute({
+      type: 'assign',
+      personId: person.id,
+      task: { kind: 'rest' },
+    });
+    const plans = planActors(engine).filter((plan) => plan.personId === person.id);
+    expect(plans).toHaveLength(0);
+    expect(restingHouses(engine)).toHaveLength(1);
+  });
+
+  it('places a studying child at school and marks queued field inputs', () => {
+    const engine = setup(create());
+    addBuilding(engine, 'escola', 1, 9, 2, 2);
+    const child = engine.people.find((person) => person.age < 16);
+    const people = adults(engine);
+    const fertilizerWorker = people[0];
+    const limestoneWorker = people[1];
+    const lot = engine.coffeeLots[0];
+    if (!child || !fertilizerWorker || !limestoneWorker || !lot) throw new Error('missing fixture');
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: child.id,
+        task: { kind: 'study' },
+      }).ok,
+    ).toBe(true);
+    engine.inputStock.fertilizer = 1;
+    engine.inputStock.limestone = 1;
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: fertilizerWorker.id,
+        task: { kind: 'fertilize', x: lot.x, y: lot.y },
+      }).ok,
+    ).toBe(true);
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: limestoneWorker.id,
+        task: { kind: 'limestone', x: lot.x + 1, y: lot.y },
+      }).ok,
+    ).toBe(true);
+
+    const childPlan = planActors(engine).find((plan) => plan.personId === child.id);
+    expect(childPlan?.task.kind).toBe('study');
+    expect(['boy', 'girl']).toContain(childPlan?.variant);
+    expect(fieldMarkers(engine)).toEqual([
+      { lotId: lot.id, fertilizer: true, limestone: true },
+    ]);
+  });
+
+  it('buys seedlings and plants a coffee lot with one adult task', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({
+      ok: false,
+      reason: 'no-seedlings',
+    });
+    expect(engine.execute({ type: 'buySeedlings', amount: 16 })).toEqual({ ok: true });
+    expect(engine.marketCart.seedlings).toBe(16);
+    expect(engine.coins).toBe(12);
+    assignAll(engine, { kind: 'idle' });
+    endMonth(engine);
+    expect(engine.seedlings).toBe(16);
+    expect(engine.coins).toBe(8);
+    expect(engine.execute({ type: 'plantCoffeeLot', x: 10, y: 2 })).toEqual({ ok: true });
+    expect(engine.seedlings).toBe(0);
+    expect(engine.plantOrders).toHaveLength(1);
+    const order = engine.plantOrders[0];
+    if (!order) throw new Error('missing order');
+    const person = adults(engine)[0];
+    if (!person) throw new Error('missing adult');
+    expect(
+      engine.execute({
+        type: 'assign',
+        personId: person.id,
+        task: { kind: 'plantLot', orderId: order.id },
+      }).ok,
+    ).toBe(true);
+    const report = endMonth(engine);
+    expect(report.planted).toBe(8);
+    expect(engine.plantOrders).toHaveLength(0);
+    expect(engine.coffeeLots).toHaveLength(2);
+    expect(engine.coffee.filter((stage) => stage === COFFEE_MUDA)).toHaveLength(8);
+  });
+
+  it('records monthly income and expenses in history', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'buySeedlings', amount: 16 })).toEqual({ ok: true });
+    expect(engine.execute({ type: 'buyWood', amount: 1 })).toEqual({ ok: true });
+    endMonth(engine);
+    expect(engine.history).toHaveLength(1);
+    expect(engine.history[0]?.expenses).toBe(5);
+    expect(engine.history[0]?.coins).toBe(engine.coins);
+  });
+
+  it('builds one planned road tile per adult per month without cost', () => {
     const engine = setup(create());
     const coins = engine.coins;
     for (let x = 0; x < 5; x++) {
@@ -580,16 +932,15 @@ describe('SitioEngine', () => {
       engine.execute({
         type: 'assign',
         personId: person.id,
-        period: 'morning',
         task: { kind: 'road' },
       }).ok,
     ).toBe(true);
-    const report = endWeek(engine);
-    expect(report.roads).toBe(4);
-    expect(engine.roadPlan).toHaveLength(1);
+    const report = endMonth(engine);
+    expect(report.roads).toBe(1);
+    expect(engine.roadPlan).toHaveLength(4);
     expect(engine.coins).toBe(coins);
     expect(engine.terrain[engine.index(0, 1)]).toBe(2);
-    expect(engine.terrain[engine.index(3, 1)]).toBe(2);
+    expect(engine.terrain[engine.index(1, 1)]).toBe(0);
     expect(engine.terrain[engine.index(4, 1)]).toBe(0);
   });
 
@@ -630,6 +981,26 @@ describe('SitioEngine', () => {
     });
   });
 
+  it('invites an unrelated family into an empty house', () => {
+    const engine = setup(create());
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-house',
+    });
+    addBuilding(engine, 'house', 12, 1, 2, 2);
+    expect(engine.emptyHouseCount()).toBe(1);
+    const family = engine.execute({ type: 'inviteFamily' });
+    expect(family).toEqual({ ok: true });
+    expect(engine.families).toHaveLength(2);
+    expect(engine.people).toHaveLength(8);
+    expect(engine.coins).toBe(8);
+    expect(engine.emptyHouseCount()).toBe(0);
+    expect(engine.execute({ type: 'inviteFamily' })).toEqual({
+      ok: false,
+      reason: 'no-house',
+    });
+  });
+
   it('welcomes one family per season when a house is empty and reputation is three', () => {
     const engine = setup(create());
     addBuilding(engine, 'venda', 1, 9, 2, 1);
@@ -638,9 +1009,9 @@ describe('SitioEngine', () => {
     addBuilding(engine, 'house', 12, 1, 2, 2);
     expect(engine.reputation()).toBe(4);
 
-    for (let week = 0; week < 4; week++) {
+    for (let month = 0; month < 4; month++) {
       assignAll(engine, { kind: 'yard' });
-      endWeek(engine);
+      endMonth(engine);
     }
 
     expect(engine.families).toHaveLength(2);
@@ -654,9 +1025,9 @@ describe('SitioEngine', () => {
     const engine = setup(create());
     engine.food = 0;
     engine.coins = 0;
-    for (let week = 0; week < 3; week++) {
+    for (let month = 0; month < 3; month++) {
       assignAll(engine, { kind: 'idle' });
-      endWeek(engine);
+      endMonth(engine);
     }
     expect(engine.lastReport?.hunger).toBe(true);
     expect(engine.status).toBe('lost');
@@ -680,7 +1051,7 @@ describe('SitioEngine', () => {
     engine.food = 100;
     engine.coins = 100;
     assignAll(engine, { kind: 'yard' });
-    endWeek(engine);
+    endMonth(engine);
     expect(engine.status).toBe('won');
   });
 
@@ -703,14 +1074,16 @@ describe('SitioEngine', () => {
     expect(restored.hash()).toBe(engine.hash());
   });
 
-  it('round-trips the v20 save through the kernel envelope', () => {
+  it('round-trips the v24 save through the kernel envelope', () => {
+    expect(SITIO_SAVE_VERSION).toBe(24);
     const engine = setup(create());
     assignAll(engine, { kind: 'coffee' });
-    endWeek(engine);
+    endMonth(engine);
     engine.coffeeStock = 4;
     engine.coffeeGrades.bad = 4;
     engine.wood = 7;
     engine.inputStock.fertilizer = 2;
+    engine.seedlings = 8;
     const child = engine.people.find((person) => person.age < 16);
     if (child) child.educationProgress = 2;
     engine.execute({ type: 'sellCoffee', grade: 'bad', amount: 1 });
@@ -725,10 +1098,13 @@ describe('SitioEngine', () => {
     expect(decoded.snapshot.people).toHaveLength(4);
     expect(decoded.snapshot.people.some((person) => person.educationProgress === 2)).toBe(true);
     expect(decoded.snapshot.inputStock.fertilizer).toBe(2);
-    expect(decoded.snapshot.coffeeStock).toBe(3);
+    expect(decoded.snapshot.seedlings).toBe(8);
+    expect(decoded.snapshot.history).toHaveLength(1);
+    expect(decoded.snapshot.coffeeStock).toBe(4);
+    expect(decoded.snapshot.marketCart.bad).toBe(1);
     expect(decoded.snapshot.wood).toBe(7);
-    expect(decoded.snapshot.weekSold).toBe(1);
-    expect(decoded.snapshot.weekRevenue).toBe(1);
+    expect(decoded.snapshot.monthSold).toBe(0);
+    expect(decoded.snapshot.monthRevenue).toBe(0);
     const restored = SitioEngine.fromSnapshot(decoded.snapshot);
     expect(restored.hash()).toBe(engine.hash());
   });
@@ -744,12 +1120,12 @@ describe('SitioEngine', () => {
 function play(seed: string): SitioEngine {
   const engine = setup(create(seed));
   assignAll(engine, { kind: 'coffee' });
-  endWeek(engine);
-  for (let week = 0; week < 7; week++) {
+  endMonth(engine);
+  for (let month = 0; month < 7; month++) {
     assignAll(engine, { kind: 'yard' });
-    endWeek(engine);
+    endMonth(engine);
   }
   assignAll(engine, { kind: 'coffee' });
-  endWeek(engine);
+  endMonth(engine);
   return engine;
 }

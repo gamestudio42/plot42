@@ -53,8 +53,8 @@ IndexedDB names stay per title: Horta `horta`, Posto `posto`, Mata `mata`, Síti
 
 ## Sítio
 
-Sítio is a 24×24 coffee farm on a weekly clock: four seasons, four weeks per
-season and three years, 48 weeks in total. A new farm starts from the landscape,
+Sítio is a 24×24 coffee farm on a monthly clock: four seasons, four months per
+season and three years, 48 months in total. A new farm starts from the landscape,
 not a finished village. The player places a casa grande (3×2), one colono house
 (2×2), one terreiro (2×2) and a free 4×2 coffee lot (eight cells, 16 pés). These
 placements are free; the calendar is locked until the coffee lot is placed.
@@ -62,36 +62,40 @@ Every other building is paid and constructed later. The road and forest are
 preserved and there is no road-access rule; roads reject planting, building and
 clearing.
 
-A colono house holds one family with two adults and two children. Each adult has
-a morning and an afternoon period per week; routines persist until changed and a
-person cannot work twice in one period. Children may work only in the yard, at
-half adult output: their food feeds the family but can never be sold as surplus.
-A child aged 6 or older may instead study at a completed school. Four study
-periods educate the child; education persists. At the end of each year every
+A colono house holds one family with two adults and two children. Each person has
+one monthly task; routines persist until changed. Children may work only in the
+yard, at half adult output: their food feeds the family but never creates a
+sellable surplus. A child aged 6 or older may instead study at a completed school. Two
+study months educate the child; education persists. At the end of each year every
 person ages one year; a 16-year-old becomes an adult and any idle or study
-routine becomes yard work. A family is created when its house is placed. At the
-end of each season a new family may arrive if a house is empty and reputation is
-at least 3.
+routine becomes yard work. A family is created when its house is placed. An empty
+colono house can receive an invited family for 4 coins; invited families are
+unrelated to the existing families, so siblings never marry each other. At the
+end of each season a new family may also arrive if a house is empty and
+reputation is at least 3.
 
-The week is the only clock: validate routines, resolve morning and afternoon,
-apply construction, study and production, mature or harvest coffee, apply the
-season event, feed the families, update stock, wood, money, morale and
-population, process arrivals, report and advance. The season controls frost and
-drought, not a second simulation. A coffee work period covers four cells (eight
-pés); two periods cover the 4×2 lot. Educated adults count as two units for
-coffee and construction and add one food to each yard period. Coffee is
+The month is the only clock: validate monthly tasks, apply construction, study and
+production, mature or harvest coffee, apply the season event, feed the families,
+update stock, wood, money, morale and population, process arrivals, report and
+advance. The season controls frost and
+drought, not a second simulation. A coffee monthly task covers eight cells (16
+pés), the full 4×2 lot. Educated adults count as double units for coffee and
+construction and add one extra food per task. Coffee is
 harvested in autumn and goes into stock; each terreiro holds 16 sacks, a tulha
 adds 6, and harvest above the room is lost. Stock is sold manually at the
-current price (a venda adds 1); the weekly report records sacks sold, sale
-revenue and closing stock. Yard work yields food per period; families eat two
-units per week; surplus is sold; hunger reduces morale. Frost damages mature
-coffee and drought reduces yard output in the last week of their seasons.
+current price (a venda adds 1); the monthly report records sacks sold, sale
+revenue and closing stock. Yard work yields food per task; families eat two
+units per month. Food is stored in one house pantry capped at eight per family;
+the player sells it manually at the market, and excess above the cap is wasted.
+Hunger reduces morale. Frost damages mature
+coffee and drought reduces yard output in the last month of their seasons.
 Families leave at morale 0 and the farm is lost when no family remains.
 
-Construction costs coins and wood and takes work periods; the site keeps its
-progress and is drawn as a generic canteiro in three stages. A new farm starts
-with 4 wood; clearing one forest tile yields 2 wood, wood can also be bought at
-the market for 1 coin each, and planting one coffee cell costs 1 coin. Houses
+Construction costs coins and wood and takes one work unit per adult per month;
+roads also advance one tile per adult per month. The site keeps its progress and
+is drawn as a generic canteiro in three stages. A new farm starts
+with 4 wood; clearing one forest tile yields 2 wood, and wood can also be bought
+at the market for 1 coin each. Houses
 and terreiros can be repeated; a tulha, a venda, an escola and a capela are
 unique. The chain is tulha after terreiro, venda after tulha, escola after venda
 and capela after escola.
@@ -104,14 +108,42 @@ medium at base and good for one more; a venda adds one more. Harvested stock is
 kept in the three grade piles and sold separately; the terreiro and tulha
 capacity applies to the total.
 
+A new coffee lot is a 4×2 order that needs 16 seedlings, bought as four-seedling
+bundles for one coin. One adult monthly task completes the order before it becomes
+a muda lot. Monthly history records coins, income, expenses and
+harvest/stock by grade, and the Reports page draws the financial and production
+lines. The interface uses a bottom book navigation with Families, Works, Coffee,
+Market and Reports pages. Market purchases and coffee sales are queued and
+applied together at the end of the month; the market page shows pending items,
+cost, revenue and net coins before confirmation. Queued purchases reserve their
+coins, so buildings and family invitations cannot spend them before the month
+ends.
+
+Each resident has one monthly task and one worker on the map. A worker task
+carries the output of the old two periods; targeted actions clear, fertilize or
+limestone one tile/lot per task. Residents whose monthly task is idle or rest are
+removed from the map and leave only floating Zzz above the house. Each adult on
+vacation earns one coin for the house. When a construction or planting order
+finishes, its workers return home on vacation. Adults and children have a stored
+sex and outfit color chosen by the engine RNG; the map and family portrait use
+the same sprite variant. Queued fertilizer and limestone tasks put their sack
+icons above the lot, and each lot shows a clock badge with its first harvest
+forecast.
+
+The harvest forecast is a pure calculation from the current coffee crew: it
+simulates the same monthly growth and autumn harvest limits, without mutating the
+game, and reports both the first and the complete harvest month per lot. It
+assumes the current coffee scale and no frost. The construction site is drawn
+generically in three progress phases with foundation, materials, scaffolding,
+ladder and hoist; planting orders use a separate nursery bed drawing.
+
 Roads are visually planned with the Road tool and saved as a queue. An adult
-assigned to Road builds up to four queued tiles per week, regardless of whether
-the adult is assigned in one or both periods. Roads cost no coins or wood and
+assigned to Road builds one queued tile per month. Roads cost no coins or wood and
 do not gate construction. The school currently educates without a teacher or
-staff; staffed institutions are the next stage. The game ends at week 48: the
+staff; staffed institutions are the next stage. The game ends at month 48: the
 farm wins if it has six families, a chapel, a school, a shop and morale of at
-least 2; otherwise it ends. Saves use `sitio-save` v20 (`.sitio.json`); v19 and
-earlier must start a new farm.
+least 2; otherwise it ends. Saves use `sitio-save` v24 (`.sitio.json`); older
+saves are not migrated and must start a new farm.
 
 ## Mata
 

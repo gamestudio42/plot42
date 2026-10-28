@@ -3,8 +3,8 @@ import type { RngState } from '@shell/kernel';
 export const SITIO_SIZE = 24;
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
 export type Season = (typeof SEASONS)[number];
-export const WEEKS_PER_SEASON = 4;
-export const TURNS_PER_YEAR = WEEKS_PER_SEASON * SEASONS.length;
+export const MONTHS_PER_SEASON = 4;
+export const TURNS_PER_YEAR = MONTHS_PER_SEASON * SEASONS.length;
 export const FINAL_TURN = TURNS_PER_YEAR * 3;
 
 export const TERRAIN_TERRA = 0;
@@ -88,6 +88,17 @@ export interface CoffeeGrades {
   good: number;
 }
 
+export interface MarketCart {
+  wood: number;
+  fertilizer: number;
+  limestone: number;
+  seedlings: number;
+  food: number;
+  bad: number;
+  medium: number;
+  good: number;
+}
+
 export type InputKind = 'fertilizer' | 'limestone';
 
 export interface InputStock {
@@ -100,10 +111,16 @@ export const INPUT_PRICES: Record<InputKind, number> = {
   limestone: 2,
 };
 
+export const FAMILY_INVITE_COST = 4;
+export const SEEDLING_BUNDLE_SIZE = 4;
+export const SEEDLING_BUNDLE_PRICE = 1;
+export const COFFEE_LOT_SEEDLINGS = 16;
+export const COFFEE_PLANT_PERIODS = 2;
+
 export const COFFEE_QUALITY_BASE = 40;
 export const FERTILIZER_QUALITY_BONUS = 20;
 export const LIMESTONE_QUALITY_BONUS = 20;
-export const ROAD_TILES_PER_WEEK = 4;
+export const ROAD_TILES_PER_MONTH = 1;
 
 export const START_COINS = 12;
 export const START_FOOD = 4;
@@ -113,6 +130,8 @@ export const WOOD_BUY_PRICE = 1;
 export const FAMILY_NEED = 2;
 export const YARD_FOOD_PER_PERIOD = 2;
 export const FOOD_CAP = 8;
+export const FOOD_SELL_PRICE = 1;
+export const REST_BONUS = 1;
 export const COFFEE_CELLS_PER_PERIOD = 4;
 export const HARVEST_YIELD = COFFEE_PES_PER_CELL;
 export const TERREIRO_CAPACITY = 16;
@@ -125,6 +144,9 @@ export const WIN_FAMILIES = 6;
 export const FROST_LOSS = 2;
 export const SCHOOL_AGE = 6;
 export const EDUCATION_PERIODS = 4;
+export const PERIODS_PER_MONTH_TASK = 2;
+export const OUTFIT_COUNT = 6;
+export type PersonSex = 'male' | 'female';
 
 export const FAMILY_NAMES = [
   'Silva',
@@ -162,8 +184,6 @@ export const PERSON_NAMES = [
   'António',
 ] as const;
 
-export type Period = 'morning' | 'afternoon';
-
 export type WorkTask =
   | { kind: 'idle' }
   | { kind: 'rest' }
@@ -171,6 +191,7 @@ export type WorkTask =
   | { kind: 'coffee' }
   | { kind: 'study' }
   | { kind: 'road' }
+  | { kind: 'plantLot'; orderId: number }
   | { kind: 'fertilize'; x: number; y: number }
   | { kind: 'limestone'; x: number; y: number }
   | { kind: 'build'; siteId: number }
@@ -196,8 +217,9 @@ export interface Person {
   familyId: number;
   education: boolean;
   educationProgress: number;
-  morning: WorkTask;
-  afternoon: WorkTask;
+  sex: PersonSex;
+  outfit: number;
+  task: WorkTask;
 }
 
 export interface Family {
@@ -238,6 +260,28 @@ export interface CoffeeLot {
   limed: boolean;
 }
 
+export interface CoffeePlantOrder {
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  progress: number;
+  required: number;
+}
+
+export interface MonthHistoryPoint {
+  turn: number;
+  month: number;
+  year: number;
+  season: Season;
+  coins: number;
+  income: number;
+  expenses: number;
+  harvest: CoffeeGrades;
+  stock: CoffeeGrades;
+}
+
 export type YearEvent = 'none' | 'frost' | 'drought';
 
 export interface MoraleChange {
@@ -248,7 +292,7 @@ export interface MoraleChange {
 
 export interface SeasonReport {
   turn: number;
-  week: number;
+  month: number;
   year: number;
   season: Season;
   harvest: number;
@@ -261,6 +305,8 @@ export interface SeasonReport {
   foodConsumed: number;
   foodBought: number;
   foodSold: number;
+  foodWasted: number;
+  restBonus: number;
   planted: number;
   cleared: number;
   studied: number;
@@ -291,6 +337,7 @@ export interface SitioStats {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeeCapacity: number;
@@ -317,15 +364,18 @@ export interface SitioFullState {
   name: string;
   seed: string;
   turn: number;
-  week: number;
-  weekOfSeason: number;
-  weekOfYear: number;
+  month: number;
+  monthOfSeason: number;
+  monthOfYear: number;
   year: number;
   season: Season;
   coins: number;
+  availableCoins: number;
   food: number;
+  foodCapacity: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeeCapacity: number;
@@ -341,9 +391,12 @@ export interface SitioFullState {
   sites: Site[];
   structures: Structure[];
   coffeeLots: CoffeeLot[];
+  plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  marketCart: MarketCart;
   yearEvent: YearEvent;
   lastReport: SeasonReport | null;
+  history: MonthHistoryPoint[];
   stats: SitioStats;
 }
 
@@ -355,6 +408,7 @@ export interface SitioSnapshot {
   food: number;
   wood: number;
   inputStock: InputStock;
+  seedlings: number;
   coffeeStock: number;
   coffeeGrades: CoffeeGrades;
   coffeePrice: number;
@@ -370,11 +424,15 @@ export interface SitioSnapshot {
   sites: Site[];
   structures: Structure[];
   coffeeLots: CoffeeLot[];
+  plantOrders: CoffeePlantOrder[];
   roadPlan: { x: number; y: number }[];
+  marketCart: MarketCart;
   totals: SitioTotals;
   lastReport: SeasonReport | null;
-  weekSold: number;
-  weekRevenue: number;
+  history: MonthHistoryPoint[];
+  monthSold: number;
+  monthRevenue: number;
+  monthExpense: number;
 }
 
 export interface NewSitioOptions {
@@ -394,15 +452,20 @@ export interface SitioMeta {
 }
 
 export type SitioCommand =
-  | { type: 'assign'; personId: number; period: Period; task: WorkTask }
+  | { type: 'assign'; personId: number; task: WorkTask }
   | { type: 'build'; kind: BuildingKind; x: number; y: number }
   | { type: 'placeStarter'; kind: StarterKind; x: number; y: number }
   | { type: 'sellCoffee'; grade: CoffeeGrade; amount: number }
+  | { type: 'sellFood'; amount: number }
   | { type: 'buyWood'; amount: number }
   | { type: 'buyInput'; kind: InputKind; amount: number }
+  | { type: 'buySeedlings'; amount: number }
+  | { type: 'plantCoffeeLot'; x: number; y: number }
   | { type: 'planRoad'; x: number; y: number }
   | { type: 'clearRoadPlan' }
-  | { type: 'endWeek' };
+  | { type: 'clearMarketCart' }
+  | { type: 'inviteFamily' }
+  | { type: 'endMonth' };
 
 export type SitioCommandReason =
   | 'oob'
@@ -413,6 +476,8 @@ export type SitioCommandReason =
   | 'no-coins'
   | 'no-wood'
   | 'no-input'
+  | 'no-seedlings'
+  | 'no-house'
   | 'no-family'
   | 'no-person'
   | 'not-adult'
@@ -440,6 +505,7 @@ export type ToSitioMessage =
   | { type: 'command'; id: number; command: SitioCommand }
   | { type: 'starterPreview'; id: number; kind: StarterKind; x: number; y: number }
   | { type: 'buildPreview'; id: number; kind: BuildingKind; x: number; y: number }
+  | { type: 'coffeePreview'; id: number; x: number; y: number }
   | { type: 'snapshot'; id: number }
   | { type: 'hash'; id: number }
   | { type: 'exportSave'; id: number; savedAt: string }
@@ -455,6 +521,7 @@ export type FromSitioMessage =
   | { type: 'commandResult'; id: number; result: SitioCommandResult }
   | { type: 'starterPreviewResult'; id: number; result: StarterPreviewResult }
   | { type: 'buildPreviewResult'; id: number; result: SitioCommandResult }
+  | { type: 'coffeePreviewResult'; id: number; result: SitioCommandResult }
   | { type: 'snapshot'; id: number; snapshot: SitioSnapshot }
   | { type: 'hash'; id: number; hash: string }
   | { type: 'saveData'; id: number; text: string; meta: SitioMeta }
@@ -462,7 +529,7 @@ export type FromSitioMessage =
   | { type: 'error'; message: string };
 
 export function seasonOf(turn: number): Season {
-  const index = Math.floor(turn / WEEKS_PER_SEASON) % SEASONS.length;
+  const index = Math.floor(turn / MONTHS_PER_SEASON) % SEASONS.length;
   return SEASONS[(index + SEASONS.length) % SEASONS.length] as Season;
 }
 
@@ -470,11 +537,11 @@ export function yearOf(turn: number): number {
   return Math.floor(turn / TURNS_PER_YEAR) + 1;
 }
 
-export function weekOfSeason(turn: number): number {
-  return (turn % WEEKS_PER_SEASON) + 1;
+export function monthOfSeason(turn: number): number {
+  return (turn % MONTHS_PER_SEASON) + 1;
 }
 
-export function weekOfYear(turn: number): number {
+export function monthOfYear(turn: number): number {
   return (turn % TURNS_PER_YEAR) + 1;
 }
 

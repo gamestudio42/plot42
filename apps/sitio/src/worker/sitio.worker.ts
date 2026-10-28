@@ -50,6 +50,12 @@ scope.onmessage = (event) => {
         post({ type: 'buildPreviewResult', id: message.id, result });
         break;
       }
+      case 'coffeePreview': {
+        if (!engine) throw new Error('No sítio loaded');
+        const result = engine.canPlantCoffeeLot(message.x, message.y);
+        post({ type: 'coffeePreviewResult', id: message.id, result });
+        break;
+      }
       case 'snapshot':
         if (!engine) throw new Error('No sítio loaded');
         post({ type: 'snapshot', id: message.id, snapshot: engine.serialize() });
