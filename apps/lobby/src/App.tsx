@@ -57,21 +57,6 @@ function Tags({ game, t }: { game: Game; t: Strings }) {
   );
 }
 
-function ExternalIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        d="M9 2h5v5M14 2 7 9M12 9.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function PlayIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
@@ -80,11 +65,11 @@ function PlayIcon() {
   );
 }
 
-function Cta({ game, t }: { game: Game; t: Strings }) {
+function Cta({ t }: { t: Strings }) {
   return (
     <span className="cta">
-      {game.kind === 'sandbox' ? <PlayIcon /> : <ExternalIcon />}
-      {game.kind === 'sandbox' ? t.playHere : t.openSite}
+      <PlayIcon />
+      {t.play}
     </span>
   );
 }
@@ -111,7 +96,7 @@ function Hero({ game, t }: { game: Game; t: Strings }) {
         </span>
         <span className="hero-blurb">{strings.blurb}</span>
         <Tags game={game} t={t} />
-        <Cta game={game} t={t} />
+        <Cta t={t} />
       </span>
     </a>
   );
@@ -147,7 +132,7 @@ function Card({ game, t }: { game: Game; t: Strings }) {
           </span>
           <Tags game={game} t={t} />
           <span className="card-blurb">{strings.blurb}</span>
-          <Cta game={game} t={t} />
+          <Cta t={t} />
         </span>
       </a>
     </li>
@@ -214,12 +199,12 @@ export function App() {
 
   const filters: { id: Filter; label: string; count: number }[] = [
     { id: 'all', label: t.filterAll, count: GAMES.length },
+    { id: 'web', label: t.filterWeb, count: GAMES.filter((g) => g.kind === 'web').length },
     {
       id: 'sandbox',
       label: t.filterSandbox,
       count: GAMES.filter((g) => g.kind === 'sandbox').length,
     },
-    { id: 'web', label: t.filterWeb, count: GAMES.filter((g) => g.kind === 'web').length },
   ];
 
   return (
@@ -284,6 +269,9 @@ export function App() {
           ))}
         </nav>
 
+        {filter !== 'sandbox' ? (
+          <Shelf id="web" title={t.webTitle} subtitle={t.webSubtitle} games={web} t={t} />
+        ) : null}
         {filter !== 'web' ? (
           <Shelf
             id="sandbox"
@@ -292,9 +280,6 @@ export function App() {
             games={sandbox}
             t={t}
           />
-        ) : null}
-        {filter !== 'sandbox' ? (
-          <Shelf id="web" title={t.webTitle} subtitle={t.webSubtitle} games={web} t={t} />
         ) : null}
         {shown === 0 ? <p className="empty">{t.noResults.replace('{q}', q)}</p> : null}
       </main>
