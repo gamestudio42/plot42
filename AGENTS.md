@@ -11,10 +11,12 @@ plus three games that share the shell (`kernel`, `bridge`, `view-iso`, `chrome`)
 - Posto is a turn-based outpost on a 10×10 board.
 - Mata is a living grove: plants shade, drink and feed each other.
 
-Urbe, Sítio and Neo Urbe are separate repositories
+Urbe, Sítio, Neo Urbe, Urbe Oasis and Vazante are separate repositories
 ([gamestudio42/urbe](https://github.com/gamestudio42/urbe),
 [gamestudio42/sitio](https://github.com/gamestudio42/sitio),
-[gamestudio42/neo-urbe](https://github.com/gamestudio42/neo-urbe)).
+[gamestudio42/neo-urbe](https://github.com/gamestudio42/neo-urbe),
+[gamestudio42/urbe-oasis](https://github.com/gamestudio42/urbe-oasis),
+[gamestudio42/vazante](https://github.com/gamestudio42/vazante)).
 The lobby links to their published sites. Do not add their source back here.
 
 ## Golden rules
@@ -72,7 +74,7 @@ packages/chrome/   Store, boot/pause/toasts, i18n helpers, audio graph, IndexedD
 packages/horta/    Horta sim (plant / grow / harvest)
 packages/posto/    Posto sim (move / attack, enemy turn)
 packages/mata/     Mata sim (shade / water / nutrients / fauna / health, `mata-save`)
-apps/lobby/        Plot 42 landing page (marks, LocaleSelect, five locales)
+apps/lobby/        Plot 42 store: catalog in src/games.ts, marks, LocaleSelect, five locales
 apps/horta/        Horta web app (port 5174)
 apps/posto/        Posto web app (port 5175)
 apps/mata/         Mata web app (port 5177)

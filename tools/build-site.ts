@@ -5,7 +5,7 @@
  *   /posto/     tactics
  *   /mata/      living grove
  *
- * Urbe, Sítio and Neo Urbe are not built here. The lobby links to their own Pages sites.
+ * Urbe, Sítio, Neo Urbe, Urbe Oasis and Vazante are not built here. The lobby links to their own Pages sites.
  * BASE_PATH is the site root (e.g. /plot42/). Each hosted game is built under that prefix.
  */
 import { execSync } from 'node:child_process';
