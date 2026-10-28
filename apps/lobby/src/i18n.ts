@@ -32,8 +32,7 @@ const en = {
   sandboxSubtitle: 'Sandbox games built into this lot. They open right here, no install.',
   webTitle: 'Studio games',
   webSubtitle: 'Full games with their own sites. The card opens the game’s page.',
-  playHere: 'Play',
-  openSite: 'Open site',
+  play: 'Play',
   count: '{n} games',
   noResults: 'No game matches “{q}”.',
   games: {
@@ -107,8 +106,7 @@ const ptBR: typeof en = {
   sandboxSubtitle: 'Jogos sandbox construídos neste lote. Abrem aqui mesmo, sem instalar nada.',
   webTitle: 'Jogos do estúdio',
   webSubtitle: 'Jogos completos com site próprio. O card abre a página do jogo.',
-  playHere: 'Jogar',
-  openSite: 'Abrir site',
+  play: 'Jogar',
   count: '{n} jogos',
   noResults: 'Nenhum jogo encontrado para “{q}”.',
   games: {
@@ -181,8 +179,7 @@ const es: typeof en = {
   sandboxSubtitle: 'Juegos sandbox construidos en este lote. Se abren aquí mismo, sin instalar.',
   webTitle: 'Juegos del estudio',
   webSubtitle: 'Juegos completos con sitio propio. La tarjeta abre la página del juego.',
-  playHere: 'Jugar',
-  openSite: 'Abrir sitio',
+  play: 'Jugar',
   count: '{n} juegos',
   noResults: 'Ningún juego coincide con “{q}”.',
   games: {
@@ -256,8 +253,7 @@ const fr: typeof en = {
     'Des jeux bac à sable construits sur ce lot. Ils s’ouvrent ici, sans installation.',
   webTitle: 'Jeux du studio',
   webSubtitle: 'Des jeux complets avec leur propre site. La carte ouvre la page du jeu.',
-  playHere: 'Jouer',
-  openSite: 'Ouvrir le site',
+  play: 'Jouer',
   count: '{n} jeux',
   noResults: 'Aucun jeu ne correspond à « {q} ».',
   games: {
@@ -332,8 +328,7 @@ const de: typeof en = {
     'Sandbox-Spiele, direkt auf diesem Grundstück gebaut. Sie starten hier, ohne Installation.',
   webTitle: 'Spiele des Studios',
   webSubtitle: 'Vollständige Spiele mit eigener Seite. Die Karte öffnet die Seite des Spiels.',
-  playHere: 'Spielen',
-  openSite: 'Seite öffnen',
+  play: 'Spielen',
   count: '{n} Spiele',
   noResults: 'Kein Spiel passt zu „{q}“.',
   games: {
