@@ -530,6 +530,42 @@ body,
   display: flex;
 }
 
+/* The Snap Store badge sits on the card's bottom-right corner, level with the Play button. */
+.card-slot,
+.hero-wrap {
+  position: relative;
+}
+
+.snap-badge {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: block;
+  line-height: 0;
+  border-radius: 8px;
+  transition: transform 0.15s ease;
+}
+
+.snap-badge img {
+  display: block;
+  height: 36px;
+  width: auto;
+}
+
+.snap-badge:hover,
+.snap-badge:focus-visible {
+  transform: translateY(-1px);
+}
+
+.hero-wrap .snap-badge {
+  right: 28px;
+  bottom: 28px;
+}
+
+.hero-wrap .snap-badge img {
+  height: 44px;
+}
+
 .card {
   flex: 1;
   display: flex;

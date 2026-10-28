@@ -1,6 +1,6 @@
 import { LocaleSelect, Logo } from '@shell/chrome';
 import { useState, type CSSProperties } from 'react';
-import { FEATURED, GAMES, displayHost, gameHref, type Game } from './games';
+import { FEATURED, GAMES, displayHost, gameHref, snapHref, type Game } from './games';
 import {
   applyDocumentLocale,
   catalog,
@@ -74,38 +74,59 @@ function Cta({ t }: { t: Strings }) {
   );
 }
 
+/**
+ * Official Snap Store badge. It is a sibling of the card link (links cannot nest),
+ * laid over the card's bottom-right corner by CSS.
+ */
+function SnapBadge({ snap, t }: { snap: string; t: Strings }) {
+  return (
+    <a className="snap-badge" href={snapHref(snap)} data-testid={`snap-${snap}`}>
+      <picture>
+        <source
+          srcSet="https://snapcraft.io/en/light/install.svg"
+          media="(prefers-color-scheme: light)"
+        />
+        <img src="https://snapcraft.io/en/dark/install.svg" alt={t.snapStore} height={40} />
+      </picture>
+    </a>
+  );
+}
+
 function Hero({ game, t }: { game: Game; t: Strings }) {
   const strings = t.games[game.slug];
   return (
-    <a
-      className={`hero kind-${game.kind}`}
-      href={gameHref(game)}
-      style={coverStyle(game, true)}
-      data-testid="lobby-featured"
-    >
-      <span className="hero-art" aria-hidden="true" />
-      <span className="hero-body">
-        <span className="hero-labels">
-          <span className="badge badge-featured">{t.featured}</span>
-          {game.isNew ? <span className="badge badge-new">{t.newBadge}</span> : null}
-          <KindBadge game={game} t={t} />
+    <div className="hero-wrap">
+      <a
+        className={`hero kind-${game.kind}`}
+        href={gameHref(game)}
+        style={coverStyle(game, true)}
+        data-testid="lobby-featured"
+      >
+        <span className="hero-art" aria-hidden="true" />
+        <span className="hero-body">
+          <span className="hero-labels">
+            <span className="badge badge-featured">{t.featured}</span>
+            {game.isNew ? <span className="badge badge-new">{t.newBadge}</span> : null}
+            <KindBadge game={game} t={t} />
+          </span>
+          <span className="hero-title">
+            <img className="hero-icon" src={markUrl(game)} width={64} height={64} alt="" />
+            {strings.title}
+          </span>
+          <span className="hero-blurb">{strings.blurb}</span>
+          <Tags game={game} t={t} />
+          <Cta t={t} />
         </span>
-        <span className="hero-title">
-          <img className="hero-icon" src={markUrl(game)} width={64} height={64} alt="" />
-          {strings.title}
-        </span>
-        <span className="hero-blurb">{strings.blurb}</span>
-        <Tags game={game} t={t} />
-        <Cta t={t} />
-      </span>
-    </a>
+      </a>
+      {game.snap ? <SnapBadge snap={game.snap} t={t} /> : null}
+    </div>
   );
 }
 
 function Card({ game, t }: { game: Game; t: Strings }) {
   const strings = t.games[game.slug];
   return (
-    <li>
+    <li className="card-slot">
       <a
         className={`card kind-${game.kind}`}
         href={gameHref(game)}
@@ -135,6 +156,7 @@ function Card({ game, t }: { game: Game; t: Strings }) {
           <Cta t={t} />
         </span>
       </a>
+      {game.snap ? <SnapBadge snap={game.snap} t={t} /> : null}
     </li>
   );
 }
