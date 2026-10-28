@@ -33,6 +33,7 @@ const en = {
   webTitle: 'Studio games',
   webSubtitle: 'Full Game Studio 42 games, each on its own site.',
   play: 'Play',
+  snapStore: 'Get it from the Snap Store',
   count: '{n} games',
   noResults: 'No game matches “{q}”.',
   games: {
@@ -108,6 +109,7 @@ const ptBR: typeof en = {
   webTitle: 'Jogos do estúdio',
   webSubtitle: 'Jogos completos da Game Studio 42, cada um com seu próprio site.',
   play: 'Jogar',
+  snapStore: 'Baixe na Snap Store',
   count: '{n} jogos',
   noResults: 'Nenhum jogo encontrado para “{q}”.',
   games: {
@@ -182,6 +184,7 @@ const es: typeof en = {
   webTitle: 'Juegos del estudio',
   webSubtitle: 'Juegos completos de Game Studio 42, cada uno en su propio sitio.',
   play: 'Jugar',
+  snapStore: 'Consíguelo en la Snap Store',
   count: '{n} juegos',
   noResults: 'Ningún juego coincide con “{q}”.',
   games: {
@@ -256,6 +259,7 @@ const fr: typeof en = {
   webTitle: 'Jeux du studio',
   webSubtitle: 'Des jeux complets de Game Studio 42, chacun sur son propre site.',
   play: 'Jouer',
+  snapStore: 'Disponible sur le Snap Store',
   count: '{n} jeux',
   noResults: 'Aucun jeu ne correspond à « {q} ».',
   games: {
@@ -331,6 +335,7 @@ const de: typeof en = {
   webTitle: 'Spiele des Studios',
   webSubtitle: 'Vollständige Spiele von Game Studio 42, jedes auf seiner eigenen Seite.',
   play: 'Spielen',
+  snapStore: 'Im Snap Store herunterladen',
   count: '{n} Spiele',
   noResults: 'Kein Spiel passt zu „{q}“.',
   games: {

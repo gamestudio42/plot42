@@ -40,6 +40,8 @@ interface BaseGame {
   cover: readonly [string, string];
   accent: string;
   isNew?: boolean;
+  /** Snap Store package name, when the game also ships as a Linux snap (snapcraft.io/<snap>). */
+  snap?: string;
 }
 
 export interface SandboxGame extends BaseGame {
@@ -66,6 +68,7 @@ export const GAMES: readonly Game[] = [
     cover: ['#3b1d1a', '#0f1a12'],
     accent: '#ff5a45',
     isNew: true,
+    snap: 'vazante',
   },
   {
     slug: 'urbe-oasis',
@@ -127,6 +130,10 @@ export const GAMES: readonly Game[] = [
 ];
 
 export const FEATURED: GameSlug = 'vazante';
+
+export function snapHref(snap: string): string {
+  return `https://snapcraft.io/${snap}`;
+}
 
 export function gameHref(game: Game, dev: boolean = import.meta.env.DEV): string {
   if (game.kind === 'web') return game.href;

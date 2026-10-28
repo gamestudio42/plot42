@@ -48,6 +48,17 @@ test('shelves sandbox and studio games apart, with their marks', async ({ page }
   await expect(page.getByTestId('lobby-featured')).toHaveAttribute('href', WEB.vazante);
 });
 
+test('offers the Snap Store only for games that ship a snap', async ({ page }) => {
+  await page.goto('/');
+  // Vazante has a badge on its card and on the featured banner.
+  const badges = page.getByTestId('snap-vazante');
+  await expect(badges).toHaveCount(2);
+  for (const badge of await badges.all()) {
+    await expect(badge).toHaveAttribute('href', 'https://snapcraft.io/vazante');
+  }
+  await expect(page.locator('.snap-badge')).toHaveCount(2);
+});
+
 test('filters by shelf and by search', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('filter-sandbox').click();
