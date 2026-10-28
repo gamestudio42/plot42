@@ -38,7 +38,6 @@ export default defineConfig(
       'packages/horta/src/**/*.ts',
       'packages/posto/src/**/*.ts',
       'packages/mata/src/**/*.ts',
-      'packages/sitio/src/**/*.ts',
     ],
     rules: {
       'no-restricted-globals': [
@@ -63,7 +62,6 @@ export default defineConfig(
       'apps/horta/src/**/*.{ts,tsx}',
       'apps/posto/src/**/*.{ts,tsx}',
       'apps/mata/src/**/*.{ts,tsx}',
-      'apps/sitio/src/**/*.{ts,tsx}',
       'apps/lobby/src/**/*.{ts,tsx}',
       'packages/chrome/src/**/*.{ts,tsx}',
     ],
@@ -78,7 +76,6 @@ export default defineConfig(
       'apps/horta/vite.config.ts',
       'apps/posto/vite.config.ts',
       'apps/mata/vite.config.ts',
-      'apps/sitio/vite.config.ts',
       'apps/lobby/vite.config.ts',
     ],
     languageOptions: { globals: globals.node },

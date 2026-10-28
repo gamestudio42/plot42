@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Plot 42 \u2014 a static browser game platform: lobby, Horta, Posto, Mata and Sítio. Urbe and Neo Urbe live in their own repositories.",
+  "description": "Plot 42 \u2014 a static browser game platform: lobby, Horta, Posto and Mata. Urbe, Sítio and Neo Urbe live in their own repositories.",
   "license": "MIT",
   "packageManager": "pnpm@10.27.0",
   "engines": {
@@ -15,7 +15,6 @@
     "horta": "pnpm --filter @horta/web dev",
     "posto": "pnpm --filter @posto/web dev",
     "mata": "pnpm --filter @mata/web dev",
-    "sitio": "pnpm --filter @sitio/web dev",
     "build": "pnpm build:site",
     "build:site": "tsx tools/build-site.ts",
     "preview": "pnpm preview:site",
@@ -23,18 +22,15 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc -p packages/kernel && tsc -p packages/bridge && tsc -p packages/view-iso && tsc -p packages/chrome && tsc -p packages/horta && tsc -p packages/posto && tsc -p packages/mata && tsc -p packages/sitio && tsc -p apps/horta && tsc -p apps/posto && tsc -p apps/mata && tsc -p apps/sitio && tsc -p apps/lobby && tsc -p tsconfig.json",
+    "typecheck": "tsc -p packages/kernel && tsc -p packages/bridge && tsc -p packages/view-iso && tsc -p packages/chrome && tsc -p packages/horta && tsc -p packages/posto && tsc -p packages/mata && tsc -p apps/horta && tsc -p apps/posto && tsc -p apps/mata && tsc -p apps/lobby && tsc -p tsconfig.json",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "art": "tsx tools/build-art.ts",
-    "art:draw": "tsx tools/build-art.ts --draw"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@horta/sim": "workspace:*",
     "@posto/sim": "workspace:*",
     "@mata/sim": "workspace:*",
-    "@sitio/sim": "workspace:*",
     "@shell/kernel": "workspace:*",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",

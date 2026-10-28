@@ -4,9 +4,8 @@
  *   /horta/     harvest grid
  *   /posto/     tactics
  *   /mata/      living grove
- *   /sitio/     coffee farm that becomes a village
  *
- * Urbe and Neo Urbe are not built here. The lobby links to their own Pages sites.
+ * Urbe, Sítio and Neo Urbe are not built here. The lobby links to their own Pages sites.
  * BASE_PATH is the site root (e.g. /plot42/). Each hosted game is built under that prefix.
  */
 import { execSync } from 'node:child_process';
@@ -44,8 +43,5 @@ cpSync(join(root, 'apps/posto/dist-site'), join(site, 'posto'), { recursive: tru
 
 run('@mata/web', `${baseRoot}mata/`);
 cpSync(join(root, 'apps/mata/dist-site'), join(site, 'mata'), { recursive: true });
-
-run('@sitio/web', `${baseRoot}sitio/`);
-cpSync(join(root, 'apps/sitio/dist-site'), join(site, 'sitio'), { recursive: true });
 
 console.log(`Assembled site/ with BASE_PATH=${baseRoot}`);
