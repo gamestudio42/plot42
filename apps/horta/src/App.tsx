@@ -17,7 +17,7 @@ export function App() {
     if (!host) return;
     const next = new HortaSession();
     setSession(next);
-    void next.boot(host);
+    void next.boot(host).catch(() => next.ui.set({ bootError: true }));
     return () => next.dispose();
   }, []);
 
@@ -32,10 +32,44 @@ export function App() {
 function Screens({ session }: { session: HortaSession }) {
   const screen = useStore(session.ui, (s) => s.screen);
   const toasts = useStore(session.ui, (s) => s.toasts);
+  const saveError = useStore(session.ui, (s) => s.saveError);
+  const hasSession = useStore(session.ui, (s) => s.hasSession);
+  const busy = useStore(session.ui, (s) => s.busy);
+  const t = useStrings(session.ui);
   return (
     <>
       {screen === 'menu' ? <Menu session={session} /> : <GameHud session={session} />}
       <Toasts toasts={toasts} onDismiss={(id) => session.dismissToast(id)} />
+      {saveError ? (
+        <aside className="recovery-notice" role="alert" data-testid="storage-error">
+          <p>{t.storageUnavailable}</p>
+          {hasSession ? (
+            <div className="menu-actions">
+              <button
+                type="button"
+                className="button"
+                disabled={busy}
+                onClick={() => void session.save()}
+              >
+                {t.retrySave}
+              </button>
+              <button
+                type="button"
+                className="button"
+                data-testid="horta-export"
+                onClick={() => session.exportFile()}
+              >
+                {t.exportSave}
+              </button>
+            </div>
+          ) : null}
+        </aside>
+      ) : null}
+      {busy ? (
+        <div className="session-busy" role="status">
+          {t.saving}
+        </div>
+      ) : null}
       <BootScreen session={session} />
     </>
   );
@@ -50,6 +84,9 @@ function Menu({ session }: { session: HortaSession }) {
   const saves = useStore(session.ui, (s) => s.saves ?? []);
   const boot = useStore(session.ui, (s) => s.boot);
   const latest = saves[0] ?? null;
+  const hasSession = useStore(session.ui, (s) => s.hasSession);
+  const activeName = useStore(session.ui, (s) => s.stats?.name);
+  const busy = useStore(session.ui, (s) => s.busy);
   if (boot.step !== 'done') return null;
   return (
     <div className="main-menu" data-testid="horta-menu">
@@ -76,29 +113,31 @@ function Menu({ session }: { session: HortaSession }) {
         <p className="muted">{t.subtitle}</p>
         <label className="field">
           <span>{t.name}</span>
-          <input value={name} onChange={(e) => session.setName(e.target.value)} />
+          <input disabled={busy} value={name} onChange={(e) => session.setName(e.target.value)} />
         </label>
         <label className="field">
           <span>{t.seed}</span>
-          <input value={seed} onChange={(e) => session.setSeed(e.target.value)} />
+          <input disabled={busy} value={seed} onChange={(e) => session.setSeed(e.target.value)} />
         </label>
         <div className="menu-actions">
           <button
             type="button"
             className="button primary"
             data-testid="horta-new"
+            disabled={busy}
             onClick={() => void session.newGame()}
           >
             {t.newGame}
           </button>
-          {latest && (
+          {(hasSession || latest) && (
             <button
               type="button"
               className="button"
               data-testid="horta-continue"
+              disabled={busy}
               onClick={() => void session.continueLatest()}
             >
-              {t.continue}: {latest.name}
+              {hasSession ? t.resume : t.continue}: {hasSession ? activeName : latest?.name}
             </button>
           )}
         </div>
@@ -108,12 +147,13 @@ function Menu({ session }: { session: HortaSession }) {
               {t.loadFile}
               <input
                 type="file"
+                disabled={busy}
                 accept=".json"
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  void file.text().then((text) => session.loadFile(text));
+                  void session.openFile(file);
                   e.target.value = '';
                 }}
               />
@@ -126,12 +166,17 @@ function Menu({ session }: { session: HortaSession }) {
             <ul className="save-list">
               {saves.map((slot) => (
                 <li key={slot.id}>
-                  <div className="save-info">
+                  <div className="save-info" data-testid="save-slot">
                     <strong>{slot.name}</strong>
                     <div className="muted small">{slot.savedAt.slice(0, 10)}</div>
                   </div>
-                  <button type="button" className="button small" onClick={() => void session.loadSlot(slot.id)}>
-                    {t.continue}
+                  <button
+                    type="button"
+                    className="button small"
+                    disabled={busy}
+                    onClick={() => void session.loadSlot(slot.id)}
+                  >
+                    {t.loadSaved}
                   </button>
                 </li>
               ))}
@@ -165,7 +210,7 @@ function GameHud({ session }: { session: HortaSession }) {
           <span className="hud-label">{t.planted}</span>
           <span>{stats?.planted ?? 0}</span>
         </div>
-        <div className="hud-stat">
+        <div className="hud-stat" data-testid="horta-ripe">
           <span className="hud-label">{t.ripe}</span>
           <span>{stats?.ripe ?? 0}</span>
         </div>
@@ -179,6 +224,9 @@ function GameHud({ session }: { session: HortaSession }) {
               key={value}
               type="button"
               className={`button ${speed === value ? 'active' : ''}`}
+              data-testid={`horta-speed-${value}`}
+              aria-pressed={speed === value}
+              aria-label={value === 0 ? t.paused : `${value}×`}
               onClick={() => session.setSpeed(value)}
             >
               {value === 0 ? '❚❚' : `${value}×`}
@@ -191,13 +239,28 @@ function GameHud({ session }: { session: HortaSession }) {
           soundOn={t.soundOn}
           soundOff={t.soundOff}
         />
-        <button type="button" className="button" onClick={() => void session.save()}>
+        <button
+          type="button"
+          className="button"
+          data-testid="horta-save"
+          onClick={() => void session.save()}
+        >
           {t.save}
         </button>
-        <button type="button" className="button" onClick={() => session.exportFile()}>
-          .json
+        <button
+          type="button"
+          className="button"
+          data-testid="horta-export"
+          onClick={() => session.exportFile()}
+        >
+          {t.exportSave}
         </button>
-        <button type="button" className="button" onClick={() => session.backToMenu()}>
+        <button
+          type="button"
+          className="button"
+          data-testid="horta-menu-button"
+          onClick={() => session.backToMenu()}
+        >
           {t.menu}
         </button>
       </div>

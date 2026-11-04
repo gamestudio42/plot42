@@ -16,7 +16,11 @@ export class SimClient<TTo, TFrom, TListener extends object> {
 
   constructor(protected readonly worker: WorkerPort<TTo, TFrom>) {
     this.worker.onmessage = (event) => this.handle(event.data);
-    this.worker.onerror = (event) => this.onWorkerError(event.message || 'Worker failed');
+    this.worker.onerror = (event) => {
+      const message = event.message || 'Worker failed';
+      this.rpc.rejectAll(new Error(message));
+      this.onWorkerError(message);
+    };
   }
 
   subscribe(listener: TListener): () => void {
@@ -28,10 +32,7 @@ export class SimClient<TTo, TFrom, TListener extends object> {
     this.worker.postMessage(message);
   }
 
-  request<T>(
-    message: TTo & { id: number },
-    pick: (m: TFrom) => T | undefined,
-  ): Promise<T> {
+  request<T>(message: TTo & { id: number }, pick: (m: TFrom) => T | undefined): Promise<T> {
     return this.rpc.request((id) => this.send({ ...message, id }), pick);
   }
 
@@ -40,6 +41,7 @@ export class SimClient<TTo, TFrom, TListener extends object> {
   }
 
   dispose(): void {
+    this.rpc.rejectAll(new Error('Session closed'));
     this.worker.terminate();
   }
 

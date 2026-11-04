@@ -62,7 +62,8 @@ export const WIN_BALANCE = 16;
 
 export const ERODE_CHANCE = 0.08;
 
-export const MATA_SPEED_TICKS = [0, 8, 16, 32] as const;
+// One ecological day per eight seconds: 44 days take 5m52s at normal speed.
+export const MATA_SPEED_TICKS = [0, 1 / 8, 2 / 8, 3 / 8] as const;
 export type MataSpeed = 0 | 1 | 2 | 3;
 
 export type MataTool = SpeciesKey | 'water' | 'clear';
@@ -189,7 +190,8 @@ export const DIAG: readonly [number, number][] = [
   [-1, -1],
 ];
 
-export type ProblemCode = 'dry' | 'starved' | 'too-shady' | 'too-sunny' | 'bare' | 'young' | 'ailing';
+export type ProblemCode =
+  'dry' | 'starved' | 'too-shady' | 'too-sunny' | 'bare' | 'young' | 'ailing';
 
 export interface TileProblem {
   code: ProblemCode;

@@ -49,6 +49,7 @@ export class HortaRenderer {
   private hover: Point | null = null;
   private onPlot: ((x: number, y: number, clear: boolean) => void) | null = null;
   private initialized = false;
+  private savedCamera: { x: number; y: number; zoom: number } | null = null;
   private destroyed = false;
   private inputEnabled = true;
   private attract: { time: number; still: boolean } | null = null;
@@ -88,16 +89,20 @@ export class HortaRenderer {
     this.inputEnabled = enabled;
   }
 
-  setAttract(on: boolean): void {
+  setAttract(on: boolean, restoreCamera = false): void {
     if (on === (this.attract !== null)) return;
     if (on) {
+      this.savedCamera = { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
       this.attract = { time: 0, still: prefersReducedMotion() };
       this.keys.clear();
       this.panning = null;
       this.hover = null;
     } else {
       this.attract = null;
-      this.camera.zoom = 1;
+      if (restoreCamera && this.savedCamera) {
+        this.camera.centerOn(this.savedCamera.x, this.savedCamera.y);
+      }
+      this.camera.zoom = restoreCamera ? (this.savedCamera?.zoom ?? 1) : 1;
     }
   }
 

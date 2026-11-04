@@ -4,10 +4,8 @@ import { expect, test } from '@playwright/test';
  * The lobby is the entry point of the static site, laid out as a store with two shelves.
  * Horta, Posto and Mata are sandbox games hosted here.
  * Urbe, Neo Urbe, Urbe Oasis, Vazante and Sítio open the sites published from their own repositories.
- * The spec runs against the built `site/` served by `pnpm preview:site`.
+ * The spec runs against the built `site/` served by the Playwright-configured Vite preview.
  */
-
-const SITE_PORT = 4180;
 
 const SANDBOX: Record<string, string> = {
   horta: 'horta/',
@@ -23,10 +21,8 @@ const WEB: Record<string, string> = {
   sitio: 'https://gamestudio42.github.io/sitio/',
 };
 
-test.use({ baseURL: `http://localhost:${SITE_PORT}/` });
-
 test('shelves sandbox and studio games apart, with their marks', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   for (const [shelf, games] of [
     ['sandbox', SANDBOX],
     ['web', WEB],
@@ -49,7 +45,7 @@ test('shelves sandbox and studio games apart, with their marks', async ({ page }
 });
 
 test('offers the Snap Store only for games that ship a snap', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   // Vazante has a badge on its card and on the featured banner.
   const badges = page.getByTestId('snap-vazante');
   await expect(badges).toHaveCount(2);
@@ -60,7 +56,7 @@ test('offers the Snap Store only for games that ship a snap', async ({ page }) =
 });
 
 test('filters by shelf and by search', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.getByTestId('filter-sandbox').click();
   await expect(page.getByTestId('shelf-web')).toHaveCount(0);
   await expect(page.getByTestId('shelf-sandbox').locator('.card')).toHaveCount(3);
@@ -72,6 +68,19 @@ test('filters by shelf and by search', async ({ page }) => {
 });
 
 test('ships all five locales in the lobby', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('lobby-locale')).toBeVisible();
+  await page.goto('./');
+  for (const [locale, label, heading] of [
+    ['en', 'English', 'Every Game Studio 42 game, on one shelf.'],
+    ['pt-BR', 'Português', 'Todos os jogos da Game Studio 42 numa só vitrine.'],
+    ['es', 'Español', 'Todos los juegos de Game Studio 42 en un solo escaparate.'],
+    ['fr', 'Français', 'Tous les jeux de Game Studio 42, sur une seule vitrine.'],
+    ['de', 'Deutsch', 'Alle Spiele von Game Studio 42 in einem Regal.'],
+  ]) {
+    await page.locator('.locale-trigger').click();
+    await page.getByRole('listbox').getByRole('button', { name: label, exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', locale!);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading!);
+    await page.reload();
+    await expect(page.getByTestId('lobby-locale')).toHaveValue(locale!);
+  }
 });

@@ -22,6 +22,20 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 export const LOCALE_KEY = 'posto.locale';
 
 const en = {
+  resume: 'Resume session',
+  loadSaved: 'Load checkpoint',
+  exportSave: 'Export save',
+  storageUnavailable:
+    'Progress could not be saved in this browser. Keep this tab open and export a file before leaving. Saving must succeed before switching worlds.',
+  operationFailed: 'The action could not be completed. Your current session is still available.',
+  invalidSave:
+    'This file is not a valid save for this game. Your current session has not been replaced.',
+  bootFailed:
+    'The game could not start or stopped responding. Reload to recover your last checkpoint.',
+  reload: 'Reload game',
+  retrySave: 'Retry saving',
+  saving: 'Protecting your progress…',
+
   pageTitle: 'Posto',
   title: 'Posto',
   subtitle: 'Hold the grid. Move, then strike.',
@@ -59,6 +73,20 @@ const en = {
 };
 
 const ptBR: typeof en = {
+  resume: 'Retomar partida',
+  loadSaved: 'Carregar checkpoint',
+  exportSave: 'Exportar partida',
+  storageUnavailable:
+    'Não foi possível salvar neste navegador. Mantenha esta aba aberta e exporte um arquivo antes de sair. É necessário salvar para trocar de mundo.',
+  operationFailed: 'Não foi possível concluir a ação. Sua partida atual continua disponível.',
+  invalidSave:
+    'Este arquivo não é um save válido deste jogo. Sua partida atual não foi substituída.',
+  bootFailed:
+    'O jogo não iniciou ou parou de responder. Recarregue para recuperar o último checkpoint.',
+  reload: 'Recarregar jogo',
+  retrySave: 'Tentar salvar novamente',
+  saving: 'Protegendo seu progresso…',
+
   pageTitle: 'Posto',
   title: 'Posto',
   subtitle: 'Segure o grid. Mova, depois ataque.',
@@ -96,6 +124,20 @@ const ptBR: typeof en = {
 };
 
 const es: typeof en = {
+  resume: 'Reanudar partida',
+  loadSaved: 'Cargar punto de guardado',
+  exportSave: 'Exportar partida',
+  storageUnavailable:
+    'No se pudo guardar en este navegador. Mantén esta pestaña abierta y exporta un archivo antes de salir. Debes guardar antes de cambiar de mundo.',
+  operationFailed: 'No se pudo completar la acción. Tu partida actual sigue disponible.',
+  invalidSave:
+    'Este archivo no es una partida válida para este juego. Tu partida actual no se ha reemplazado.',
+  bootFailed:
+    'El juego no pudo iniciarse o dejó de responder. Recarga para recuperar el último guardado.',
+  reload: 'Recargar juego',
+  retrySave: 'Reintentar guardado',
+  saving: 'Protegiendo tu progreso…',
+
   pageTitle: 'Posto',
   title: 'Posto',
   subtitle: 'Sostén la cuadrícula. Muévete, luego golpea.',
@@ -133,6 +175,20 @@ const es: typeof en = {
 };
 
 const fr: typeof en = {
+  resume: 'Reprendre la partie',
+  loadSaved: 'Charger la sauvegarde',
+  exportSave: 'Exporter la partie',
+  storageUnavailable:
+    'Impossible de sauvegarder dans ce navigateur. Gardez cet onglet ouvert et exportez un fichier avant de quitter. La sauvegarde doit réussir avant de changer de monde.',
+  operationFailed: 'Cette action a échoué. Votre partie actuelle reste disponible.',
+  invalidSave:
+    'Ce fichier ne contient pas une sauvegarde valide pour ce jeu. Votre partie actuelle est conservée.',
+  bootFailed:
+    'Le jeu ne démarre pas ou ne répond plus. Rechargez pour récupérer la dernière sauvegarde.',
+  reload: 'Recharger le jeu',
+  retrySave: 'Réessayer la sauvegarde',
+  saving: 'Protection de votre progression…',
+
   pageTitle: 'Posto',
   title: 'Posto',
   subtitle: 'Tenez la grille. Déplacez, puis frappez.',
@@ -170,6 +226,20 @@ const fr: typeof en = {
 };
 
 const de: typeof en = {
+  resume: 'Partie fortsetzen',
+  loadSaved: 'Spielstand laden',
+  exportSave: 'Spielstand exportieren',
+  storageUnavailable:
+    'Speichern in diesem Browser fehlgeschlagen. Lass diesen Tab geöffnet und exportiere eine Datei, bevor du ihn verlässt. Speichere erfolgreich, bevor du die Welt wechselst.',
+  operationFailed: 'Die Aktion ist fehlgeschlagen. Deine aktuelle Partie ist weiterhin verfügbar.',
+  invalidSave:
+    'Diese Datei ist kein gültiger Spielstand für dieses Spiel. Deine aktuelle Partie wurde nicht ersetzt.',
+  bootFailed:
+    'Das Spiel konnte nicht starten oder reagiert nicht mehr. Lade neu, um den letzten Spielstand wiederherzustellen.',
+  reload: 'Spiel neu laden',
+  retrySave: 'Erneut speichern',
+  saving: 'Dein Fortschritt wird gesichert…',
+
   pageTitle: 'Posto',
   title: 'Posto',
   subtitle: 'Halte das Feld. Bewege dich, dann schlage zu.',

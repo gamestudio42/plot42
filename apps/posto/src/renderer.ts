@@ -70,6 +70,7 @@ export class PostoRenderer {
   private hover: Point | null = null;
   private onTile: ((x: number, y: number) => void) | null = null;
   private initialized = false;
+  private savedCamera: { x: number; y: number; zoom: number } | null = null;
   private destroyed = false;
   private inputEnabled = true;
   private attract: { time: number; still: boolean } | null = null;
@@ -112,16 +113,21 @@ export class PostoRenderer {
     this.inputEnabled = enabled;
   }
 
-  setAttract(on: boolean): void {
+  setAttract(on: boolean, restoreCamera = false): void {
     if (on === (this.attract !== null)) return;
     if (on) {
+      this.savedCamera = { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom };
       this.attract = { time: 0, still: prefersReducedMotion() };
       this.keys.clear();
       this.panning = null;
       this.hover = null;
     } else {
       this.attract = null;
-      if (this.outcome === 'playing') this.camera.zoom = 1;
+      if (restoreCamera && this.savedCamera) {
+        this.camera.centerOn(this.savedCamera.x, this.savedCamera.y);
+      }
+      if (this.outcome === 'playing')
+        this.camera.zoom = restoreCamera ? (this.savedCamera?.zoom ?? 1) : 1;
     }
   }
 
@@ -272,7 +278,8 @@ export class PostoRenderer {
     for (const step of STEPS) {
       const x = selected.x + step.x;
       const y = selected.y + step.y;
-      if (!this.heights || x < 0 || y < 0 || x >= this.heights.size || y >= this.heights.size) continue;
+      if (!this.heights || x < 0 || y < 0 || x >= this.heights.size || y >= this.heights.size)
+        continue;
       const other = this.occupant(x, y);
       if (!other) move.push({ x, y });
       else if (other.side === 'enemy') attack.push({ x, y });
