@@ -22,6 +22,39 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 export const LOCALE_KEY = 'mata.locale';
 
 const en = {
+  guideTitle: 'Give the grove a chance',
+  guideIntro:
+    'The season is paused. Plan your planting before time starts. You can pause again at any time.',
+  guideStep1: 'Start with grass on sunny ground. Inspect water and soil before spending seeds.',
+  guideStep2:
+    'Ingá feeds its neighbors. Established crowns provide shade for ferns. Keep cacti in the sun.',
+  guideStep3:
+    'Water the most vulnerable plants and keep a reserve for the drought. Planting and watering also work while paused.',
+  guideGoal:
+    'At the end of the drought, keep at least {plants} plants, {kinds} species and {balance} balance.',
+  guideTiming:
+    'Drought begins on day {start}; the result arrives on day {end}. A full season lasts about six minutes at 1×.',
+  guideAction: 'Plan my grove',
+  help: 'Field guide',
+  day: 'Day {n}',
+  objective: 'Restoration goal',
+  retry: 'Try this seed again',
+  progress: '{plants} plants · {kinds} species · {balance} balance',
+
+  resume: 'Resume session',
+  loadSaved: 'Load checkpoint',
+  exportSave: 'Export save',
+  storageUnavailable:
+    'Progress could not be saved in this browser. Keep this tab open and export a file before leaving. Saving must succeed before switching worlds.',
+  operationFailed: 'The action could not be completed. Your current session is still available.',
+  invalidSave:
+    'This file is not a valid save for this game. Your current session has not been replaced.',
+  bootFailed:
+    'The game could not start or stopped responding. Reload to recover your last checkpoint.',
+  reload: 'Reload game',
+  retrySave: 'Retry saving',
+  saving: 'Protecting your progress…',
+
   pageTitle: 'Mata',
   title: 'Mata',
   subtitle: 'Restore a scar. The grove decides if it lives.',
@@ -109,6 +142,40 @@ const en = {
 };
 
 const ptBR: typeof en = {
+  guideTitle: 'Dê uma chance à mata',
+  guideIntro:
+    'A estação está pausada. Planeje o plantio antes de iniciar o tempo. Você pode pausar novamente quando quiser.',
+  guideStep1:
+    'Comece com capim em áreas de sol. Inspecione a água e o solo antes de gastar sementes.',
+  guideStep2:
+    'O ingá alimenta os vizinhos. Copas desenvolvidas dão sombra às samambaias. Deixe os cactos no sol.',
+  guideStep3:
+    'Regue as plantas mais vulneráveis e reserve água para a seca. Você também pode plantar e regar com o tempo pausado.',
+  guideGoal:
+    'Ao fim da seca, mantenha pelo menos {plants} plantas, {kinds} espécies e {balance} de equilíbrio.',
+  guideTiming:
+    'A seca começa no dia {start}; o resultado chega no dia {end}. A estação completa dura cerca de seis minutos em 1×.',
+  guideAction: 'Planejar minha mata',
+  help: 'Guia de campo',
+  day: 'Dia {n}',
+  objective: 'Meta de restauração',
+  retry: 'Tentar novamente nesta semente',
+  progress: '{plants} plantas · {kinds} espécies · {balance} de equilíbrio',
+
+  resume: 'Retomar partida',
+  loadSaved: 'Carregar checkpoint',
+  exportSave: 'Exportar partida',
+  storageUnavailable:
+    'Não foi possível salvar neste navegador. Mantenha esta aba aberta e exporte um arquivo antes de sair. É necessário salvar para trocar de mundo.',
+  operationFailed: 'Não foi possível concluir a ação. Sua partida atual continua disponível.',
+  invalidSave:
+    'Este arquivo não é um save válido deste jogo. Sua partida atual não foi substituída.',
+  bootFailed:
+    'O jogo não iniciou ou parou de responder. Recarregue para recuperar o último checkpoint.',
+  reload: 'Recarregar jogo',
+  retrySave: 'Tentar salvar novamente',
+  saving: 'Protegendo seu progresso…',
+
   pageTitle: 'Mata',
   title: 'Mata',
   subtitle: 'Restaure uma cicatriz. O bosque decide se vive.',
@@ -196,6 +263,39 @@ const ptBR: typeof en = {
 };
 
 const es: typeof en = {
+  guideTitle: 'Dale una oportunidad al bosque',
+  guideIntro:
+    'La estación está en pausa. Planifica antes de iniciar el tiempo. Puedes volver a pausar cuando quieras.',
+  guideStep1: 'Empieza con hierba al sol. Inspecciona el agua y el suelo antes de gastar semillas.',
+  guideStep2:
+    'El ingá alimenta a sus vecinos. Las copas maduras dan sombra a los helechos. Mantén los cactus al sol.',
+  guideStep3:
+    'Riega las plantas vulnerables y reserva agua para la sequía. También puedes plantar y regar en pausa.',
+  guideGoal:
+    'Al terminar la sequía, conserva al menos {plants} plantas, {kinds} especies y {balance} de equilibrio.',
+  guideTiming:
+    'La sequía empieza el día {start}; el resultado llega el día {end}. Una estación dura unos seis minutos a 1×.',
+  guideAction: 'Planificar mi bosque',
+  help: 'Guía de campo',
+  day: 'Día {n}',
+  objective: 'Meta de restauración',
+  retry: 'Reintentar esta semilla',
+  progress: '{plants} plantas · {kinds} especies · {balance} de equilibrio',
+
+  resume: 'Reanudar partida',
+  loadSaved: 'Cargar punto de guardado',
+  exportSave: 'Exportar partida',
+  storageUnavailable:
+    'No se pudo guardar en este navegador. Mantén esta pestaña abierta y exporta un archivo antes de salir. Debes guardar antes de cambiar de mundo.',
+  operationFailed: 'No se pudo completar la acción. Tu partida actual sigue disponible.',
+  invalidSave:
+    'Este archivo no es una partida válida para este juego. Tu partida actual no se ha reemplazado.',
+  bootFailed:
+    'El juego no pudo iniciarse o dejó de responder. Recarga para recuperar el último guardado.',
+  reload: 'Recargar juego',
+  retrySave: 'Reintentar guardado',
+  saving: 'Protegiendo tu progreso…',
+
   pageTitle: 'Mata',
   title: 'Mata',
   subtitle: 'Restaura una cicatriz. El bosque decide si vive.',
@@ -283,6 +383,40 @@ const es: typeof en = {
 };
 
 const fr: typeof en = {
+  guideTitle: 'Donnez une chance au bosquet',
+  guideIntro:
+    'La saison est en pause. Préparez vos plantations avant de lancer le temps. Vous pouvez toujours remettre en pause.',
+  guideStep1:
+    'Commencez par des herbes au soleil. Inspectez l’eau et le sol avant de dépenser des graines.',
+  guideStep2:
+    'L’ingá nourrit ses voisins. Les couronnes adultes ombragent les fougères. Gardez les cactus au soleil.',
+  guideStep3:
+    'Arrosez les plantes fragiles et gardez de l’eau pour la sécheresse. Planter et arroser restent possibles en pause.',
+  guideGoal:
+    'À la fin de la sécheresse, gardez au moins {plants} plantes, {kinds} espèces et {balance} d’équilibre.',
+  guideTiming:
+    'La sécheresse commence au jour {start}; le résultat arrive au jour {end}. Une saison dure environ six minutes à 1×.',
+  guideAction: 'Préparer mon bosquet',
+  help: 'Guide de terrain',
+  day: 'Jour {n}',
+  objective: 'Objectif de restauration',
+  retry: 'Réessayer cette graine',
+  progress: '{plants} plantes · {kinds} espèces · {balance} d’équilibre',
+
+  resume: 'Reprendre la partie',
+  loadSaved: 'Charger la sauvegarde',
+  exportSave: 'Exporter la partie',
+  storageUnavailable:
+    'Impossible de sauvegarder dans ce navigateur. Gardez cet onglet ouvert et exportez un fichier avant de quitter. La sauvegarde doit réussir avant de changer de monde.',
+  operationFailed: 'Cette action a échoué. Votre partie actuelle reste disponible.',
+  invalidSave:
+    'Ce fichier ne contient pas une sauvegarde valide pour ce jeu. Votre partie actuelle est conservée.',
+  bootFailed:
+    'Le jeu ne démarre pas ou ne répond plus. Rechargez pour récupérer la dernière sauvegarde.',
+  reload: 'Recharger le jeu',
+  retrySave: 'Réessayer la sauvegarde',
+  saving: 'Protection de votre progression…',
+
   pageTitle: 'Mata',
   title: 'Mata',
   subtitle: 'Réparez une cicatrice. Le bosquet décide s’il vit.',
@@ -370,6 +504,40 @@ const fr: typeof en = {
 };
 
 const de: typeof en = {
+  guideTitle: 'Gib dem Hain eine Chance',
+  guideIntro:
+    'Die Saison ist pausiert. Plane die Bepflanzung, bevor du die Zeit startest. Du kannst jederzeit wieder pausieren.',
+  guideStep1:
+    'Beginne mit Gras auf sonnigem Boden. Prüfe Wasser und Boden, bevor du Samen verbrauchst.',
+  guideStep2:
+    'Ingá versorgt Nachbarn mit Nährstoffen. Ausgewachsene Kronen beschatten Farne. Kakteen brauchen Sonne.',
+  guideStep3:
+    'Bewässere gefährdete Pflanzen und spare Wasser für die Dürre. Pflanzen und Gießen funktionieren auch in der Pause.',
+  guideGoal:
+    'Erhalte bis zum Ende der Dürre mindestens {plants} Pflanzen, {kinds} Arten und {balance} Gleichgewicht.',
+  guideTiming:
+    'Die Dürre beginnt an Tag {start}; das Ergebnis kommt an Tag {end}. Eine Saison dauert bei 1× etwa sechs Minuten.',
+  guideAction: 'Meinen Hain planen',
+  help: 'Feldhandbuch',
+  day: 'Tag {n}',
+  objective: 'Renaturierungsziel',
+  retry: 'Diesen Startwert erneut versuchen',
+  progress: '{plants} Pflanzen · {kinds} Arten · {balance} Gleichgewicht',
+
+  resume: 'Partie fortsetzen',
+  loadSaved: 'Spielstand laden',
+  exportSave: 'Spielstand exportieren',
+  storageUnavailable:
+    'Speichern in diesem Browser fehlgeschlagen. Lass diesen Tab geöffnet und exportiere eine Datei, bevor du ihn verlässt. Speichere erfolgreich, bevor du die Welt wechselst.',
+  operationFailed: 'Die Aktion ist fehlgeschlagen. Deine aktuelle Partie ist weiterhin verfügbar.',
+  invalidSave:
+    'Diese Datei ist kein gültiger Spielstand für dieses Spiel. Deine aktuelle Partie wurde nicht ersetzt.',
+  bootFailed:
+    'Das Spiel konnte nicht starten oder reagiert nicht mehr. Lade neu, um den letzten Spielstand wiederherzustellen.',
+  reload: 'Spiel neu laden',
+  retrySave: 'Erneut speichern',
+  saving: 'Dein Fortschritt wird gesichert…',
+
   pageTitle: 'Mata',
   title: 'Mata',
   subtitle: 'Heile eine Narbe. Der Hain entscheidet, ob er lebt.',

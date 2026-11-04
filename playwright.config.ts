@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4180;
+const PORT = Number(process.env.E2E_PORT ?? 4180);
+const BASE_PATH = (process.env.BASE_PATH ?? '/').replace(/\/?$/, '/');
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -10,7 +11,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: `http://localhost:${PORT}${BASE_PATH}`,
     trace: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
   },

@@ -39,6 +39,18 @@ Urbe, Sítio, Neo Urbe, Urbe Oasis and Vazante are published from their own repo
 [vazante](https://github.com/gamestudio42/vazante)). This site links to
 them and does not contain their source.
 
+## Playing and keeping progress
+
+Horta, Posto and Mata checkpoint each world separately in this browser. Use
+**Resume session** to return from the menu without rewinding; **Continue** after
+reloading restores the last checkpoint. Export a save file for a portable backup.
+If browser storage fails, keep the tab open and export before leaving. See
+[session recovery](docs/architecture.md#session-recovery) for checkpoint guarantees.
+
+Mata starts paused with a field guide. Plan your grove, then choose a speed.
+A season lasts about six minutes at 1×; planting and watering also work while
+paused. The restoration goal and drought timeline remain available during play.
+
 ## Develop
 
 ```sh
@@ -54,7 +66,7 @@ Or with Docker: `docker compose up` serves the lobby on port 5176.
 | Command             | Description                                     |
 | ------------------- | ----------------------------------------------- |
 | `pnpm check`        | Lint, type check, unit tests and the site build |
-| `pnpm test:e2e`     | Playwright test for the lobby                   |
+| `pnpm test:e2e`     | Lobby and game-session browser tests            |
 | `pnpm build:site`   | Lobby + Horta, Posto and Mata into `site/`      |
 | `pnpm preview:site` | Serve `site/` on http://localhost:4173          |
 

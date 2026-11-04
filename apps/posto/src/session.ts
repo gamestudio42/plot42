@@ -1,12 +1,6 @@
 import { POSTO_SAVE_EXTENSION, type Outcome, type PostoStats } from '@posto/sim';
-import {
-  AUTOSAVE_ID,
-  SaveStore,
-  slugFileName,
-  Store,
-  type SfxBoard,
-  type ToastItem,
-} from '@shell/chrome';
+import { SaveStore, slugFileName, Store, type SfxBoard, type ToastItem } from '@shell/chrome';
+import { isTyping } from '@shell/view-iso';
 import { createPostoAudio, postoDrone, type PostoSound } from './audio';
 import { PostoClient } from './client';
 import { applyDocumentLocale, bootLocale, catalog, persistLocale, type Locale } from './i18n';
@@ -30,6 +24,10 @@ export interface PostoSaveSlot {
 export interface PostoUi {
   boot: BootState;
   screen: Screen;
+  hasSession: boolean;
+  busy: boolean;
+  saveError: boolean;
+  bootError: boolean;
   stats: PostoStats | null;
   selectedId: number | null;
   toasts: ToastItem[];
@@ -46,6 +44,10 @@ export class PostoSession {
   readonly ui = new Store<PostoUi>({
     boot: { step: 'graphics', progress: 0 },
     screen: 'menu',
+    hasSession: false,
+    busy: false,
+    saveError: false,
+    bootError: false,
     stats: null,
     selectedId: null,
     toasts: [],
@@ -59,6 +61,11 @@ export class PostoSession {
   readonly renderer = new PostoRenderer();
   readonly sfx: SfxBoard<PostoSound>;
   private toastSeq = 1;
+  private activeSlotId: string | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
+  private pendingSaves = 0;
+  private disposed = false;
+  private autosaveTimer: ReturnType<typeof setInterval> | undefined;
   private lastOutcome: Outcome = 'playing';
   private readonly keys = new AbortController();
 
@@ -77,15 +84,17 @@ export class PostoSession {
         this.ui.set({ stats });
         this.announceOutcome(stats.outcome);
       },
-      onError: (message) => {
-        this.sfx.play('error');
-        this.toast('error', message);
+      onError: () => {
+        if (this.disposed) return;
+        this.ui.set({ bootError: true });
+        this.renderer.setInputEnabled(false);
       },
     });
-    this.renderer.setOnTile((x, y) => void this.handleTile(x, y));
+    this.renderer.setOnTile((x, y) => void this.handleTile(x, y).catch(() => this.reportError()));
     window.addEventListener(
       'keydown',
       (event) => {
+        if (isTyping(event)) return;
         if (event.key === 'm' || event.key === 'M') {
           if (event.ctrlKey || event.metaKey || event.altKey) return;
           this.setMuted(!this.ui.get().muted);
@@ -98,10 +107,39 @@ export class PostoSession {
   async boot(host: HTMLElement): Promise<void> {
     this.ui.set({ boot: { step: 'graphics', progress: 0.2 } });
     await this.renderer.init(host);
+    if (this.disposed) return;
     this.ui.set({ boot: { step: 'outpost', progress: 0.6 } });
     await this.startMenuOutpost();
     await this.refreshSaves();
     this.ui.set({ boot: { step: 'done', progress: 1 } });
+    this.autosaveTimer = setInterval(() => {
+      if (this.ui.get().screen === 'game' && !this.ui.get().busy && !this.ui.get().bootError)
+        void this.save(false);
+    }, 10_000);
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (
+          document.hidden &&
+          this.activeSlotId &&
+          !this.ui.get().busy &&
+          !this.ui.get().bootError
+        ) {
+          void this.save(false);
+        }
+      },
+      { signal: this.keys.signal },
+    );
+    window.addEventListener(
+      'beforeunload',
+      (event) => {
+        if (this.activeSlotId && (this.pendingSaves > 0 || this.ui.get().saveError)) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      },
+      { signal: this.keys.signal },
+    );
   }
 
   setLocale(locale: Locale): void {
@@ -125,50 +163,105 @@ export class PostoSession {
   }
 
   async newGame(): Promise<void> {
-    const { name, seed } = this.ui.get();
-    this.select(null);
-    this.lastOutcome = 'playing';
-    this.renderer.setAttract(false);
+    await this.transition(async () => {
+      const { name, seed } = this.ui.get();
+      this.select(null);
+      this.lastOutcome = 'playing';
+      this.renderer.setAttract(false);
+      this.renderer.setInputEnabled(true);
+      this.renderer.setOutcome('playing');
+      await this.client.newGame({ name: name || 'Posto', seed: seed || 'posto' });
+      this.ui.set({ screen: 'game' });
+      this.activeSlotId = crypto.randomUUID();
+      this.ui.set({ hasSession: true });
+      this.applyDrone();
+      await this.save(false);
+    });
+  }
+
+  resume(): void {
+    if (!this.activeSlotId || this.ui.get().busy) return;
+    this.renderer.setAttract(false, true);
     this.renderer.setInputEnabled(true);
-    this.renderer.setOutcome('playing');
-    await this.client.newGame({ name: name || 'Posto', seed: seed || 'posto' });
     this.ui.set({ screen: 'game' });
     this.applyDrone();
   }
 
   async continueLatest(): Promise<void> {
+    if (this.activeSlotId) {
+      this.resume();
+      return;
+    }
     const latest = this.ui.get().saves[0];
-    if (!latest) return;
-    await this.loadSlot(latest.id);
+    if (latest) await this.loadSlot(latest.id);
   }
 
   async loadSlot(id: string): Promise<void> {
-    const text = await store.read(id);
-    await this.loadFile(text);
+    if (id === this.activeSlotId) {
+      this.resume();
+      return;
+    }
+    await this.transition(async () => {
+      const text = await store.read(id);
+      await this.importWorld(text, id);
+    });
   }
 
-  async save(): Promise<void> {
-    const { text, meta } = await this.client.exportSave(new Date().toISOString());
-    await store.write(
-      {
-        id: AUTOSAVE_ID,
-        savedAt: meta.savedAt,
-        name: meta.name,
-        autosave: true,
-        bytes: text.length,
-      },
-      text,
-    );
-    await this.refreshSaves();
-    this.sfx.play('save');
-    this.toast('info', catalog(this.ui.get().locale).saved);
+  async save(notify = true): Promise<boolean> {
+    if (notify && this.ui.get().busy) return false;
+    const id = this.activeSlotId;
+    if (!id || this.disposed) return true;
+    this.pendingSaves++;
+    const task = this.saveQueue.then(async () => {
+      try {
+        if (this.disposed) return false;
+        const { text, meta } = await this.client.exportSave(new Date().toISOString());
+        await store.write(
+          {
+            id,
+            savedAt: meta.savedAt,
+            name: meta.name,
+            autosave: !notify,
+            bytes: new Blob([text]).size,
+          },
+          text,
+        );
+        if (this.disposed) return true;
+        this.ui.set({ saveError: false });
+        await this.refreshSaves();
+        if (notify) {
+          this.sfx.play('save');
+          this.toast('info', catalog(this.ui.get().locale).saved);
+        }
+        return true;
+      } catch {
+        if (!this.disposed) this.ui.set({ saveError: true });
+        return false;
+      } finally {
+        this.pendingSaves--;
+      }
+    });
+    this.saveQueue = task.then(() => undefined);
+    return task;
   }
 
   async loadFile(text: string): Promise<void> {
+    await this.transition(() => this.importWorld(text, crypto.randomUUID()));
+  }
+
+  async openFile(file: File): Promise<void> {
+    try {
+      await this.loadFile(await file.text());
+    } catch {
+      this.reportError();
+    }
+  }
+
+  private async importWorld(text: string, id: string): Promise<void> {
     const result = await this.client.importSave(text);
     if (!result.ok) {
       this.sfx.play('error');
-      this.toast('error', result.errors[0]?.code ?? 'INVALID');
+      this.toast('error', catalog(this.ui.get().locale).invalidSave);
       return;
     }
     this.select(null);
@@ -178,27 +271,57 @@ export class PostoSession {
     this.renderer.setOutcome(result.meta.outcome);
     this.ui.set({ screen: 'game', name: result.meta.name, seed: result.meta.seed });
     this.applyDrone();
+    this.activeSlotId = id;
+    this.ui.set({ hasSession: true });
+    await this.save(false);
     this.toast('info', catalog(this.ui.get().locale).loaded);
   }
 
   exportFile(): void {
-    void this.client.exportSave(new Date().toISOString()).then(({ text, meta }) => {
-      const blob = new Blob([text], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = slugFileName(meta.name, POSTO_SAVE_EXTENSION, 'posto');
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    void this.client
+      .exportSave(new Date().toISOString())
+      .then(({ text, meta }) => {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = slugFileName(meta.name, POSTO_SAVE_EXTENSION, 'posto');
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      })
+      .catch(() => this.reportError());
   }
 
   backToMenu(): void {
+    if (this.ui.get().busy) return;
     this.select(null);
     this.renderer.setInputEnabled(false);
     this.renderer.setAttract(true);
     this.ui.set({ screen: 'menu' });
     this.applyDrone();
+    void this.save(false);
+  }
+
+  private async transition(action: () => Promise<void>): Promise<void> {
+    if (this.ui.get().busy || this.ui.get().bootError) return;
+    this.ui.set({ busy: true });
+    this.renderer.setInputEnabled(false);
+    try {
+      // Do not replace an active world unless its checkpoint has committed.
+      if (this.activeSlotId && !(await this.save(false))) return;
+      await action();
+    } catch {
+      this.reportError();
+    } finally {
+      if (!this.disposed) {
+        this.ui.set({ busy: false });
+        this.renderer.setInputEnabled(this.ui.get().screen === 'game' && !this.ui.get().bootError);
+      }
+    }
+  }
+
+  private reportError(): void {
+    if (!this.disposed) this.toast('error', catalog(this.ui.get().locale).operationFailed);
   }
 
   toast(kind: ToastItem['kind'], message: string): void {
@@ -212,6 +335,8 @@ export class PostoSession {
   }
 
   dispose(): void {
+    this.disposed = true;
+    clearInterval(this.autosaveTimer);
     this.keys.abort();
     this.sfx.dispose();
     this.client.dispose();
@@ -229,7 +354,7 @@ export class PostoSession {
     try {
       this.ui.set({ saves: await store.list() });
     } catch {
-      this.ui.set({ saves: [] });
+      this.ui.set({ saveError: true });
     }
   }
 
@@ -263,6 +388,7 @@ export class PostoSession {
   }
 
   private async handleTile(x: number, y: number): Promise<void> {
+    if (this.ui.get().busy || this.ui.get().screen !== 'game' || this.ui.get().bootError) return;
     if (this.client.stats?.outcome !== 'playing') return;
     const occupant = this.client.units.find((unit) => unit.hp > 0 && unit.x === x && unit.y === y);
     const selected = this.client.units.find((unit) => unit.id === this.ui.get().selectedId);
@@ -279,7 +405,10 @@ export class PostoSession {
           targetId: occupant.id,
         });
         if (!result.ok) this.sfx.play('error');
-        else this.sfx.play('attack');
+        else {
+          this.sfx.play('attack');
+          void this.save(false);
+        }
         const still = this.client.units.find((unit) => unit.id === selected.id);
         this.select(still && still.hp > 0 ? still.id : null);
         return;
@@ -287,7 +416,10 @@ export class PostoSession {
       if (!occupant) {
         const result = await this.client.command({ type: 'move', unitId: selected.id, x, y });
         if (!result.ok) this.sfx.play('error');
-        else this.sfx.play('move');
+        else {
+          this.sfx.play('move');
+          void this.save(false);
+        }
         return;
       }
     }

@@ -10,14 +10,7 @@ import {
   type MataTool,
   type TileFacts,
 } from '@mata/sim';
-import {
-  AUTOSAVE_ID,
-  SaveStore,
-  slugFileName,
-  Store,
-  type SfxBoard,
-  type ToastItem,
-} from '@shell/chrome';
+import { SaveStore, slugFileName, Store, type SfxBoard, type ToastItem } from '@shell/chrome';
 import { isTyping } from '@shell/view-iso';
 import { createMataAudio, mataDrone, type MataSound } from './audio';
 import { MataClient } from './client';
@@ -42,6 +35,11 @@ export interface MataSaveSlot {
 export interface MataUi {
   boot: BootState;
   screen: Screen;
+  hasSession: boolean;
+  busy: boolean;
+  saveError: boolean;
+  bootError: boolean;
+  guideOpen: boolean;
   speed: MataSpeed;
   stats: MataStats | null;
   toasts: ToastItem[];
@@ -71,6 +69,11 @@ export class MataSession {
   readonly ui = new Store<MataUi>({
     boot: { step: 'graphics', progress: 0 },
     screen: 'menu',
+    hasSession: false,
+    busy: false,
+    saveError: false,
+    bootError: false,
+    guideOpen: false,
     speed: 1,
     stats: null,
     toasts: [],
@@ -87,6 +90,11 @@ export class MataSession {
   readonly renderer = new MataRenderer();
   readonly sfx: SfxBoard<MataSound>;
   private toastSeq = 1;
+  private activeSlotId: string | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
+  private pendingSaves = 0;
+  private disposed = false;
+  private autosaveTimer: ReturnType<typeof setInterval> | undefined;
   private readonly keys = new AbortController();
   private sawWarned = false;
   private sawDrought = false;
@@ -109,12 +117,15 @@ export class MataSession {
         this.ui.set({ stats });
         this.announce(stats);
       },
-      onError: (message) => {
-        this.sfx.play('error');
-        this.toast('error', message);
+      onError: () => {
+        if (this.disposed) return;
+        this.ui.set({ bootError: true });
+        this.renderer.setInputEnabled(false);
       },
     });
-    this.renderer.setOnPlot((x, y, clear) => void this.handlePlot(x, y, clear));
+    this.renderer.setOnPlot(
+      (x, y, clear) => void this.handlePlot(x, y, clear).catch(() => this.reportError()),
+    );
     this.renderer.setOnHover((tile) => {
       if (!tile) {
         this.ui.set({ inspect: null });
@@ -128,10 +139,40 @@ export class MataSession {
   async boot(host: HTMLElement): Promise<void> {
     this.ui.set({ boot: { step: 'graphics', progress: 0.2 } });
     await this.renderer.init(host);
+    if (this.disposed) return;
     this.ui.set({ boot: { step: 'grove', progress: 0.55 } });
     await this.startMenuGrove();
     await this.refreshSaves();
     this.ui.set({ boot: { step: 'done', progress: 1 } });
+    this.autosaveTimer = setInterval(() => {
+      if (this.ui.get().screen === 'game' && !this.ui.get().busy && !this.ui.get().bootError)
+        void this.save(false);
+    }, 10_000);
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (
+          document.hidden &&
+          this.activeSlotId &&
+          !this.ui.get().busy &&
+          !this.ui.get().bootError
+        ) {
+          this.setSpeed(0);
+          void this.save(false);
+        }
+      },
+      { signal: this.keys.signal },
+    );
+    window.addEventListener(
+      'beforeunload',
+      (event) => {
+        if (this.activeSlotId && (this.pendingSaves > 0 || this.ui.get().saveError)) {
+          event.preventDefault();
+          event.returnValue = '';
+        }
+      },
+      { signal: this.keys.signal },
+    );
   }
 
   setLocale(locale: Locale): void {
@@ -155,10 +196,20 @@ export class MataSession {
   }
 
   setSpeed(speed: MataSpeed): void {
+    if (this.ui.get().guideOpen && speed !== 0) return;
     const outcome = this.ui.get().stats?.outcome;
     const next = outcome && outcome !== 'playing' ? 0 : speed;
     this.ui.set({ speed: next });
     this.client.setSpeed(next);
+  }
+
+  openGuide(): void {
+    this.setSpeed(0);
+    this.ui.set({ guideOpen: true });
+  }
+
+  closeGuide(): void {
+    this.ui.set({ guideOpen: false });
   }
 
   setTool(tool: MataTool): void {
@@ -177,58 +228,112 @@ export class MataSession {
   }
 
   async newGame(): Promise<void> {
-    const { name, seed } = this.ui.get();
-    this.sawWarned = false;
-    this.sawDrought = false;
-    this.sawOutcome = false;
-    this.renderer.setAttract(false);
-    this.renderer.setInputEnabled(true);
-    await this.client.newGame({
-      name: name || 'Mata',
-      seed: seed || 'mata',
-      size: MATA_SIZE_DEFAULT,
-      preset: 'wild',
+    await this.transition(async () => {
+      const { name, seed } = this.ui.get();
+      this.sawWarned = false;
+      this.sawDrought = false;
+      this.sawOutcome = false;
+      this.renderer.setAttract(false);
+      this.renderer.setInputEnabled(true);
+      await this.client.newGame({
+        name: name || 'Mata',
+        seed: seed || 'mata',
+        size: MATA_SIZE_DEFAULT,
+        preset: 'wild',
+      });
+      this.renderer.setInputEnabled(true);
+      this.setSpeed(0);
+      this.ui.set({ screen: 'game', inspect: null, guideOpen: true });
+      this.activeSlotId = crypto.randomUUID();
+      this.ui.set({ hasSession: true });
+      this.applyDrone();
+      await this.save(false);
     });
+  }
+
+  resume(): void {
+    if (!this.activeSlotId || this.ui.get().busy) return;
+    this.renderer.setAttract(false, true);
     this.renderer.setInputEnabled(true);
-    this.setSpeed(1);
-    this.ui.set({ screen: 'game', inspect: null });
+    this.ui.set({ screen: 'game' });
     this.applyDrone();
   }
 
   async continueLatest(): Promise<void> {
+    if (this.activeSlotId) {
+      this.resume();
+      return;
+    }
     const latest = this.ui.get().saves[0];
-    if (!latest) return;
-    const text = await store.read(latest.id);
-    await this.loadFile(text);
+    if (latest) await this.loadSlot(latest.id);
   }
 
   async loadSlot(id: string): Promise<void> {
-    const text = await store.read(id);
-    await this.loadFile(text);
+    if (id === this.activeSlotId) {
+      this.resume();
+      return;
+    }
+    await this.transition(async () => {
+      const text = await store.read(id);
+      await this.importWorld(text, id);
+    });
   }
 
-  async save(): Promise<void> {
-    const { text, meta } = await this.client.exportSave(new Date().toISOString());
-    await store.write(
-      {
-        id: AUTOSAVE_ID,
-        savedAt: meta.savedAt,
-        name: meta.name,
-        autosave: true,
-        bytes: text.length,
-      },
-      text,
-    );
-    await this.refreshSaves();
-    this.sfx.play('save');
-    this.toast('info', catalog(this.ui.get().locale).saved);
+  async save(notify = true): Promise<boolean> {
+    if (notify && this.ui.get().busy) return false;
+    const id = this.activeSlotId;
+    if (!id || this.disposed) return true;
+    this.pendingSaves++;
+    const task = this.saveQueue.then(async () => {
+      try {
+        if (this.disposed) return false;
+        const { text, meta } = await this.client.exportSave(new Date().toISOString());
+        await store.write(
+          {
+            id,
+            savedAt: meta.savedAt,
+            name: meta.name,
+            autosave: !notify,
+            bytes: new Blob([text]).size,
+          },
+          text,
+        );
+        if (this.disposed) return true;
+        this.ui.set({ saveError: false });
+        await this.refreshSaves();
+        if (notify) {
+          this.sfx.play('save');
+          this.toast('info', catalog(this.ui.get().locale).saved);
+        }
+        return true;
+      } catch {
+        if (!this.disposed) this.ui.set({ saveError: true });
+        return false;
+      } finally {
+        this.pendingSaves--;
+      }
+    });
+    this.saveQueue = task.then(() => undefined);
+    return task;
   }
 
   async loadFile(text: string): Promise<void> {
+    await this.transition(() => this.importWorld(text, crypto.randomUUID()));
+  }
+
+  async openFile(file: File): Promise<void> {
+    try {
+      await this.loadFile(await file.text());
+    } catch {
+      this.reportError();
+    }
+  }
+
+  private async importWorld(text: string, id: string): Promise<void> {
     const result = await this.client.importSave(text);
     if (!result.ok) {
       this.sfx.play('error');
-      this.toast('error', result.errors[0]?.code ?? 'INVALID');
+      this.toast('error', catalog(this.ui.get().locale).invalidSave);
       return;
     }
     this.sawWarned = result.meta.outcome !== 'playing';
@@ -239,27 +344,58 @@ export class MataSession {
     this.setSpeed(0);
     this.ui.set({ screen: 'game', name: result.meta.name, seed: result.meta.seed, inspect: null });
     this.applyDrone();
+    this.activeSlotId = id;
+    this.ui.set({ hasSession: true, guideOpen: result.meta.tick === 0 });
+    await this.save(false);
     this.toast('info', catalog(this.ui.get().locale).loaded);
   }
 
   exportFile(): void {
-    void this.client.exportSave(new Date().toISOString()).then(({ text, meta }) => {
-      const blob = new Blob([text], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = slugFileName(meta.name, MATA_SAVE_EXTENSION, 'mata');
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    void this.client
+      .exportSave(new Date().toISOString())
+      .then(({ text, meta }) => {
+        const blob = new Blob([text], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = slugFileName(meta.name, MATA_SAVE_EXTENSION, 'mata');
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      })
+      .catch(() => this.reportError());
   }
 
   backToMenu(): void {
+    if (this.ui.get().busy) return;
     this.setSpeed(0);
     this.renderer.setInputEnabled(false);
     this.renderer.setAttract(true);
     this.ui.set({ screen: 'menu', inspect: null });
     this.applyDrone();
+    void this.save(false);
+  }
+
+  private async transition(action: () => Promise<void>): Promise<void> {
+    if (this.ui.get().busy || this.ui.get().bootError) return;
+    this.ui.set({ busy: true });
+    this.renderer.setInputEnabled(false);
+    this.setSpeed(0);
+    try {
+      // Do not replace an active world unless its checkpoint has committed.
+      if (this.activeSlotId && !(await this.save(false))) return;
+      await action();
+    } catch {
+      this.reportError();
+    } finally {
+      if (!this.disposed) {
+        this.ui.set({ busy: false });
+        this.renderer.setInputEnabled(this.ui.get().screen === 'game' && !this.ui.get().bootError);
+      }
+    }
+  }
+
+  private reportError(): void {
+    if (!this.disposed) this.toast('error', catalog(this.ui.get().locale).operationFailed);
   }
 
   toast(kind: ToastItem['kind'], message: string): void {
@@ -273,6 +409,8 @@ export class MataSession {
   }
 
   dispose(): void {
+    this.disposed = true;
+    clearInterval(this.autosaveTimer);
     this.keys.abort();
     this.sfx.dispose();
     this.client.dispose();
@@ -280,7 +418,12 @@ export class MataSession {
   }
 
   private async startMenuGrove(): Promise<void> {
-    await this.client.newGame({ name: 'Mata', seed: 'mata-menu', size: MATA_SIZE_DEFAULT, preset: 'menu' });
+    await this.client.newGame({
+      name: 'Mata',
+      seed: 'mata-menu',
+      size: MATA_SIZE_DEFAULT,
+      preset: 'menu',
+    });
     this.setSpeed(1);
     this.renderer.setInputEnabled(false);
     this.renderer.setAttract(true);
@@ -291,7 +434,7 @@ export class MataSession {
     try {
       this.ui.set({ saves: await store.list() });
     } catch {
-      this.ui.set({ saves: [] });
+      this.ui.set({ saveError: true });
     }
   }
 
@@ -325,6 +468,7 @@ export class MataSession {
       this.setSpeed(0);
       this.renderer.setInputEnabled(false);
       this.sfx.play(stats.outcome === 'won' ? 'restore' : 'error');
+      void this.save(false);
     }
   }
 
@@ -349,16 +493,18 @@ export class MataSession {
   }
 
   private async handlePlot(x: number, y: number, shift: boolean): Promise<void> {
+    if (this.ui.get().busy || this.ui.get().screen !== 'game' || this.ui.get().bootError) return;
     if ((this.ui.get().stats?.outcome ?? 'playing') !== 'playing') return;
     const tool = this.ui.get().tool;
-    const command = shift || tool === 'clear'
-      ? ({ type: 'clear' as const, x, y })
-      : tool === 'water'
-        ? ({ type: 'water' as const, x, y })
-        : (() => {
-            const species = toolSpecies(tool);
-            return species ? { type: 'plant' as const, x, y, species } : null;
-          })();
+    const command =
+      shift || tool === 'clear'
+        ? { type: 'clear' as const, x, y }
+        : tool === 'water'
+          ? { type: 'water' as const, x, y }
+          : (() => {
+              const species = toolSpecies(tool);
+              return species ? { type: 'plant' as const, x, y, species } : null;
+            })();
     if (!command) return;
     const result = await this.client.command(command);
     if (!result.ok) {
@@ -366,5 +512,6 @@ export class MataSession {
       return;
     }
     this.sfx.play(command.type === 'plant' ? 'plant' : command.type);
+    void this.save(false);
   }
 }

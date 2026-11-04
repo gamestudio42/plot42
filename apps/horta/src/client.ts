@@ -37,6 +37,14 @@ export class HortaClient {
       type: 'module',
     });
     this.worker.onmessage = (event: MessageEvent<FromHortaMessage>) => this.handle(event.data);
+    this.worker.onerror = () => {
+      this.rpc.rejectAll(new Error('Worker failed'));
+      this.emit('onError', 'Worker failed');
+    };
+    this.worker.onmessageerror = () => {
+      this.rpc.rejectAll(new Error('Unreadable worker reply'));
+      this.emit('onError', 'Unreadable worker reply');
+    };
   }
 
   subscribe(listener: HortaListener): () => void {
@@ -88,6 +96,7 @@ export class HortaClient {
   }
 
   dispose(): void {
+    this.rpc.rejectAll(new Error('Session closed'));
     this.worker.terminate();
   }
 
@@ -111,6 +120,7 @@ export class HortaClient {
         this.applyDelta(message.delta);
         break;
       case 'error':
+        this.rpc.rejectAll(new Error(message.message));
         this.emit('onError', message.message);
         break;
       default:

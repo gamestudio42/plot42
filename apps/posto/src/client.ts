@@ -37,6 +37,14 @@ export class PostoClient {
       type: 'module',
     });
     this.worker.onmessage = (event: MessageEvent<FromPostoMessage>) => this.handle(event.data);
+    this.worker.onerror = () => {
+      this.rpc.rejectAll(new Error('Worker failed'));
+      this.emit('onError', 'Worker failed');
+    };
+    this.worker.onmessageerror = () => {
+      this.rpc.rejectAll(new Error('Unreadable worker reply'));
+      this.emit('onError', 'Unreadable worker reply');
+    };
   }
 
   subscribe(listener: PostoListener): () => void {
@@ -84,6 +92,7 @@ export class PostoClient {
   }
 
   dispose(): void {
+    this.rpc.rejectAll(new Error('Session closed'));
     this.worker.terminate();
   }
 
@@ -107,6 +116,7 @@ export class PostoClient {
         this.applyDelta(message.delta);
         break;
       case 'error':
+        this.rpc.rejectAll(new Error(message.message));
         this.emit('onError', message.message);
         break;
       default:

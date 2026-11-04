@@ -1,4 +1,9 @@
 import {
+  DROUGHT_START_TICK,
+  DROUGHT_END_TICK,
+  WIN_PLANTS,
+  WIN_UNIQUE,
+  WIN_BALANCE,
   MATA_OVERLAYS,
   MATA_TOOLS,
   SPECIES_KEY,
@@ -24,7 +29,7 @@ export function App() {
     if (!host) return;
     const next = new MataSession();
     setSession(next);
-    void next.boot(host);
+    void next.boot(host).catch(() => next.ui.set({ bootError: true }));
     return () => next.dispose();
   }, []);
 
@@ -39,10 +44,44 @@ export function App() {
 function Screens({ session }: { session: MataSession }) {
   const screen = useStore(session.ui, (s) => s.screen);
   const toasts = useStore(session.ui, (s) => s.toasts);
+  const saveError = useStore(session.ui, (s) => s.saveError);
+  const hasSession = useStore(session.ui, (s) => s.hasSession);
+  const busy = useStore(session.ui, (s) => s.busy);
+  const t = useStrings(session.ui);
   return (
     <>
       {screen === 'menu' ? <Menu session={session} /> : <GameHud session={session} />}
       <Toasts toasts={toasts} onDismiss={(id) => session.dismissToast(id)} />
+      {saveError ? (
+        <aside className="recovery-notice" role="alert" data-testid="storage-error">
+          <p>{t.storageUnavailable}</p>
+          {hasSession ? (
+            <div className="menu-actions">
+              <button
+                type="button"
+                className="button"
+                disabled={busy}
+                onClick={() => void session.save()}
+              >
+                {t.retrySave}
+              </button>
+              <button
+                type="button"
+                className="button"
+                data-testid="mata-export"
+                onClick={() => session.exportFile()}
+              >
+                {t.exportSave}
+              </button>
+            </div>
+          ) : null}
+        </aside>
+      ) : null}
+      {busy ? (
+        <div className="session-busy" role="status">
+          {t.saving}
+        </div>
+      ) : null}
       <BootScreen session={session} />
     </>
   );
@@ -57,6 +96,9 @@ function Menu({ session }: { session: MataSession }) {
   const saves = useStore(session.ui, (s) => s.saves ?? []);
   const boot = useStore(session.ui, (s) => s.boot);
   const latest = saves[0] ?? null;
+  const hasSession = useStore(session.ui, (s) => s.hasSession);
+  const activeName = useStore(session.ui, (s) => s.stats?.name);
+  const busy = useStore(session.ui, (s) => s.busy);
   if (boot.step !== 'done') return null;
   return (
     <div className="main-menu" data-testid="mata-menu">
@@ -83,29 +125,31 @@ function Menu({ session }: { session: MataSession }) {
         <p className="muted">{t.subtitle}</p>
         <label className="field">
           <span>{t.name}</span>
-          <input value={name} onChange={(e) => session.setName(e.target.value)} />
+          <input disabled={busy} value={name} onChange={(e) => session.setName(e.target.value)} />
         </label>
         <label className="field">
           <span>{t.seed}</span>
-          <input value={seed} onChange={(e) => session.setSeed(e.target.value)} />
+          <input disabled={busy} value={seed} onChange={(e) => session.setSeed(e.target.value)} />
         </label>
         <div className="menu-actions">
           <button
             type="button"
             className="button primary"
             data-testid="mata-new"
+            disabled={busy}
             onClick={() => void session.newGame()}
           >
             {t.newGame}
           </button>
-          {latest && (
+          {(hasSession || latest) && (
             <button
               type="button"
               className="button"
               data-testid="mata-continue"
+              disabled={busy}
               onClick={() => void session.continueLatest()}
             >
-              {t.continue}: {latest.name}
+              {hasSession ? t.resume : t.continue}: {hasSession ? activeName : latest?.name}
             </button>
           )}
         </div>
@@ -115,12 +159,13 @@ function Menu({ session }: { session: MataSession }) {
               {t.loadFile}
               <input
                 type="file"
+                disabled={busy}
                 accept=".json"
                 hidden
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  void file.text().then((text) => session.loadFile(text));
+                  void session.openFile(file);
                   e.target.value = '';
                 }}
               />
@@ -133,12 +178,17 @@ function Menu({ session }: { session: MataSession }) {
             <ul className="save-list">
               {saves.map((slot) => (
                 <li key={slot.id}>
-                  <div className="save-info">
+                  <div className="save-info" data-testid="save-slot">
                     <strong>{slot.name}</strong>
                     <div className="muted small">{slot.savedAt.slice(0, 10)}</div>
                   </div>
-                  <button type="button" className="button small" onClick={() => void session.loadSlot(slot.id)}>
-                    {t.continue}
+                  <button
+                    type="button"
+                    className="button small"
+                    disabled={busy}
+                    onClick={() => void session.loadSlot(slot.id)}
+                  >
+                    {t.loadSaved}
                   </button>
                 </li>
               ))}
@@ -164,18 +214,20 @@ function GameHud({ session }: { session: MataSession }) {
   const tool = useStore(session.ui, (s) => s.tool);
   const overlay = useStore(session.ui, (s) => s.overlay);
   const inspect = useStore(session.ui, (s) => s.inspect);
+  const guideOpen = useStore(session.ui, (s) => s.guideOpen);
   const cells = stats ? stats.size * stats.size : 1;
   const cover = stats ? Math.round((stats.planted * 100) / cells) : 0;
   return (
     <>
       <PauseOverlay
-        paused={speed === 0 && (!stats || stats.outcome === 'playing')}
+        paused={!guideOpen && speed === 0 && (!stats || stats.outcome === 'playing')}
         title={t.paused}
         hint={t.pausedHint}
       />
       <div className="hud" data-testid="mata-hud">
         <div className="hud-city">
           <strong>{stats?.name ?? t.title}</strong>
+          <span data-testid="mata-day">{t.day.replace('{n}', String(stats?.tick ?? 0))}</span>
           {stats?.outcome === 'won' ? <span className="badge-restored">{t.won}</span> : null}
           {stats?.phase === 'warned' || stats?.phase === 'drought' ? (
             <span className="badge-drought">{t.drought}</span>
@@ -183,7 +235,9 @@ function GameHud({ session }: { session: MataSession }) {
         </div>
         <div className="hud-stat hud-balance" data-testid="mata-balance">
           <span className="hud-label">{t.balance}</span>
-          <span className={`balance-value ${balanceClass(stats?.balance ?? 0)}`}>{stats?.balance ?? 0}</span>
+          <span className={`balance-value ${balanceClass(stats?.balance ?? 0)}`}>
+            {stats?.balance ?? 0}
+          </span>
           <span className="balance-bar" aria-hidden>
             <span style={{ width: `${stats?.balance ?? 0}%` }} />
           </span>
@@ -218,6 +272,9 @@ function GameHud({ session }: { session: MataSession }) {
               key={value}
               type="button"
               className={`button ${speed === value ? 'active' : ''}`}
+              data-testid={`mata-speed-${value}`}
+              aria-pressed={speed === value}
+              aria-label={value === 0 ? t.paused : `${value}×`}
               onClick={() => session.setSpeed(value)}
             >
               {value === 0 ? '❚❚' : `${value}×`}
@@ -230,17 +287,42 @@ function GameHud({ session }: { session: MataSession }) {
           soundOn={t.soundOn}
           soundOff={t.soundOff}
         />
-        <button type="button" className="button" onClick={() => void session.save()}>
+        <button
+          type="button"
+          className="button"
+          data-testid="mata-save"
+          onClick={() => void session.save()}
+        >
           {t.save}
         </button>
-        <button type="button" className="button" onClick={() => session.exportFile()}>
-          .json
+        <button
+          type="button"
+          className="button"
+          data-testid="mata-export"
+          onClick={() => session.exportFile()}
+        >
+          {t.exportSave}
         </button>
-        <button type="button" className="button" onClick={() => session.backToMenu()}>
+        <button
+          type="button"
+          className="button"
+          data-testid="mata-menu-button"
+          onClick={() => session.backToMenu()}
+        >
           {t.menu}
         </button>
       </div>
       <div className="desk">
+        <details className="objective" data-testid="mata-objective">
+          <summary>{t.objective}</summary>
+          <p>{goalText(t.guideGoal)}</p>
+          <p>
+            {t.progress
+              .replace('{plants}', String(stats?.planted ?? 0))
+              .replace('{kinds}', String(stats?.unique ?? 0))
+              .replace('{balance}', String(stats?.balance ?? 0))}
+          </p>
+        </details>
         <div className="toolbar" data-testid="mata-tools">
           {MATA_TOOLS.map((id) => (
             <button
@@ -324,6 +406,10 @@ function GameHud({ session }: { session: MataSession }) {
           </ul>
         </aside>
       ) : null}
+      <button type="button" className="button guide-button" onClick={() => session.openGuide()}>
+        {t.help}
+      </button>
+      <FieldGuide session={session} />
       <p className="hint">
         {stats?.phase === 'warned'
           ? t.droughtWarn.replace('{n}', String(stats.droughtIn))
@@ -335,6 +421,16 @@ function GameHud({ session }: { session: MataSession }) {
         <div className="outcome" data-testid="mata-outcome">
           <strong>{stats.outcome === 'won' ? t.won : t.lost}</strong>
           <p>{stats.outcome === 'won' ? t.wonHint : t.lostHint}</p>
+          <p>
+            {t.progress
+              .replace('{plants}', String(stats.planted))
+              .replace('{kinds}', String(stats.unique))
+              .replace('{balance}', String(stats.balance))}
+          </p>
+          <p>{goalText(t.guideGoal)}</p>
+          <button type="button" className="button primary" onClick={() => void session.newGame()}>
+            {t.retry}
+          </button>
           <button type="button" className="button primary" onClick={() => session.backToMenu()}>
             {t.menu}
           </button>
@@ -348,4 +444,54 @@ function balanceClass(value: number): string {
   if (value >= 70) return 'good';
   if (value >= 40) return 'mid';
   return 'bad';
+}
+
+function goalText(template: string): string {
+  return template
+    .replace('{plants}', String(WIN_PLANTS))
+    .replace('{kinds}', String(WIN_UNIQUE))
+    .replace('{balance}', String(WIN_BALANCE));
+}
+
+function FieldGuide({ session }: { session: MataSession }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const open = useStore(session.ui, (s) => s.guideOpen);
+  const t = useStrings(session.ui);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+  return (
+    <dialog
+      ref={ref}
+      className="field-guide"
+      aria-labelledby="guide-title"
+      onCancel={() => session.closeGuide()}
+    >
+      <p className="guide-kicker">{t.objective}</p>
+      <h2 id="guide-title">{t.guideTitle}</h2>
+      <p>{t.guideIntro}</p>
+      <ol>
+        <li>{t.guideStep1}</li>
+        <li>{t.guideStep2}</li>
+        <li>{t.guideStep3}</li>
+      </ol>
+      <p className="guide-goal">{goalText(t.guideGoal)}</p>
+      <p>
+        {t.guideTiming
+          .replace('{start}', String(DROUGHT_START_TICK))
+          .replace('{end}', String(DROUGHT_END_TICK))}
+      </p>
+      <button
+        type="button"
+        className="button primary"
+        data-testid="mata-guide-close"
+        onClick={() => session.closeGuide()}
+      >
+        {t.guideAction}
+      </button>
+    </dialog>
+  );
 }

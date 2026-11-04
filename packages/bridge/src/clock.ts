@@ -36,8 +36,8 @@ export class WorkerClock {
       return 0;
     }
     this.accumulator += (elapsed * rate) / 1000;
-    const ticks = Math.min(this.maxTicksPerFrame, Math.floor(this.accumulator));
-    this.accumulator = Math.min(this.accumulator - ticks, this.maxTicksPerFrame);
+    const ticks = Math.min(this.maxTicksPerFrame, Math.floor(this.accumulator + 1e-9));
+    this.accumulator = Math.max(0, Math.min(this.accumulator - ticks, this.maxTicksPerFrame));
     return ticks;
   }
 }
