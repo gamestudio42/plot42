@@ -71,7 +71,13 @@ Or with Docker: `docker compose up` serves the lobby on port 5176.
 | `pnpm preview:site` | Serve `site/` on http://localhost:4173          |
 
 `pnpm build:site` reads `BASE_PATH` (default `/`). GitHub Pages uses
-`/<repository>/`. The assembled tree is `site/index.html` plus `horta/`, `posto/`
+`/<repository>/`; PR previews use `/<repository>/pr-preview/pr-<number>/`.
+Each preview includes the lobby and all three hosted games. The workflow posts
+a preview link on the PR, updates it on new commits, and removes it on closure.
+Fork previews publish through a separate trusted workflow after validation.
+See [Pages deployment](docs/architecture.md#pages-deployment) for setup.
+
+The assembled tree is `site/index.html` plus `horta/`, `posto/`
 and `mata/`.
 
 Docs: [architecture](docs/architecture.md) · [agents](AGENTS.md) · [contributing](CONTRIBUTING.md)

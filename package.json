@@ -23,7 +23,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc -p packages/kernel && tsc -p packages/bridge && tsc -p packages/view-iso && tsc -p packages/chrome && tsc -p packages/horta && tsc -p packages/posto && tsc -p packages/mata && tsc -p apps/horta && tsc -p apps/posto && tsc -p apps/mata && tsc -p apps/lobby && tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run && node --test tools/preview-plan.test.mjs",
     "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
