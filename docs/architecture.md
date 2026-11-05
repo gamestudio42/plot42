@@ -119,3 +119,25 @@ accidental use of DOM or Node APIs fails the type check. ESLint additionally ban
 `Math.random`, `Date`, `window` and `document` inside those packages and inside
 `packages/kernel`. Every random decision uses the kernel RNG, in a deterministic order.
 React components send commands and read state. The renderer never mutates simulation state.
+
+## Pages deployment
+
+`.github/workflows/pages.yml` follows Vazante's production/preview layout. Lint,
+type checks, unit tests and the Chromium journeys must pass before uploading
+`site/`. The browser build uses the exact production or PR URL prefix, including
+the nested Horta, Posto and Mata apps. Production updates the `gh-pages` root and
+preserves `pr-preview/`; same-repository PRs update `pr-preview/pr-N/`.
+
+Fork builds run with read-only permissions and upload `preview-pr-N` artifacts.
+`pages-preview-fork.yml`, installed on `main`, consumes successful runs without
+checking out or executing fork code. It checks the current PR repository, head SHA
+and open state before publishing. Closed forks upload removal markers; removal
+checks the current closed state, skips missing/empty preview directories and keeps
+unexpected API failures visible. Reopened PRs and stale builds cannot remove or
+replace an active preview. All publishing jobs serialize on `gh-pages`.
+
+First activation requires Pages to serve the `gh-pages` branch at `/` instead of
+an Actions-uploaded artifact. Seed that branch with the currently published
+production artifact before changing the source, so the root stays available while
+the first preview is created. Fork publishing becomes active after the workflow
+and trusted planner reach `main`. No PAT or fork secrets are needed.

@@ -70,7 +70,7 @@ export default defineConfig(
   },
   {
     files: [
-      'tools/**/*.ts',
+      'tools/**/*.{ts,mjs}',
       'tests/**/*.ts',
       '*.config.{js,ts}',
       'apps/horta/vite.config.ts',
