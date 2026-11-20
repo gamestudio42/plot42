@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Posto">
+  <polygon points="8,48 32,60 32,56 8,44" fill="#4a3824"/>
+  <polygon points="32,60 56,48 56,44 32,56" fill="#5c4630"/>
+  <polygon points="8,44 32,56 56,44 32,32" fill="#6b5a3e"/>
+  <polygon points="20,40 32,46 32,22 20,16" fill="#8a5a2a"/>
+  <polygon points="32,46 44,40 44,16 32,22" fill="#c07830"/>
+  <polygon points="20,16 32,22 44,16 32,10" fill="#e8c56b"/>
+  <polygon points="30,28 34,26 34,34 30,36" fill="#2a2018"/>
+</svg>
